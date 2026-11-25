@@ -6,6 +6,7 @@ import {
   gameWidgetStates,
   readWidgets,
   resetNames,
+  userResetNames,
   widgetMembers,
 } from "./gameWidgets";
 import type { WidgetHandler } from "./handlers";
@@ -227,5 +228,30 @@ describe("resetNames", () => {
         [],
       ),
     ).toEqual([]);
+  });
+});
+
+describe("userResetNames", () => {
+  const player = (
+    name: string | null,
+    loadedBy: string[],
+    previous: string[] = [],
+  ) =>
+    ({
+      path: `LuaUI/Widgets/${name ?? "broken"}.lua`,
+      info: name === null ? null : { name, previousNames: previous },
+      loadedBy,
+    }) as never;
+
+  it("takes the names of the player's widgets the game loads, with the names they had before", () => {
+    expect(
+      userResetNames("MF", [
+        player("Mine", ["MF"], ["OldMine"]),
+        player("Mine", ["MF"]),
+        player("Elsewhere", ["SF"]),
+        // A file that did not run has no name to reset.
+        player(null, ["MF"]),
+      ]),
+    ).toEqual(["Mine", "OldMine"]);
   });
 });

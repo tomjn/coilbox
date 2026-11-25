@@ -11982,7 +11982,7 @@ msgstr "Can't damage its own unit"
 #: src/uberstress/pages/RunPage.tsx
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/RemoveWidget.tsx
-#: src/widgets/pages/ResetGameWidgets.tsx
+#: src/widgets/pages/ResetWidgets.tsx
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 #: src/workshop/pages/components/InPlaceWrite.tsx
@@ -31932,9 +31932,10 @@ msgstr "pulsar"
 msgid "Purple"
 msgstr "Purple"
 
-#: src/widgets/pages/ResetGameWidgets.tsx
-msgid "Put {game}'s own widgets back to their defaults?"
-msgstr "Put {game}'s own widgets back to their defaults?"
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Put {0}'s own widgets back to their defaults and clear their saved settings?"
+msgstr "Put {0}'s own widgets back to their defaults and clear their saved settings?"
 
 #: src/multiplayer/chat/PartySection.tsx
 msgid "Put {name} out of the party"
@@ -33981,7 +33982,7 @@ msgstr "Resend verification email"
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
-#: src/widgets/pages/ResetGameWidgets.tsx
+#: src/widgets/pages/ResetWidgets.tsx
 msgid "Reset"
 msgstr "Reset"
 
@@ -33992,10 +33993,6 @@ msgstr "Reset {description}"
 #: src/sound/SoundSettings.tsx
 msgid "Reset {eventLabel} to {defaultSoundLabel}"
 msgstr "Reset {eventLabel} to {defaultSoundLabel}"
-
-#: src/widgets/pages/ResetGameWidgets.tsx
-msgid "Reset {game}'s own widgets"
-msgstr "Reset {game}'s own widgets"
 
 #: src/mapconv/pages/components/MapinfoOptions.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
@@ -34029,6 +34026,10 @@ msgstr "Reset database before each bench run"
 #: src/multiplayer/battles/BattleFilterPopover.tsx
 msgid "Reset filters"
 msgstr "Reset filters"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Reset game widgets"
+msgstr "Reset game widgets"
 
 #: src/workshop/pages/components/BuildMenuPanel.tsx
 msgid "Reset menu"
@@ -34070,6 +34071,10 @@ msgstr "Reset to plan"
 #: src/lego/pages/components/PosesPopover.tsx
 msgid "Reset to the built shape"
 msgstr "Reset to the built shape"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Reset user widgets"
+msgstr "Reset user widgets"
 
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 msgid "Resetting…"
@@ -38697,6 +38702,11 @@ msgstr "Switch builder on"
 #: src/scenario/pages/components/shortcuts.ts
 msgid "Switch mode: Select, Zones, Actors, Groups, Bases, Blueprints"
 msgstr "Switch mode: Select, Zones, Actors, Groups, Bases, Blueprints"
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Switch off your widgets in {0} and clear their saved settings?"
+msgstr "Switch off your widgets in {0} and clear their saved settings?"
 
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
 msgid "Switch to {name}"

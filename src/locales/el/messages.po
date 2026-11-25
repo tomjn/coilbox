@@ -14839,7 +14839,7 @@ msgstr "Δεν μπορεί να βλάψει τη δική του μονάδα"
 #: src/uberstress/pages/RunPage.tsx
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/RemoveWidget.tsx
-#: src/widgets/pages/ResetGameWidgets.tsx
+#: src/widgets/pages/ResetWidgets.tsx
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 #: src/workshop/pages/components/InPlaceWrite.tsx
@@ -39477,10 +39477,10 @@ msgstr "pulsar"
 msgid "Purple"
 msgstr "Μωβ"
 
-#: src/widgets/pages/ResetGameWidgets.tsx
-#, fuzzy
-msgid "Put {game}'s own widgets back to their defaults?"
-msgstr "Επαναφορά των widgets του {game} στις προεπιλογές τους;"
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Put {0}'s own widgets back to their defaults and clear their saved settings?"
+msgstr ""
 
 #: src/multiplayer/chat/PartySection.tsx
 #, fuzzy
@@ -41997,7 +41997,7 @@ msgstr "Επαναποστολή email επαλήθευσης"
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
-#: src/widgets/pages/ResetGameWidgets.tsx
+#: src/widgets/pages/ResetWidgets.tsx
 #, fuzzy
 msgid "Reset"
 msgstr "Επαναφορά"
@@ -42011,11 +42011,6 @@ msgstr "Επαναφορά: {description}"
 #, fuzzy
 msgid "Reset {eventLabel} to {defaultSoundLabel}"
 msgstr "Επαναφορά του {eventLabel} σε {defaultSoundLabel}"
-
-#: src/widgets/pages/ResetGameWidgets.tsx
-#, fuzzy
-msgid "Reset {game}'s own widgets"
-msgstr "Επαναφορά των widgets του {game}"
 
 #: src/mapconv/pages/components/MapinfoOptions.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
@@ -42057,6 +42052,10 @@ msgstr "Επαναφορά της βάσης δεδομένων πριν από 
 #, fuzzy
 msgid "Reset filters"
 msgstr "Επαναφορά φίλτρων"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Reset game widgets"
+msgstr ""
 
 #: src/workshop/pages/components/BuildMenuPanel.tsx
 #, fuzzy
@@ -42108,6 +42107,10 @@ msgstr "Επαναφορά στο πλάνο"
 #, fuzzy
 msgid "Reset to the built shape"
 msgstr "Επαναφορά στο σχήμα κατασκευής"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Reset user widgets"
+msgstr ""
 
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #, fuzzy
@@ -47829,6 +47832,11 @@ msgstr "Ενεργοποίηση κατασκευαστή"
 #, fuzzy
 msgid "Switch mode: Select, Zones, Actors, Groups, Bases, Blueprints"
 msgstr "Εναλλαγή λειτουργίας: Επιλογή, Ζώνες, Δρώντες, Ομάδες μονάδων, Βάσεις, Σχέδια"
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Switch off your widgets in {0} and clear their saved settings?"
+msgstr ""
 
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
 #, fuzzy

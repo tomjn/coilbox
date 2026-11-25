@@ -14839,7 +14839,7 @@ msgstr "Non può danneggiare la propria unità"
 #: src/uberstress/pages/RunPage.tsx
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/RemoveWidget.tsx
-#: src/widgets/pages/ResetGameWidgets.tsx
+#: src/widgets/pages/ResetWidgets.tsx
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 #: src/workshop/pages/components/InPlaceWrite.tsx
@@ -39477,10 +39477,10 @@ msgstr "pulsar"
 msgid "Purple"
 msgstr "Viola"
 
-#: src/widgets/pages/ResetGameWidgets.tsx
-#, fuzzy
-msgid "Put {game}'s own widgets back to their defaults?"
-msgstr "Ripristinare i valori predefiniti dei widget di {game}?"
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Put {0}'s own widgets back to their defaults and clear their saved settings?"
+msgstr ""
 
 #: src/multiplayer/chat/PartySection.tsx
 #, fuzzy
@@ -41997,7 +41997,7 @@ msgstr "Invia di nuovo l’email di verifica"
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
-#: src/widgets/pages/ResetGameWidgets.tsx
+#: src/widgets/pages/ResetWidgets.tsx
 #, fuzzy
 msgid "Reset"
 msgstr "Ripristina"
@@ -42011,11 +42011,6 @@ msgstr "Ripristina {description}"
 #, fuzzy
 msgid "Reset {eventLabel} to {defaultSoundLabel}"
 msgstr "Ripristina {eventLabel} a {defaultSoundLabel}"
-
-#: src/widgets/pages/ResetGameWidgets.tsx
-#, fuzzy
-msgid "Reset {game}'s own widgets"
-msgstr "Ripristina i widget di {game}"
 
 #: src/mapconv/pages/components/MapinfoOptions.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
@@ -42057,6 +42052,10 @@ msgstr "Azzera il database prima di ogni benchmark"
 #, fuzzy
 msgid "Reset filters"
 msgstr "Ripristina i filtri"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Reset game widgets"
+msgstr ""
 
 #: src/workshop/pages/components/BuildMenuPanel.tsx
 #, fuzzy
@@ -42108,6 +42107,10 @@ msgstr "Torna al piano"
 #, fuzzy
 msgid "Reset to the built shape"
 msgstr "Torna alla forma costruita"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Reset user widgets"
+msgstr ""
 
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #, fuzzy
@@ -47829,6 +47832,11 @@ msgstr "Attiva il costruttore"
 #, fuzzy
 msgid "Switch mode: Select, Zones, Actors, Groups, Bases, Blueprints"
 msgstr "Cambia modalità: Seleziona, Zone, Attori, Gruppi, Basi, Schemi"
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Switch off your widgets in {0} and clear their saved settings?"
+msgstr ""
 
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
 #, fuzzy

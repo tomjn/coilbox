@@ -858,48 +858,84 @@ describe("WidgetsPage", () => {
     ]);
   });
 
-  it("offers a reset only when a game's own widget is away from its default, and resets it", async () => {
+  describe("resetting", () => {
     const config = `${list.configDir}/LuaUI/Config/MF.lua`;
     const text =
-      'return {\n\tdata = {\n\t\tGlow = { size = 3 },\n\t},\n\torder = {\n\t\t["Glow"] = 0,\n\t\t["Radar"] = 4,\n\t\t["Theirs"] = 5,\n\t},\n}\n';
-    disk.set(config, text);
-    shipped.widgets = [
-      {
-        path: "luaui/widgets/glow.lua",
-        archive: "mf.sdz",
-        folder: "LuaUI/Widgets",
-        nested: false,
-        info: { name: "Glow", enabled: true },
-        error: null,
-      },
-    ];
-    const reset = { name: "Reset Metal Factions's own widgets" };
-    files.files = new Map([
-      [
-        "Metal Factions",
-        { kind: "ready", path: config, order: new Map([["Glow", 1]]) },
-      ],
-    ]);
-    const first = page("/library/widgets?game=Metal%20Factions");
-    expect(screen.queryByRole("button", reset)).toBeNull();
-    first.unmount();
+      'return {\n\tdata = {\n\t\tBuildWatch = { x = 1 },\n\t\tGlow = { size = 3 },\n\t},\n\torder = {\n\t\t["BuildWatch"] = 2,\n\t\t["Glow"] = 0,\n\t\t["Theirs"] = 5,\n\t},\n}\n';
+    const glow: GameWidget = {
+      path: "luaui/widgets/glow.lua",
+      archive: "mf.sdz",
+      folder: "LuaUI/Widgets",
+      nested: false,
+      info: { name: "Glow", enabled: true },
+      error: null,
+    };
+    const ready = () => {
+      disk.set(config, text);
+      shipped.widgets = [glow];
+      files.files = new Map([
+        [
+          "Metal Factions",
+          {
+            kind: "ready",
+            path: config,
+            order: new Map([
+              ["BuildWatch", 2],
+              ["Glow", 0],
+              ["Theirs", 5],
+            ]),
+          },
+        ],
+      ]);
+    };
+    const resetWith = (label: string) => {
+      fireEvent.click(screen.getByRole("button", { name: label }));
+      fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+    };
 
-    files.files = new Map([
-      [
-        "Metal Factions",
-        { kind: "ready", path: config, order: new Map([["Glow", 0]]) },
-      ],
-    ]);
-    page("/library/widgets?game=Metal%20Factions");
-    fireEvent.click(screen.getByRole("button", reset));
-    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
-    await waitFor(() =>
-      expect(disk.get(config)).toBe(
-        'return {\n\tdata = {\n\t\tGlow = { size = 3 },\n\t},\n\torder = {\n\t\t["Radar"] = 4,\n\t\t["Theirs"] = 5,\n\t},\n}\n',
-      ),
-    );
-    // The file as it was is kept beside it.
-    expect([...disk.values()]).toContain(text);
+    it("offers neither reset before the game has saved a file", () => {
+      shipped.widgets = [glow];
+      files.files = new Map([["Metal Factions", { kind: "missing" }]]);
+      page("/library/widgets?game=Metal%20Factions");
+      expect(
+        screen.queryByRole("button", { name: "Reset game widgets" }),
+      ).toBeNull();
+      expect(
+        screen.queryByRole("button", { name: "Reset user widgets" }),
+      ).toBeNull();
+    });
+
+    it("clears a game widget's on or off and saved settings, and leaves the player's", async () => {
+      ready();
+      page("/library/widgets?game=Metal%20Factions");
+      resetWith("Reset game widgets");
+      await waitFor(() => expect(disk.get(config)).not.toBe(text));
+      const after = disk.get(config) ?? "";
+      expect(after).not.toContain("Glow");
+      expect(after).toContain("BuildWatch = { x = 1 }");
+      expect(after).toContain('["BuildWatch"] = 2');
+      expect(after).toContain('["Theirs"] = 5');
+      // The file as it was is kept beside it.
+      expect([...disk.values()]).toContain(text);
+    });
+
+    it("clears the player's widgets' on or off and saved settings, switches them off, and leaves the game's", async () => {
+      ready();
+      updateSets((s) => ({ ...s, global: { BuildWatch: true } }));
+      page("/library/widgets?game=Metal%20Factions");
+      resetWith("Reset user widgets");
+      await waitFor(() => expect(disk.get(config)).not.toBe(text));
+      const after = disk.get(config) ?? "";
+      expect(after).not.toContain("BuildWatch");
+      expect(after).toContain("Glow = { size = 3 }");
+      expect(after).toContain('["Glow"] = 0');
+      // Coilbox writes the set at launch, so it must say off too.
+      await waitFor(() =>
+        expect(readSets().overrides.MF?.BuildWatch).toBe(false),
+      );
+      expect(readSets().global).toEqual({ BuildWatch: true });
+      expect([...disk.values()]).toContain(text);
+    });
   });
 
   it("shows a player's unchosen widget at its default until the game has a file", () => {
