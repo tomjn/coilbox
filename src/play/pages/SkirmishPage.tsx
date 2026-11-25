@@ -120,6 +120,7 @@ import {
   type BattleRestrictions,
   type SkirmishDraft,
   useSkirmishDraft,
+  useSkirmishEngine,
 } from "../drafts";
 import { mergeGameAi } from "../gameAi";
 import { withOption } from "../modOptions";
@@ -150,6 +151,10 @@ import { useAiBonusSuggestions } from "../useAiBonusSuggestions";
 import { coilboxWidgetInstalled, withUserWidgets } from "../userWidgets";
 import { useSkirmishDebrief } from "../useSkirmishDebrief";
 import { DebriefDrawer } from "./components/DebriefDrawer";
+import {
+  EngineOverrideField,
+  engineLabel,
+} from "./components/EngineOverrideField";
 import { GameOptionsPanel } from "./components/GameOptionsPanel";
 import { GameSelectCard } from "./components/GameSelectCard";
 import { MapCard } from "./components/MapCard";
@@ -191,10 +196,16 @@ export default function SkirmishPage() {
   const { t } = useLingui();
   const navigate = useNavigate();
   const {
-    target,
+    target: preferredTarget,
+    targets,
     loading: targetLoading,
     refresh: refreshTarget,
   } = usePreferredTarget();
+  // An engine picked for Singleplayer only. One that has since been removed
+  // falls back to the preferred engine.
+  const [enginePick, setEnginePick] = useSkirmishEngine();
+  const pickedTarget = targets.find((o) => o.enginePath === enginePick);
+  const target = pickedTarget ?? preferredTarget;
   const enginePath = target?.enginePath;
   const dataDir = target?.dataDir;
   const { running, relayed, launch, cancel } = usePlay();
@@ -1440,6 +1451,18 @@ export default function SkirmishPage() {
             }
             onOptionValuesChange={setModOptionValues}
             disabled={running}
+            engineSummary={
+              pickedTarget ? engineLabel(pickedTarget, targets) : undefined
+            }
+            engineField={
+              <EngineOverrideField
+                value={enginePick}
+                preferred={preferredTarget}
+                targets={targets}
+                onChange={setEnginePick}
+                disabled={running}
+              />
+            }
           />
         </div>
 

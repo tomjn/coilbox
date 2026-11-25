@@ -87,3 +87,12 @@ export const defaultSkirmishDraft: SkirmishDraft = {
 export function useSkirmishDraft() {
   return useSetting<StoredSkirmishDraft>("play.skirmish", defaultSkirmishDraft);
 }
+
+/**
+ * The engine folder Singleplayer launches with instead of the preferred one, or
+ * "" for the preferred engine. Kept out of the draft so a preset, which can be
+ * shared, never carries a path that only exists on this machine.
+ */
+export function useSkirmishEngine() {
+  return useSetting<string>("play.skirmishEnginePath", "");
+}
