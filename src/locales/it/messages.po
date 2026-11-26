@@ -8614,8 +8614,7 @@ msgstr ""
 msgid "0.5 in each channel means no change; 1.0 is twice as bright."
 msgstr "0,5 in ogni canale significa nessun cambiamento. 1,0 è il doppio della luminosità."
 
-#: src/mapconv/pages/CompilePage.tsx
-#: src/mapconv/pages/SettingsSection.tsx
+#: src/mapconv/compression.ts
 #, fuzzy
 msgid "1 — No compression"
 msgstr "1: nessuna compressione"
@@ -8650,12 +8649,7 @@ msgstr "1v1"
 msgid "1v1, cheese, teaching"
 msgstr "1v1, cheese, insegnamento"
 
-#: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "2 — Fast"
-msgstr "2: veloce"
-
-#: src/mapconv/pages/CompilePage.tsx
+#: src/mapconv/compression.ts
 #, fuzzy
 msgid "2 — Fast (compare last N tiles)"
 msgstr "2: veloce (confronta le ultime N tessere)"
@@ -8664,12 +8658,7 @@ msgstr "2: veloce (confronta le ultime N tessere)"
 msgid "2 samples"
 msgstr ""
 
-#: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "3 — Insane (slow)"
-msgstr "3: estremo (lento)"
-
-#: src/mapconv/pages/CompilePage.tsx
+#: src/mapconv/compression.ts
 #, fuzzy
 msgid "3 — Insane (whole map; very slow)"
 msgstr "3: estremo (intera mappa, molto lento)"
@@ -8694,8 +8683,7 @@ msgstr "Modello 3D"
 msgid "3D preview unavailable."
 msgstr "Anteprima 3D non disponibile."
 
-#: src/mapconv/pages/CompilePage.tsx
-#: src/mapconv/pages/SettingsSection.tsx
+#: src/mapconv/compression.ts
 #, fuzzy
 msgid "4 — High quality fast"
 msgstr "4: alta qualità veloce"
@@ -10113,6 +10101,10 @@ msgstr "Informazioni sul clic su ogni pezzo"
 msgid "About Coilbox"
 msgstr "Informazioni su Coilbox"
 
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "About compression"
+msgstr ""
+
 #: src/profile/SettingsSection.tsx
 msgid "About creating a profile"
 msgstr ""
@@ -10223,6 +10215,10 @@ msgstr ""
 msgid "About reloading the profile"
 msgstr ""
 
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "About remembering folders"
+msgstr ""
+
 #: src/content/pages/components/ReplayTracksStorage.tsx
 #, fuzzy
 msgid "About replay tracks"
@@ -10288,6 +10284,10 @@ msgstr ""
 
 #: src/hub/pages/components/HubAddressField.tsx
 msgid "About the hub address"
+msgstr ""
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "About the map tools"
 msgstr ""
 
 #: src/sound/SoundSettings.tsx
@@ -12878,7 +12878,6 @@ msgid "Autosave {when}"
 msgstr "Salvataggio automatico {when}"
 
 #: src/conquest/pages/components/BattleOverlay.tsx
-#: src/mapconv/pages/SettingsSection.tsx
 #, fuzzy
 msgid "available"
 msgstr "disponibile"
@@ -14640,6 +14639,10 @@ msgstr "Crea un .glb a sé e lo salva dove vuoi, senza toccare la cartella del g
 msgid "Builds anything"
 msgstr "Costruisce tutto"
 
+#: src/mapconv/index.ts
+msgid "Builds maps and takes them apart."
+msgstr ""
+
 #: src/workshop/pages/components/BuildMenuPanel.tsx
 #, fuzzy
 msgid "Builds nothing"
@@ -15852,16 +15855,12 @@ msgstr "Verifica del router…"
 msgid "Checking your sign-in"
 msgstr "Verifica dell’accesso"
 
-#: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "checking…"
-msgstr "verifica…"
-
 #: src/blueprint/pages/components/WidgetPanel.tsx
 #: src/content/pages/components/states.tsx
 #: src/content/pages/components/UnitRendersRow.tsx
 #: src/deeplink/pages/ImportSection.tsx
 #: src/game-updates/pages/GameUpdatesSection.tsx
+#: src/mapconv/pages/SettingsSection.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #: src/notify/NotificationsSettings.tsx
 #: src/packs/pages/components/ImportPackForm.tsx
@@ -16775,6 +16774,10 @@ msgstr "Coilbox non può scrivere {label} nel file del gioco"
 #, fuzzy
 msgid "Coilbox challenge"
 msgstr "Sfida coilbox"
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Coilbox comes with the SpringMapConvNG tools. Compile needs mapcompile and Decompile needs mapdecompile."
+msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "Coilbox connects to any TASServer-compatible lobby, including one you run yourself. lobby.recoilengine.org runs uberserver, which has a full deployment guide using Docker and MariaDB. Add yours as a custom server once it is running."
@@ -17791,6 +17794,10 @@ msgstr "Script dell’unità compilato"
 msgid "Compiles the mission, checks it loads, then starts the engine."
 msgstr "Compila la missione, verifica che si carichi, poi avvia il motore."
 
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Compiling"
+msgstr ""
+
 #: src/conquest/galaxy3d/GalaxyView.tsx
 #, fuzzy
 msgid "Compiling shaders…"
@@ -17825,6 +17832,10 @@ msgstr "Completata"
 #, fuzzy
 msgid "Compose this unit's two textures from separate layers, in the channel layout the engine reads rather than the layout an image editor works in. Building replaces the texture below, the same as choosing one by hand."
 msgstr "Componi le due texture di questa unità da livelli separati, nella disposizione dei canali che legge il motore anziché in quella usata da un editor di immagini. Creare sostituisce la texture qui sotto, come sceglierne una a mano."
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Compression"
+msgstr ""
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 #, fuzzy
@@ -18619,6 +18630,10 @@ msgstr "Impossibile leggere del tutto ({unreadableCount})"
 #, fuzzy
 msgid "Could not check everything"
 msgstr "Impossibile verificare tutto"
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Could not check for the tools: {probeError}"
+msgstr ""
 
 #: src/direct/ReachablePorts.tsx
 #, fuzzy
@@ -19877,11 +19892,6 @@ msgstr "predefinito {defaultValue}"
 msgid "Default AI"
 msgstr "AI predefinita"
 
-#: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Default compression type"
-msgstr "Tipo di compressione predefinito"
-
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Default damage"
@@ -19906,11 +19916,6 @@ msgstr "Predefinito: {defaultText}"
 #, fuzzy
 msgid "defaults"
 msgstr "valori predefiniti"
-
-#: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Defaults"
-msgstr "Valori predefiniti"
 
 #: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
@@ -24443,6 +24448,10 @@ msgstr "Avanti"
 #, fuzzy
 msgid "Forward one frame"
 msgstr "Avanti di un frame"
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Found"
+msgstr ""
 
 #: src/multiplayer/admin/ChannelsSection.tsx
 #, fuzzy
@@ -30672,6 +30681,10 @@ msgstr "Mappa e motore non installati"
 msgid "Map and game missing"
 msgstr "Mappa e gioco mancanti"
 
+#: src/mapconv/index.ts
+msgid "Map compiler"
+msgstr ""
+
 #: src/conquest/pages/ConquestListPage.tsx
 #, fuzzy
 msgid "Map folder \"{folder}\""
@@ -31671,6 +31684,10 @@ msgstr "Solo MissileLauncher."
 #, fuzzy
 msgid "missing"
 msgstr "mancante"
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Missing"
+msgstr ""
 
 #: src/campaign/index.ts
 #: src/scenario/validate.ts
@@ -35449,6 +35466,10 @@ msgstr "Non aggiornati:"
 msgid "Not built"
 msgstr "Non compilato"
 
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Not checked"
+msgstr ""
+
 #: src/multiplayer/battles/HostBattleForm.tsx
 #, fuzzy
 msgid "Not checked, because every battle you host goes through the server's relay."
@@ -35494,11 +35515,6 @@ msgstr "non modificato"
 #, fuzzy
 msgid "Not equipped anywhere."
 msgstr "Non equipaggiata da nessuna parte."
-
-#: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "not found"
-msgstr "non trovato"
 
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #, fuzzy
@@ -39484,11 +39500,6 @@ msgstr "Potenza"
 msgid "pr-downloader is unavailable"
 msgstr "pr-downloader non è disponibile"
 
-#: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Pre-fill the file pickers with the folders you used last time."
-msgstr "Precompila i selettori di file con le cartelle usate l’ultima volta."
-
 #: src/content/replayEventList.ts
 #, fuzzy
 msgid "Pre-game"
@@ -41601,9 +41612,8 @@ msgid "Rematch: {rematchMapName}"
 msgstr "Rivincita: {rematchMapName}"
 
 #: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Remember last-used folders"
-msgstr "Ricorda le ultime cartelle usate"
+msgid "Remember folders"
+msgstr ""
 
 #: src/content/pages/components/RemixPanel.tsx
 #: src/content/pages/PlayerDossierPage.tsx
@@ -44553,11 +44563,6 @@ msgstr "Crea gli account prima della fase cronometrata (register)"
 msgid "Seed SQL"
 msgstr "SQL dei semi"
 
-#: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "seeds the Compile page"
-msgstr "precompila la pagina Compila"
-
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
 msgid "seen before"
@@ -47264,11 +47269,6 @@ msgstr "springfiles non ha motori per questo tipo di computer. Recoil sì, quind
 msgid "springfiles has no engines to offer right now. Try again in a moment, or switch the source above to Recoil."
 msgstr "springfiles al momento non ha motori da offrire. Riprova tra poco, o passa la fonte qui sopra a Recoil."
 
-#: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "SpringMapConvNG sidecars"
-msgstr "Sidecar SpringMapConvNG"
-
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Sprite colour"
@@ -49397,9 +49397,8 @@ msgid "The colour the shield fades to as its charge regenerates to full."
 msgstr "Il colore verso cui sfuma lo scudo mentre la sua carica si rigenera fino al massimo."
 
 #: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "The compile/decompile features shell out to the bundled SpringMapConvNG binaries."
-msgstr "Le funzioni di compilazione e decompilazione richiamano i binari SpringMapConvNG inclusi."
+msgid "The Compile page starts with this choice. You can still change it there for each map."
+msgstr ""
 
 #: src/scenario/validate.ts
 #, fuzzy
@@ -49910,6 +49909,10 @@ msgstr "Il file dipinge con {imagesUsed} immagini e un modello Spring ha una sol
 #, fuzzy
 msgid "The file paints with {imagesUsed} textures where a Spring unit has one, so the first was taken and the rest of the model draws with it."
 msgstr "Il file dipinge con {imagesUsed} texture dove un’unità Spring ne ha una, quindi è stata presa la prima e il resto del modello viene disegnato con quella."
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "The file pickers open in the folders you used last time. Turning this off forgets them."
+msgstr ""
 
 #: src/lego/moduleFile.ts
 #, fuzzy
@@ -50856,11 +50859,6 @@ msgstr "la mappa"
 #, fuzzy
 msgid "The map \"{savedTitle}\" is no longer installed."
 msgstr "La mappa «{savedTitle}» non è più installata."
-
-#: src/mapconv/index.ts
-#, fuzzy
-msgid "The map compiler coilbox builds and takes apart maps with."
-msgstr "Il compilatore di mappe con cui coilbox costruisce e smonta le mappe."
 
 #: src/scenario/pages/ScenarioEditPage.tsx
 #, fuzzy
@@ -54571,6 +54569,7 @@ msgid "Took \"{name}\" off the withheld list."
 msgstr "Hai tolto «{name}» dall’elenco delle unità trattenute."
 
 #: src/general/pages/SettingsSection.tsx
+#: src/mapconv/pages/SettingsSection.tsx
 #: src/profile/SettingsSection.tsx
 #, fuzzy
 msgid "Tools"

@@ -8614,8 +8614,7 @@ msgstr ""
 msgid "0.5 in each channel means no change; 1.0 is twice as bright."
 msgstr "Το 0.5 σε κάθε κανάλι σημαίνει καμία αλλαγή. Το 1.0 είναι διπλάσια φωτεινότητα."
 
-#: src/mapconv/pages/CompilePage.tsx
-#: src/mapconv/pages/SettingsSection.tsx
+#: src/mapconv/compression.ts
 #, fuzzy
 msgid "1 — No compression"
 msgstr "1 — Χωρίς συμπίεση"
@@ -8650,12 +8649,7 @@ msgstr "1v1"
 msgid "1v1, cheese, teaching"
 msgstr "1v1, cheese, εκπαίδευση"
 
-#: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "2 — Fast"
-msgstr "2 — Γρήγορο"
-
-#: src/mapconv/pages/CompilePage.tsx
+#: src/mapconv/compression.ts
 #, fuzzy
 msgid "2 — Fast (compare last N tiles)"
 msgstr "2 — Γρήγορο (σύγκριση τελευταίων N πλακιδίων)"
@@ -8664,12 +8658,7 @@ msgstr "2 — Γρήγορο (σύγκριση τελευταίων N πλακι
 msgid "2 samples"
 msgstr ""
 
-#: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "3 — Insane (slow)"
-msgstr "3 — Ακραίο (αργό)"
-
-#: src/mapconv/pages/CompilePage.tsx
+#: src/mapconv/compression.ts
 #, fuzzy
 msgid "3 — Insane (whole map; very slow)"
 msgstr "3 — Ακραίο (όλος ο χάρτης, πολύ αργό)"
@@ -8694,8 +8683,7 @@ msgstr "Τρισδιάστατο μοντέλο"
 msgid "3D preview unavailable."
 msgstr "Η τρισδιάστατη προεπισκόπηση δεν είναι διαθέσιμη."
 
-#: src/mapconv/pages/CompilePage.tsx
-#: src/mapconv/pages/SettingsSection.tsx
+#: src/mapconv/compression.ts
 #, fuzzy
 msgid "4 — High quality fast"
 msgstr "4 — Υψηλή ποιότητα, γρήγορο"
@@ -10113,6 +10101,10 @@ msgstr "Σχετικά με το κλικ σε κάθε τμήμα"
 msgid "About Coilbox"
 msgstr "Σχετικά με το Coilbox"
 
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "About compression"
+msgstr ""
+
 #: src/profile/SettingsSection.tsx
 msgid "About creating a profile"
 msgstr ""
@@ -10223,6 +10215,10 @@ msgstr ""
 msgid "About reloading the profile"
 msgstr ""
 
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "About remembering folders"
+msgstr ""
+
 #: src/content/pages/components/ReplayTracksStorage.tsx
 #, fuzzy
 msgid "About replay tracks"
@@ -10288,6 +10284,10 @@ msgstr ""
 
 #: src/hub/pages/components/HubAddressField.tsx
 msgid "About the hub address"
+msgstr ""
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "About the map tools"
 msgstr ""
 
 #: src/sound/SoundSettings.tsx
@@ -12878,7 +12878,6 @@ msgid "Autosave {when}"
 msgstr "Αυτόματη αποθήκευση {when}"
 
 #: src/conquest/pages/components/BattleOverlay.tsx
-#: src/mapconv/pages/SettingsSection.tsx
 #, fuzzy
 msgid "available"
 msgstr "διαθέσιμο"
@@ -14640,6 +14639,10 @@ msgstr "Δημιουργεί ένα .glb μόνο του και το αποθη�
 msgid "Builds anything"
 msgstr "Κατασκευάζει οτιδήποτε"
 
+#: src/mapconv/index.ts
+msgid "Builds maps and takes them apart."
+msgstr ""
+
 #: src/workshop/pages/components/BuildMenuPanel.tsx
 #, fuzzy
 msgid "Builds nothing"
@@ -15852,16 +15855,12 @@ msgstr "Έλεγχος του δρομολογητή σας…"
 msgid "Checking your sign-in"
 msgstr "Έλεγχος της σύνδεσής σας"
 
-#: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "checking…"
-msgstr "έλεγχος…"
-
 #: src/blueprint/pages/components/WidgetPanel.tsx
 #: src/content/pages/components/states.tsx
 #: src/content/pages/components/UnitRendersRow.tsx
 #: src/deeplink/pages/ImportSection.tsx
 #: src/game-updates/pages/GameUpdatesSection.tsx
+#: src/mapconv/pages/SettingsSection.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #: src/notify/NotificationsSettings.tsx
 #: src/packs/pages/components/ImportPackForm.tsx
@@ -16775,6 +16774,10 @@ msgstr "Το Coilbox δεν μπορεί να γράψει το {label} στο �
 #, fuzzy
 msgid "Coilbox challenge"
 msgstr "Πρόκληση Coilbox"
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Coilbox comes with the SpringMapConvNG tools. Compile needs mapcompile and Decompile needs mapdecompile."
+msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "Coilbox connects to any TASServer-compatible lobby, including one you run yourself. lobby.recoilengine.org runs uberserver, which has a full deployment guide using Docker and MariaDB. Add yours as a custom server once it is running."
@@ -17791,6 +17794,10 @@ msgstr "Μεταγλωττισμένο script μονάδας"
 msgid "Compiles the mission, checks it loads, then starts the engine."
 msgstr "Μεταγλωττίζει την αποστολή, ελέγχει ότι φορτώνει και μετά ξεκινά τη μηχανή."
 
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Compiling"
+msgstr ""
+
 #: src/conquest/galaxy3d/GalaxyView.tsx
 #, fuzzy
 msgid "Compiling shaders…"
@@ -17825,6 +17832,10 @@ msgstr "Ολοκληρώθηκε"
 #, fuzzy
 msgid "Compose this unit's two textures from separate layers, in the channel layout the engine reads rather than the layout an image editor works in. Building replaces the texture below, the same as choosing one by hand."
 msgstr "Συνθέστε τις δύο υφές αυτής της μονάδας από ξεχωριστά επίπεδα, με τη διάταξη καναλιών που διαβάζει η μηχανή και όχι αυτή με την οποία δουλεύει ένα πρόγραμμα επεξεργασίας εικόνας. Η δημιουργία αντικαθιστά την παρακάτω υφή, όπως και η χειροκίνητη επιλογή μιας."
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Compression"
+msgstr ""
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 #, fuzzy
@@ -18619,6 +18630,10 @@ msgstr "Δεν ήταν δυνατή καθόλου η ανάγνωση ({unread
 #, fuzzy
 msgid "Could not check everything"
 msgstr "Δεν ήταν δυνατός ο έλεγχος όλων"
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Could not check for the tools: {probeError}"
+msgstr ""
 
 #: src/direct/ReachablePorts.tsx
 #, fuzzy
@@ -19877,11 +19892,6 @@ msgstr "προεπιλογή {defaultValue}"
 msgid "Default AI"
 msgstr "Προεπιλεγμένο AI"
 
-#: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Default compression type"
-msgstr "Προεπιλεγμένος τύπος συμπίεσης"
-
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Default damage"
@@ -19906,11 +19916,6 @@ msgstr "Προεπιλογή: {defaultText}"
 #, fuzzy
 msgid "defaults"
 msgstr "προεπιλογές"
-
-#: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Defaults"
-msgstr "Προεπιλογές"
 
 #: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
@@ -24443,6 +24448,10 @@ msgstr "Εμπρός"
 #, fuzzy
 msgid "Forward one frame"
 msgstr "Ένα καρέ μπροστά"
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Found"
+msgstr ""
 
 #: src/multiplayer/admin/ChannelsSection.tsx
 #, fuzzy
@@ -30672,6 +30681,10 @@ msgstr "Ο χάρτης και η μηχανή δεν είναι εγκατεσ�
 msgid "Map and game missing"
 msgstr "Λείπουν ο χάρτης και το παιχνίδι"
 
+#: src/mapconv/index.ts
+msgid "Map compiler"
+msgstr ""
+
 #: src/conquest/pages/ConquestListPage.tsx
 #, fuzzy
 msgid "Map folder \"{folder}\""
@@ -31671,6 +31684,10 @@ msgstr "Μόνο για MissileLauncher."
 #, fuzzy
 msgid "missing"
 msgstr "λείπει"
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Missing"
+msgstr ""
 
 #: src/campaign/index.ts
 #: src/scenario/validate.ts
@@ -35449,6 +35466,10 @@ msgstr "Δεν ενημερώθηκαν:"
 msgid "Not built"
 msgstr "Δεν δημιουργήθηκε"
 
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Not checked"
+msgstr ""
+
 #: src/multiplayer/battles/HostBattleForm.tsx
 #, fuzzy
 msgid "Not checked, because every battle you host goes through the server's relay."
@@ -35494,11 +35515,6 @@ msgstr "χωρίς αλλαγές"
 #, fuzzy
 msgid "Not equipped anywhere."
 msgstr "Δεν είναι εξοπλισμένο πουθενά."
-
-#: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "not found"
-msgstr "δεν βρέθηκε"
 
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #, fuzzy
@@ -39484,11 +39500,6 @@ msgstr "Ισχύς"
 msgid "pr-downloader is unavailable"
 msgstr "Το pr-downloader δεν είναι διαθέσιμο"
 
-#: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Pre-fill the file pickers with the folders you used last time."
-msgstr "Προσυμπλήρωση των επιλογέων αρχείων με τους φακέλους που χρησιμοποιήσατε την τελευταία φορά."
-
 #: src/content/replayEventList.ts
 #, fuzzy
 msgid "Pre-game"
@@ -41601,9 +41612,8 @@ msgid "Rematch: {rematchMapName}"
 msgstr "Ρεβάνς: {rematchMapName}"
 
 #: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Remember last-used folders"
-msgstr "Απομνημόνευση των τελευταίων φακέλων"
+msgid "Remember folders"
+msgstr ""
 
 #: src/content/pages/components/RemixPanel.tsx
 #: src/content/pages/PlayerDossierPage.tsx
@@ -44553,11 +44563,6 @@ msgstr "Προετοιμασία λογαριασμών πριν από τη χ�
 msgid "Seed SQL"
 msgstr "SQL προετοιμασίας"
 
-#: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "seeds the Compile page"
-msgstr "προσυμπληρώνει τη σελίδα Μεταγλώττιση"
-
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
 msgid "seen before"
@@ -47264,11 +47269,6 @@ msgstr "Το springfiles δεν έχει μηχανές για αυτό το ε�
 msgid "springfiles has no engines to offer right now. Try again in a moment, or switch the source above to Recoil."
 msgstr "Το springfiles δεν έχει μηχανές να προσφέρει αυτή τη στιγμή. Δοκιμάστε ξανά σε λίγο ή αλλάξτε την πηγή παραπάνω σε Recoil."
 
-#: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "SpringMapConvNG sidecars"
-msgstr "Sidecars του SpringMapConvNG"
-
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Sprite colour"
@@ -49397,9 +49397,8 @@ msgid "The colour the shield fades to as its charge regenerates to full."
 msgstr "Το χρώμα στο οποίο ξεθωριάζει η ασπίδα καθώς η φόρτισή της αναγεννάται πλήρως."
 
 #: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "The compile/decompile features shell out to the bundled SpringMapConvNG binaries."
-msgstr "Οι λειτουργίες μεταγλώττισης και απομεταγλώττισης καλούν τα ενσωματωμένα εκτελέσιμα του SpringMapConvNG."
+msgid "The Compile page starts with this choice. You can still change it there for each map."
+msgstr ""
 
 #: src/scenario/validate.ts
 #, fuzzy
@@ -49910,6 +49909,10 @@ msgstr "Το αρχείο βάφει με {imagesUsed} εικόνες και έ�
 #, fuzzy
 msgid "The file paints with {imagesUsed} textures where a Spring unit has one, so the first was taken and the rest of the model draws with it."
 msgstr "Το αρχείο βάφει με {imagesUsed} υφές ενώ μια μονάδα Spring έχει μία, οπότε κρατήθηκε η πρώτη και το υπόλοιπο μοντέλο σχεδιάζεται με αυτή."
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "The file pickers open in the folders you used last time. Turning this off forgets them."
+msgstr ""
 
 #: src/lego/moduleFile.ts
 #, fuzzy
@@ -50856,11 +50859,6 @@ msgstr "ο χάρτης"
 #, fuzzy
 msgid "The map \"{savedTitle}\" is no longer installed."
 msgstr "Ο χάρτης «{savedTitle}» δεν είναι πλέον εγκατεστημένος."
-
-#: src/mapconv/index.ts
-#, fuzzy
-msgid "The map compiler coilbox builds and takes apart maps with."
-msgstr "Ο μεταγλωττιστής χαρτών με τον οποίο το coilbox δημιουργεί και αποσυνθέτει χάρτες."
 
 #: src/scenario/pages/ScenarioEditPage.tsx
 #, fuzzy
@@ -54571,6 +54569,7 @@ msgid "Took \"{name}\" off the withheld list."
 msgstr "Το «{name}» αφαιρέθηκε από τη λίστα αποκλεισμένων."
 
 #: src/general/pages/SettingsSection.tsx
+#: src/mapconv/pages/SettingsSection.tsx
 #: src/profile/SettingsSection.tsx
 #, fuzzy
 msgid "Tools"

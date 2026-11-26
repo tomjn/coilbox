@@ -1,7 +1,7 @@
 import { useSetting } from "@picoframe/frame";
 import type { Config } from "./bindings";
 
-/** Default config: no remembered dirs yet, "no compression" default, remember on. */
+/** Default config: no remembered dirs yet, "high quality fast" compression, remember on. */
 export const defaultConfig: Config = {
   defaultCompressionType: 4,
   rememberDirs: true,

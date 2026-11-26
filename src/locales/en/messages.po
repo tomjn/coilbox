@@ -6969,8 +6969,7 @@ msgstr "0 uses your desktop resolution."
 msgid "0.5 in each channel means no change; 1.0 is twice as bright."
 msgstr "0.5 in each channel means no change; 1.0 is twice as bright."
 
-#: src/mapconv/pages/CompilePage.tsx
-#: src/mapconv/pages/SettingsSection.tsx
+#: src/mapconv/compression.ts
 msgid "1 — No compression"
 msgstr "1 — No compression"
 
@@ -6999,11 +6998,7 @@ msgstr "1v1"
 msgid "1v1, cheese, teaching"
 msgstr "1v1, cheese, teaching"
 
-#: src/mapconv/pages/SettingsSection.tsx
-msgid "2 — Fast"
-msgstr "2 — Fast"
-
-#: src/mapconv/pages/CompilePage.tsx
+#: src/mapconv/compression.ts
 msgid "2 — Fast (compare last N tiles)"
 msgstr "2 — Fast (compare last N tiles)"
 
@@ -7011,11 +7006,7 @@ msgstr "2 — Fast (compare last N tiles)"
 msgid "2 samples"
 msgstr "2 samples"
 
-#: src/mapconv/pages/SettingsSection.tsx
-msgid "3 — Insane (slow)"
-msgstr "3 — Insane (slow)"
-
-#: src/mapconv/pages/CompilePage.tsx
+#: src/mapconv/compression.ts
 msgid "3 — Insane (whole map; very slow)"
 msgstr "3 — Insane (whole map; very slow)"
 
@@ -7035,8 +7026,7 @@ msgstr "3D model"
 msgid "3D preview unavailable."
 msgstr "3D preview unavailable."
 
-#: src/mapconv/pages/CompilePage.tsx
-#: src/mapconv/pages/SettingsSection.tsx
+#: src/mapconv/compression.ts
 msgid "4 — High quality fast"
 msgstr "4 — High quality fast"
 
@@ -8187,6 +8177,10 @@ msgstr "About clicking on each piece"
 msgid "About Coilbox"
 msgstr "About Coilbox"
 
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "About compression"
+msgstr "About compression"
+
 #: src/profile/SettingsSection.tsx
 msgid "About creating a profile"
 msgstr "About creating a profile"
@@ -8291,6 +8285,10 @@ msgstr "About reduce motion"
 msgid "About reloading the profile"
 msgstr "About reloading the profile"
 
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "About remembering folders"
+msgstr "About remembering folders"
+
 #: src/content/pages/components/ReplayTracksStorage.tsx
 msgid "About replay tracks"
 msgstr "About replay tracks"
@@ -8350,6 +8348,10 @@ msgstr "About the game's bindings"
 #: src/hub/pages/components/HubAddressField.tsx
 msgid "About the hub address"
 msgstr "About the hub address"
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "About the map tools"
+msgstr "About the map tools"
 
 #: src/sound/SoundSettings.tsx
 msgid "About the master volume"
@@ -10454,7 +10456,6 @@ msgid "Autosave {when}"
 msgstr "Autosave {when}"
 
 #: src/conquest/pages/components/BattleOverlay.tsx
-#: src/mapconv/pages/SettingsSection.tsx
 msgid "available"
 msgstr "available"
 
@@ -11887,6 +11888,10 @@ msgstr "Builds a .glb on its own and saves it wherever you like, without touchin
 msgid "Builds anything"
 msgstr "Builds anything"
 
+#: src/mapconv/index.ts
+msgid "Builds maps and takes them apart."
+msgstr "Builds maps and takes them apart."
+
 #: src/workshop/pages/components/BuildMenuPanel.tsx
 msgid "Builds nothing"
 msgstr "Builds nothing"
@@ -12885,15 +12890,12 @@ msgstr "Checking your router…"
 msgid "Checking your sign-in"
 msgstr "Checking your sign-in"
 
-#: src/mapconv/pages/SettingsSection.tsx
-msgid "checking…"
-msgstr "checking…"
-
 #: src/blueprint/pages/components/WidgetPanel.tsx
 #: src/content/pages/components/states.tsx
 #: src/content/pages/components/UnitRendersRow.tsx
 #: src/deeplink/pages/ImportSection.tsx
 #: src/game-updates/pages/GameUpdatesSection.tsx
+#: src/mapconv/pages/SettingsSection.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #: src/notify/NotificationsSettings.tsx
 #: src/packs/pages/components/ImportPackForm.tsx
@@ -13648,6 +13650,10 @@ msgstr "Coilbox cannot write {label} into the game's own file"
 #: src/runlite/pages/RunListPage.tsx
 msgid "Coilbox challenge"
 msgstr "Coilbox challenge"
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Coilbox comes with the SpringMapConvNG tools. Compile needs mapcompile and Decompile needs mapdecompile."
+msgstr "Coilbox comes with the SpringMapConvNG tools. Compile needs mapcompile and Decompile needs mapdecompile."
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "Coilbox connects to any TASServer-compatible lobby, including one you run yourself. lobby.recoilengine.org runs uberserver, which has a full deployment guide using Docker and MariaDB. Add yours as a custom server once it is running."
@@ -14469,6 +14475,10 @@ msgstr "Compiled unit script"
 msgid "Compiles the mission, checks it loads, then starts the engine."
 msgstr "Compiles the mission, checks it loads, then starts the engine."
 
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Compiling"
+msgstr "Compiling"
+
 #: src/conquest/galaxy3d/GalaxyView.tsx
 msgid "Compiling shaders…"
 msgstr "Compiling shaders…"
@@ -14496,6 +14506,10 @@ msgstr "Completed"
 #: src/lego/pages/components/TextureBuilderPanel.tsx
 msgid "Compose this unit's two textures from separate layers, in the channel layout the engine reads rather than the layout an image editor works in. Building replaces the texture below, the same as choosing one by hand."
 msgstr "Compose this unit's two textures from separate layers, in the channel layout the engine reads rather than the layout an image editor works in. Building replaces the texture below, the same as choosing one by hand."
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Compression"
+msgstr "Compression"
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 msgid "Compression tuning"
@@ -15142,6 +15156,10 @@ msgstr "Could not be read at all ({unreadableCount})"
 #: src/content/compatReport.ts
 msgid "Could not check everything"
 msgstr "Could not check everything"
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Could not check for the tools: {probeError}"
+msgstr "Could not check for the tools: {probeError}"
 
 #: src/direct/ReachablePorts.tsx
 msgid "Could not check your router"
@@ -16161,10 +16179,6 @@ msgstr "default {defaultValue}"
 msgid "Default AI"
 msgstr "Default AI"
 
-#: src/mapconv/pages/SettingsSection.tsx
-msgid "Default compression type"
-msgstr "Default compression type"
-
 #: src/content/unitFieldNotes.ts
 msgid "Default damage"
 msgstr "Default damage"
@@ -16184,10 +16198,6 @@ msgstr "Default: {defaultText}"
 #: src/multiplayer/battle/BattleOptionsDrawer.tsx
 msgid "defaults"
 msgstr "defaults"
-
-#: src/mapconv/pages/SettingsSection.tsx
-msgid "Defaults"
-msgstr "Defaults"
 
 #: src/uberstress/pages/SettingsSection.tsx
 msgid "defaults to <server-dir>/venv/bin/python3"
@@ -19889,6 +19899,10 @@ msgstr "Forward"
 #: src/content/replayMapView/timelineKeys.ts
 msgid "Forward one frame"
 msgstr "Forward one frame"
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Found"
+msgstr "Found"
 
 #: src/multiplayer/admin/ChannelsSection.tsx
 msgid "Founder"
@@ -24958,6 +24972,10 @@ msgstr "Map and engine not installed"
 msgid "Map and game missing"
 msgstr "Map and game missing"
 
+#: src/mapconv/index.ts
+msgid "Map compiler"
+msgstr "Map compiler"
+
 #: src/conquest/pages/ConquestListPage.tsx
 msgid "Map folder \"{folder}\""
 msgstr "Map folder \"{folder}\""
@@ -25775,6 +25793,10 @@ msgstr "MissileLauncher only."
 #: src/content/pages/components/FolderRow.tsx
 msgid "missing"
 msgstr "missing"
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Missing"
+msgstr "Missing"
 
 #: src/campaign/index.ts
 #: src/scenario/validate.ts
@@ -28835,6 +28857,10 @@ msgstr "Not brought up to date:"
 msgid "Not built"
 msgstr "Not built"
 
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Not checked"
+msgstr "Not checked"
+
 #: src/multiplayer/battles/HostBattleForm.tsx
 msgid "Not checked, because every battle you host goes through the server's relay."
 msgstr "Not checked, because every battle you host goes through the server's relay."
@@ -28871,10 +28897,6 @@ msgstr "not edited"
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
 msgid "Not equipped anywhere."
 msgstr "Not equipped anywhere."
-
-#: src/mapconv/pages/SettingsSection.tsx
-msgid "not found"
-msgstr "not found"
 
 #: src/multiplayer/battle/BattleEngineCard.tsx
 msgid "Not given by the lobby"
@@ -32107,10 +32129,6 @@ msgstr "Power"
 msgid "pr-downloader is unavailable"
 msgstr "pr-downloader is unavailable"
 
-#: src/mapconv/pages/SettingsSection.tsx
-msgid "Pre-fill the file pickers with the folders you used last time."
-msgstr "Pre-fill the file pickers with the folders you used last time."
-
 #: src/content/replayEventList.ts
 msgid "Pre-game"
 msgstr "Pre-game"
@@ -33833,8 +33851,8 @@ msgid "Rematch: {rematchMapName}"
 msgstr "Rematch: {rematchMapName}"
 
 #: src/mapconv/pages/SettingsSection.tsx
-msgid "Remember last-used folders"
-msgstr "Remember last-used folders"
+msgid "Remember folders"
+msgstr "Remember folders"
 
 #: src/content/pages/components/RemixPanel.tsx
 #: src/content/pages/PlayerDossierPage.tsx
@@ -36247,10 +36265,6 @@ msgstr "Seed accounts before the timed phase (register)"
 msgid "Seed SQL"
 msgstr "Seed SQL"
 
-#: src/mapconv/pages/SettingsSection.tsx
-msgid "seeds the Compile page"
-msgstr "seeds the Compile page"
-
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 msgid "seen before"
 msgstr "seen before"
@@ -38446,10 +38460,6 @@ msgstr "springfiles has no engines for this kind of machine. Recoil does, so swi
 msgid "springfiles has no engines to offer right now. Try again in a moment, or switch the source above to Recoil."
 msgstr "springfiles has no engines to offer right now. Try again in a moment, or switch the source above to Recoil."
 
-#: src/mapconv/pages/SettingsSection.tsx
-msgid "SpringMapConvNG sidecars"
-msgstr "SpringMapConvNG sidecars"
-
 #: src/content/unitFieldNotes.ts
 msgid "Sprite colour"
 msgstr "Sprite colour"
@@ -40175,8 +40185,8 @@ msgid "The colour the shield fades to as its charge regenerates to full."
 msgstr "The colour the shield fades to as its charge regenerates to full."
 
 #: src/mapconv/pages/SettingsSection.tsx
-msgid "The compile/decompile features shell out to the bundled SpringMapConvNG binaries."
-msgstr "The compile/decompile features shell out to the bundled SpringMapConvNG binaries."
+msgid "The Compile page starts with this choice. You can still change it there for each map."
+msgstr "The Compile page starts with this choice. You can still change it there for each map."
 
 #: src/scenario/validate.ts
 msgid "the compiled mission returned no table"
@@ -40588,6 +40598,10 @@ msgstr "The file paints with {imagesUsed} pictures and a Spring model has one te
 #: src/lego/pages/components/ImportResult.tsx
 msgid "The file paints with {imagesUsed} textures where a Spring unit has one, so the first was taken and the rest of the model draws with it."
 msgstr "The file paints with {imagesUsed} textures where a Spring unit has one, so the first was taken and the rest of the model draws with it."
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "The file pickers open in the folders you used last time. Turning this off forgets them."
+msgstr "The file pickers open in the folders you used last time. Turning this off forgets them."
 
 #: src/lego/moduleFile.ts
 msgid "The file was made by a newer version of coilbox."
@@ -41352,10 +41366,6 @@ msgstr "the map"
 #: src/conquest/pages/GalaxyPage.tsx
 msgid "The map \"{savedTitle}\" is no longer installed."
 msgstr "The map \"{savedTitle}\" is no longer installed."
-
-#: src/mapconv/index.ts
-msgid "The map compiler coilbox builds and takes apart maps with."
-msgstr "The map compiler coilbox builds and takes apart maps with."
 
 #: src/scenario/pages/ScenarioEditPage.tsx
 msgid "The map could not be drawn."
@@ -44337,6 +44347,7 @@ msgid "Took \"{name}\" off the withheld list."
 msgstr "Took \"{name}\" off the withheld list."
 
 #: src/general/pages/SettingsSection.tsx
+#: src/mapconv/pages/SettingsSection.tsx
 #: src/profile/SettingsSection.tsx
 msgid "Tools"
 msgstr "Tools"
