@@ -1657,6 +1657,9 @@ plans.attacked = {
 	steps = {
 		{ frame = 5, run = function()
 			checkHears("a mission with unit_attacked defines UnitDamaged", "UnitDamaged", true)
+			-- Every shooter and target, on one level above the water: a tower
+			-- behind a rise never sees its target, so never shoots (issue #5477).
+			Spring.LevelHeightMap(1700, 600, 3900, 2500, 100)
 			local units = state().units
 			check("the actors are on the map", units.victim and units.safe and units.statue)
 			-- A fall: the engine's own ground collision damage, with nobody behind it.
@@ -1683,7 +1686,8 @@ plans.attacked = {
 		{ frame = 880, run = function()
 			check("which has been shooting at it",
 				Spring.GetUnitLastAttacker(state().units.statue) == statueTower,
-				tostring(Spring.GetUnitLastAttacker(state().units.statue)))
+				-- Bracketed: it returns nothing at all for a unit never hit.
+				tostring((Spring.GetUnitLastAttacker(state().units.statue))))
 			for _, id in ipairs(HEARD) do
 				check("a real hit fires " .. id, objectiveIs(id) == COMPLETE, objectiveIs(id))
 			end
