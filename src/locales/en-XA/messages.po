@@ -3801,7 +3801,7 @@ msgid "{metricLabel} per minute, by team, over match time"
 msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
-msgid "{MIN_AUTO_AWAY_MINUTES} to {MAX_AUTO_AWAY_MINUTES}."
+msgid "{MIN_AUTO_AWAY_MINUTES} to {MAX_AUTO_AWAY_MINUTES}"
 msgstr ""
 
 #: src/content/pages/GameUnitPage.tsx
@@ -6657,6 +6657,10 @@ msgstr ""
 msgid "#{channel} is registered to {founder}."
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "•••••••• (saved)"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "`defaultLocale` names a language coilbox does not have"
 msgstr ""
@@ -8186,12 +8190,24 @@ msgstr ""
 msgid "About fullscreen"
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "About going away when idle"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "About hosting your own server"
+msgstr ""
+
 #: src/general/pages/SettingsSection.tsx
 msgid "About interface size"
 msgstr ""
 
 #: src/content/pages/components/KeyBindingEditor.tsx
 msgid "About keys with more than one action"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "About logging back in on startup"
 msgstr ""
 
 #: src/content/pages/FoldersSection.tsx
@@ -8224,6 +8240,10 @@ msgstr ""
 
 #: src/downloads/pages/SettingsSection.tsx
 msgid "About rapid repositories"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "About reconnecting"
 msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
@@ -11862,10 +11882,6 @@ msgstr ""
 msgid "Built in the unit builder as {projectName} and exported into this game"
 msgstr ""
 
-#: src/lobby-servers/pages/SettingsSection.tsx
-msgid "Built-in"
-msgstr ""
-
 #: src/multiplayer/chat/ChatPane.tsx
 msgid "Bullet list"
 msgstr ""
@@ -13558,7 +13574,7 @@ msgid "Coilbox challenge"
 msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
-msgid "Coilbox connects to any TASServer-compatible lobby, including one you run yourself. lobby.recoilengine.org runs uberserver, which ships a start-to-finish deployment guide using Docker and MariaDB. Add yours as a custom server above once it is running."
+msgid "Coilbox connects to any TASServer-compatible lobby, including one you run yourself. lobby.recoilengine.org runs uberserver, which has a full deployment guide using Docker and MariaDB. Add yours as a custom server once it is running."
 msgstr ""
 
 #: src/multiplayer/battle/compatBattle.ts
@@ -14462,10 +14478,6 @@ msgstr ""
 
 #: src/multiplayer/invite/InviteLinkHost.tsx
 msgid "Connect as {username} and join"
-msgstr ""
-
-#: src/lobby-servers/pages/SettingsSection.tsx
-msgid "Connect automatically on startup"
 msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
@@ -18462,6 +18474,10 @@ msgstr ""
 msgid "Everyone"
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Everyone else sees you as away once you stop using Coilbox for the time below. Using Coilbox again clears it. Away you set by hand stays until you clear it."
+msgstr ""
+
 #: src/multiplayer/battles/zerokBattle.ts
 msgid "Everyone for themselves."
 msgstr ""
@@ -21523,10 +21539,6 @@ msgstr ""
 msgid "Host vs computer"
 msgstr ""
 
-#: src/lobby-servers/pages/SettingsSection.tsx
-msgid "Host your own server"
-msgstr ""
-
 #: src/direct/room.ts
 msgid "Hosting on port {port} as {host}"
 msgstr ""
@@ -21901,7 +21913,7 @@ msgid "If nothing arrives, start again and ask for a new code."
 msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
-msgid "If the server drops the connection, rejoin your channels and last battle automatically."
+msgid "If the server drops the connection, Coilbox logs back in and rejoins your channels and last battle."
 msgstr ""
 
 #: src/multiplayer/chat/MemberActionsMenu.tsx
@@ -24441,6 +24453,10 @@ msgstr ""
 
 #: src/downloads/pages/ActivityPage.tsx
 msgid "Log"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Log back in on startup"
 msgstr ""
 
 #: src/home/zones/ResumeRail.tsx
@@ -28948,6 +28964,7 @@ msgid "not set"
 msgstr ""
 
 #: src/lego/pages/components/MovementSection.tsx
+#: src/lobby-servers/pages/SettingsSection.tsx
 msgid "Not set"
 msgstr ""
 
@@ -31011,6 +31028,7 @@ msgid "Passengers survive its death"
 msgstr ""
 
 #: src/lobby-servers/AddAccountForm.tsx
+#: src/lobby-servers/pages/SettingsSection.tsx
 #: src/lobby-servers/RegisterForm.tsx
 #: src/uberstress/pages/components/SeedSqlForm.tsx
 #: src/uberstress/pages/RunPage.tsx
@@ -35455,6 +35473,10 @@ msgstr ""
 msgid "Saved in game with the coilbox widget."
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Saved in keychain"
+msgstr ""
+
 #: src/lobby-servers/AddAccountForm.tsx
 msgid "Saved in your keychain when you add the login."
 msgstr ""
@@ -36252,6 +36274,7 @@ msgid "Select a run…"
 msgstr ""
 
 #: src/lobby-servers/AddAccountForm.tsx
+#: src/lobby-servers/pages/SettingsSection.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/lobby-servers/RegisterForm.tsx
 msgid "Select a server"
@@ -36570,6 +36593,7 @@ msgstr ""
 
 #: src/content/replayEventList.ts
 #: src/lobby-servers/AddAccountForm.tsx
+#: src/lobby-servers/pages/SettingsSection.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/tools.tsx
@@ -37283,10 +37307,6 @@ msgstr ""
 
 #: src/content/pages/ReplaysPage.tsx
 msgid "Show and sort the figures for {primary} alone instead of the whole match"
-msgstr ""
-
-#: src/lobby-servers/pages/SettingsSection.tsx
-msgid "Show as away to everyone else after a spell without input. Using Coilbox again clears it. Away you set by hand stays until you clear it."
 msgstr ""
 
 #: src/multiplayer/admin/ChannelsSection.tsx
@@ -44850,10 +44870,6 @@ msgstr ""
 msgid "Type your message..."
 msgstr ""
 
-#: src/lobby-servers/pages/SettingsSection.tsx
-msgid "Uberserver"
-msgstr ""
-
 #: src/uberstress/pages/SettingsSection.tsx
 msgid "uberserver checkout path"
 msgstr ""
@@ -44868,6 +44884,10 @@ msgstr ""
 
 #: src/multiplayer/admin/BotAccountsSection.tsx
 msgid "uberserver gives the new account the same password as the account named below. Coilbox never sees that password, and there is nothing to type for it here."
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Uberserver guide"
 msgstr ""
 
 #: src/multiplayer/admin/AnnouncementsSection.tsx
@@ -45906,6 +45926,7 @@ msgstr ""
 
 #: src/account/pages/SettingsSection.tsx
 #: src/lobby-servers/AddAccountForm.tsx
+#: src/lobby-servers/pages/SettingsSection.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/BansSection.tsx
@@ -46844,12 +46865,12 @@ msgstr ""
 msgid "When ChangeHeading is sent"
 msgstr ""
 
-#: src/content/pages/FoldersSection.tsx
-msgid "When coilbox starts, it looks for content folders if it has none yet, then reads the games and maps so the library opens quickly."
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "When Coilbox starts, it logs back in to every account that was connected when it last closed. To connect one account every time, open that login and turn on Connect on startup there."
 msgstr ""
 
-#: src/lobby-servers/pages/SettingsSection.tsx
-msgid "When Coilbox starts, log back in to every account that was connected when it last closed. To connect one account every time, tick Connect on startup on that login."
+#: src/content/pages/FoldersSection.tsx
+msgid "When coilbox starts, it looks for content folders if it has none yet, then reads the games and maps so the library opens quickly."
 msgstr ""
 
 #: src/i18n/frameStrings.ts
