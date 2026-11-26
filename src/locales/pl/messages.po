@@ -49136,6 +49136,7 @@ msgstr "To id przebiegu jest zajęte przez przebieg, którego nie udało się od
 msgid "That scenario file is damaged or incomplete."
 msgstr "Ten plik scenariusza jest uszkodzony lub niekompletny."
 
+#: src/scenario/pages/ScenarioEditPage.tsx
 #: src/scenario/pages/ScenariosPage.tsx
 #, fuzzy
 msgid "That scenario isn't here any more. It may have been deleted."

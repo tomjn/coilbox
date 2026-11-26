@@ -49166,6 +49166,7 @@ msgstr "Den tokt-id-en er tatt av et tokt som ikke kunne leses, så ingenting bl
 msgid "That scenario file is damaged or incomplete."
 msgstr "Den scenariofilen er skadet eller ufullstendig."
 
+#: src/scenario/pages/ScenarioEditPage.tsx
 #: src/scenario/pages/ScenariosPage.tsx
 #, fuzzy
 msgid "That scenario isn't here any more. It may have been deleted."

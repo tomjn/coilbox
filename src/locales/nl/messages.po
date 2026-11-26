@@ -49166,6 +49166,7 @@ msgstr "Die tocht-id is bezet door een tocht die niet gelezen kon worden, dus er
 msgid "That scenario file is damaged or incomplete."
 msgstr "Dat scenariobestand is beschadigd of onvolledig."
 
+#: src/scenario/pages/ScenarioEditPage.tsx
 #: src/scenario/pages/ScenariosPage.tsx
 #, fuzzy
 msgid "That scenario isn't here any more. It may have been deleted."

@@ -49136,6 +49136,7 @@ msgstr "Cet id d’exécution est pris par une exécution illisible, rien n’a 
 msgid "That scenario file is damaged or incomplete."
 msgstr "Ce fichier de scénario est endommagé ou incomplet."
 
+#: src/scenario/pages/ScenarioEditPage.tsx
 #: src/scenario/pages/ScenariosPage.tsx
 #, fuzzy
 msgid "That scenario isn't here any more. It may have been deleted."

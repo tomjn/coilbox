@@ -435,8 +435,20 @@ export function DetailError({
   );
 }
 
-/** Shown when a detail page's item isn't in the (completed) scan. */
-export function NotFound({ backTo, label }: { backTo: string; label: string }) {
+/**
+ * Shown when a detail page's item isn't in the (completed) scan. A page whose
+ * items did not come from a scan passes `message` to say what is true for it
+ * instead (issue #1521).
+ */
+export function NotFound({
+  backTo,
+  label,
+  message,
+}: {
+  backTo: string;
+  label: string;
+  message?: string;
+}) {
   return (
     <div className="flex flex-col gap-4 p-4">
       <Link
@@ -447,9 +459,12 @@ export function NotFound({ backTo, label }: { backTo: string; label: string }) {
       </Link>
       <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-10 text-center">
         <p className="text-sm text-muted-foreground">
-          <Trans>
-            This {label} isn't in the current scan. Go back and Scan the engine.
-          </Trans>
+          {message ?? (
+            <Trans>
+              This {label} isn't in the current scan. Go back and Scan the
+              engine.
+            </Trans>
+          )}
         </p>
       </div>
     </div>

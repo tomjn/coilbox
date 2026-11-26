@@ -49136,6 +49136,7 @@ msgstr "该运行 id 已被一个无法读取的运行占用，所以没有保�
 msgid "That scenario file is damaged or incomplete."
 msgstr "该场景文件已损坏或不完整。"
 
+#: src/scenario/pages/ScenarioEditPage.tsx
 #: src/scenario/pages/ScenariosPage.tsx
 #, fuzzy
 msgid "That scenario isn't here any more. It may have been deleted."
