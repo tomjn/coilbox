@@ -15327,6 +15327,7 @@ msgstr "Utfordringer"
 msgid "Chance of setting static map features alight on impact."
 msgstr "Sjanse for å sette fyr på statiske kartobjekter ved treff."
 
+#: src/account/pages/SettingsSection.tsx
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/lego/pages/components/TexturePicker.tsx
 #, fuzzy
@@ -15457,11 +15458,6 @@ msgstr "Bytt våpen"
 #, fuzzy
 msgid "Change what a game's units cost, carry and can do."
 msgstr "Endre hva et spills enheter koster, bærer og kan gjøre."
-
-#: src/account/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Change your account"
-msgstr "Endre kontoen din"
 
 #: src/content/compatReport.ts
 #: src/play/pages/components/GameOptionsPanel.tsx
@@ -38204,6 +38200,7 @@ msgstr "Passasjerer følger delen"
 msgid "Passengers survive its death"
 msgstr "Passasjerer overlever at den dør"
 
+#: src/account/pages/SettingsSection.tsx
 #: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/lobby-servers/RegisterForm.tsx

@@ -443,7 +443,19 @@ it("does not say the verification email was sent when the server refuses the res
   fireEvent.click(
     screen.getByRole("button", { name: "Resend verification email" }),
   );
-  expect(await screen.findByText(/verification is off/)).toBeTruthy();
+  expect((await screen.findByRole("alert")).textContent).toMatch(
+    /verification is off/,
+  );
+  expect(screen.queryByText(/Verification email sent/)).toBeNull();
+});
+
+it("does not carry a resend result over to another picked account", async () => {
+  renderTwoAccounts();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Resend verification email" }),
+  );
+  expect(await screen.findByText(/Verification email sent/)).toBeTruthy();
+  fireEvent.click(screen.getByText(`pick ${keyFor("bob")}`));
   expect(screen.queryByText(/Verification email sent/)).toBeNull();
 });
 

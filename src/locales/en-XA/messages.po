@@ -12432,6 +12432,7 @@ msgstr ""
 msgid "Chance of setting static map features alight on impact."
 msgstr ""
 
+#: src/account/pages/SettingsSection.tsx
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/lego/pages/components/TexturePicker.tsx
 msgid "Change"
@@ -12536,10 +12537,6 @@ msgstr ""
 
 #: src/home/groupDescription.ts
 msgid "Change what a game's units cost, carry and can do."
-msgstr ""
-
-#: src/account/pages/SettingsSection.tsx
-msgid "Change your account"
 msgstr ""
 
 #: src/content/compatReport.ts
@@ -31027,6 +31024,7 @@ msgstr ""
 msgid "Passengers survive its death"
 msgstr ""
 
+#: src/account/pages/SettingsSection.tsx
 #: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/lobby-servers/RegisterForm.tsx

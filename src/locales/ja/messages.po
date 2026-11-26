@@ -15325,6 +15325,7 @@ msgstr "チャレンジ"
 msgid "Chance of setting static map features alight on impact."
 msgstr "着弾時に静的なマップオブジェクトに火がつく確率です。"
 
+#: src/account/pages/SettingsSection.tsx
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/lego/pages/components/TexturePicker.tsx
 #, fuzzy
@@ -15455,11 +15456,6 @@ msgstr "武器を変更"
 #, fuzzy
 msgid "Change what a game's units cost, carry and can do."
 msgstr "ゲームのユニットのコスト、搭載物、能力を変更します。"
-
-#: src/account/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Change your account"
-msgstr "アカウントを変更"
 
 #: src/content/compatReport.ts
 #: src/play/pages/components/GameOptionsPanel.tsx
@@ -38188,6 +38184,7 @@ msgstr "搭乗ユニットがピースに追従"
 msgid "Passengers survive its death"
 msgstr "搭乗ユニットが撃破後も生存"
 
+#: src/account/pages/SettingsSection.tsx
 #: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/lobby-servers/RegisterForm.tsx
