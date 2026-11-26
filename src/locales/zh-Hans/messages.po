@@ -10293,6 +10293,10 @@ msgstr ""
 msgid "About the music source"
 msgstr ""
 
+#: src/notify/NotificationsSettings.tsx
+msgid "About the notification sound"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "About the pivot point"
@@ -11452,6 +11456,10 @@ msgstr "盟友"
 msgid "Allies on one side each have their own figures. Only players who share control of one army have the same figures."
 msgstr "同一方的盟友各自拥有自己的数据。只有共同控制一支部队的玩家才有相同的数据。"
 
+#: src/notify/NotificationsSettings.tsx
+msgid "Allow"
+msgstr ""
+
 #: src/scenario/pages/components/RestrictionPanel.tsx
 #, fuzzy
 msgid "Allow {name} again"
@@ -11481,6 +11489,10 @@ msgstr "允许它们通过防火墙"
 #, fuzzy
 msgid "allowed"
 msgstr "允许"
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Allowed"
+msgstr ""
 
 #: src/multiplayer/battle/BattleMembersTable.tsx
 #: src/play/pages/components/ParticipantsTable.tsx
@@ -15769,11 +15781,6 @@ msgstr "正在检查已安装的内容…"
 msgid "Checking match result…"
 msgstr "正在检查对局结果…"
 
-#: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Checking permission…"
-msgstr "正在检查权限…"
-
 #: src/campaign/pages/MissionBriefingPage.tsx
 #, fuzzy
 msgid "Checking result…"
@@ -15850,6 +15857,7 @@ msgstr "检查中…"
 #: src/deeplink/pages/ImportSection.tsx
 #: src/game-updates/pages/GameUpdatesSection.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
+#: src/notify/NotificationsSettings.tsx
 #: src/packs/pages/components/ImportPackForm.tsx
 #: src/scenario/pages/components/ImportScenarioForm.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
@@ -20516,9 +20524,8 @@ msgid "Desert"
 msgstr "沙漠"
 
 #: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Desktop notifications"
-msgstr "桌面通知"
+msgid "Desktop"
+msgstr ""
 
 #: src/content/pages/components/ReplayStartUnitLayer.tsx
 #, fuzzy
@@ -25519,11 +25526,6 @@ msgstr "走变异器路径。直接写入会跳过整个副本。"
 msgid "Going away"
 msgstr "正在远离"
 
-#: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Grant permission"
-msgstr "授予权限"
-
 #: src/content/index.ts
 #, fuzzy
 msgid "Graphics"
@@ -29508,11 +29510,6 @@ msgstr "长度必须大于 0。"
 #, fuzzy
 msgid "Let go of all of it (Esc)"
 msgstr "全部松开（Esc）"
-
-#: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Let the banner make your system's notification sound. Your operating system owns that sound and its volume, so Coilbox's own volume does not apply, though muting all sound does."
-msgstr "让通知横幅播放系统通知音。该声音及其音量由操作系统控制，所以 Coilbox 自身的音量不起作用，但全部静音仍然有效。"
 
 #: src/multiplayer/battles/HostZerokBattlePopover.tsx
 #, fuzzy
@@ -35382,6 +35379,14 @@ msgstr "不是数字"
 msgid "not a Spring root"
 msgstr "不是 Spring 根目录"
 
+#: src/notify/NotificationsSettings.tsx
+msgid "Not allowed"
+msgstr ""
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Not allowed. Turn on notifications for this app in your system settings."
+msgstr ""
+
 #: src/lego/scriptMarks.ts
 #, fuzzy
 msgid "not an effect the engine knows"
@@ -38500,16 +38505,6 @@ msgstr "天赋：{0}"
 #, fuzzy
 msgid "Perks earned"
 msgstr "获得的天赋"
-
-#: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Permission granted."
-msgstr "已授予权限。"
-
-#: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Permission not granted."
-msgstr "未授予权限。"
 
 #: src/lego/pages/components/FourViews.tsx
 #, fuzzy
@@ -44811,6 +44806,7 @@ msgstr "自爆"
 #: src/multiplayer/battle/BonusButton.tsx
 #: src/multiplayer/chat/ChatPane.tsx
 #: src/multiplayer/ConsoleDrawer.tsx
+#: src/notify/NotificationsSettings.tsx
 #, fuzzy
 msgid "Send"
 msgstr "发送"
@@ -44855,11 +44851,6 @@ msgstr "发送你的地图图片"
 #, fuzzy
 msgid "Send reset email"
 msgstr "发送重置邮件"
-
-#: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Send test notification"
-msgstr "发送测试通知"
 
 #: src/workshop/pages/components/UnitFieldRow.tsx
 #, fuzzy
@@ -45913,11 +45904,6 @@ msgstr "再显示 {moreCount} 条（共 {orderCount} 条）"
 msgid "Show {pieceName}"
 msgstr "显示 {pieceName}"
 
-#: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Show a native notification when the app is in the background."
-msgstr "应用在后台时显示系统通知。"
-
 #: src/content/pages/components/MatchStatsChart.tsx
 #, fuzzy
 msgid "Show all"
@@ -46028,6 +46014,10 @@ msgstr "显示禁言"
 #, fuzzy
 msgid "Show nano spray"
 msgstr "显示纳米喷流"
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Show notifications"
+msgstr ""
 
 #: src/content/pages/GameDetailPage.tsx
 #: src/content/pages/MapDetailPage.tsx
@@ -48365,6 +48355,10 @@ msgstr ""
 #, fuzzy
 msgid "System"
 msgstr "系统"
+
+#: src/notify/NotificationsSettings.tsx
+msgid "System permission"
+msgstr ""
 
 #: src/content/pages/components/MatchStatsChart.tsx
 #: src/workshop/pages/components/CompiledLuaPanel.tsx
@@ -57751,6 +57745,10 @@ msgstr ""
 msgid "When collapsed, hide the sidebar and slide it out on hovering the left edge."
 msgstr "折叠时隐藏侧边栏，鼠标悬停在左边缘时滑出。"
 
+#: src/notify/NotificationsSettings.tsx
+msgid "When the app is in the background"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "When the unit dies it comes apart along its joins. A light hit throws off a few of the biggest groups of parts, a heavy hit throws off every part one by one, smallest first, and the wreck follows what the hit left. A unit with no joins breaks along its piece tree."
@@ -59476,6 +59474,10 @@ msgstr "你的舰船撑不住了。征途结束。"
 #, fuzzy
 msgid "Your start unit and unlocked units are all in {gameName}."
 msgstr "你的初始单位和已解锁的单位都在 {gameName} 中。"
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Your system plays this sound at its own volume, so Coilbox's volume does not change it. Muting all sound does turn it off."
+msgstr ""
 
 #: src/lego/pages/components/UnitCounts.tsx
 #, fuzzy

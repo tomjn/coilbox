@@ -10294,6 +10294,10 @@ msgstr ""
 msgid "About the music source"
 msgstr ""
 
+#: src/notify/NotificationsSettings.tsx
+msgid "About the notification sound"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "About the pivot point"
@@ -11453,6 +11457,10 @@ msgstr "Σύμμαχοι"
 msgid "Allies on one side each have their own figures. Only players who share control of one army have the same figures."
 msgstr "Οι σύμμαχοι στην ίδια πλευρά έχουν ο καθένας δικούς του αριθμούς. Μόνο οι παίκτες που μοιράζονται τον έλεγχο ενός στρατού έχουν τους ίδιους αριθμούς."
 
+#: src/notify/NotificationsSettings.tsx
+msgid "Allow"
+msgstr ""
+
 #: src/scenario/pages/components/RestrictionPanel.tsx
 #, fuzzy
 msgid "Allow {name} again"
@@ -11482,6 +11490,10 @@ msgstr "Να επιτραπεί η διέλευσή τους από το τεί�
 #, fuzzy
 msgid "allowed"
 msgstr "επιτρέπεται"
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Allowed"
+msgstr ""
 
 #: src/multiplayer/battle/BattleMembersTable.tsx
 #: src/play/pages/components/ParticipantsTable.tsx
@@ -15771,11 +15783,6 @@ msgstr "Έλεγχος εγκατεστημένου περιεχομένου…"
 msgid "Checking match result…"
 msgstr "Έλεγχος αποτελέσματος αγώνα…"
 
-#: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Checking permission…"
-msgstr "Έλεγχος άδειας…"
-
 #: src/campaign/pages/MissionBriefingPage.tsx
 #, fuzzy
 msgid "Checking result…"
@@ -15852,6 +15859,7 @@ msgstr "έλεγχος…"
 #: src/deeplink/pages/ImportSection.tsx
 #: src/game-updates/pages/GameUpdatesSection.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
+#: src/notify/NotificationsSettings.tsx
 #: src/packs/pages/components/ImportPackForm.tsx
 #: src/scenario/pages/components/ImportScenarioForm.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
@@ -20520,9 +20528,8 @@ msgid "Desert"
 msgstr "Έρημος"
 
 #: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Desktop notifications"
-msgstr "Ειδοποιήσεις επιφάνειας εργασίας"
+msgid "Desktop"
+msgstr ""
 
 #: src/content/pages/components/ReplayStartUnitLayer.tsx
 #, fuzzy
@@ -25527,11 +25534,6 @@ msgstr "Περνά από τη διαδρομή mutator. Η εγγραφή επ�
 msgid "Going away"
 msgstr "Απομακρύνεται"
 
-#: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Grant permission"
-msgstr "Παραχώρηση άδειας"
-
 #: src/content/index.ts
 #, fuzzy
 msgid "Graphics"
@@ -29518,11 +29520,6 @@ msgstr "Το μήκος πρέπει να είναι μεγαλύτερο από
 #, fuzzy
 msgid "Let go of all of it (Esc)"
 msgstr "Αποεπιλογή όλων (Esc)"
-
-#: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Let the banner make your system's notification sound. Your operating system owns that sound and its volume, so Coilbox's own volume does not apply, though muting all sound does."
-msgstr "Να παίζει το banner τον ήχο ειδοποίησης του συστήματός σας. Αυτόν τον ήχο και την έντασή του τα ελέγχει το λειτουργικό σας σύστημα, οπότε η ένταση του Coilbox δεν ισχύει, αν και η σίγαση όλων των ήχων ισχύει."
 
 #: src/multiplayer/battles/HostZerokBattlePopover.tsx
 #, fuzzy
@@ -35394,6 +35391,14 @@ msgstr "Δεν είναι αριθμός"
 msgid "not a Spring root"
 msgstr "δεν είναι ριζικός φάκελος Spring"
 
+#: src/notify/NotificationsSettings.tsx
+msgid "Not allowed"
+msgstr ""
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Not allowed. Turn on notifications for this app in your system settings."
+msgstr ""
+
 #: src/lego/scriptMarks.ts
 #, fuzzy
 msgid "not an effect the engine knows"
@@ -38516,16 +38521,6 @@ msgstr "Πλεονέκτημα: {0}"
 #, fuzzy
 msgid "Perks earned"
 msgstr "Πλεονεκτήματα που κερδήθηκαν"
-
-#: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Permission granted."
-msgstr "Η άδεια δόθηκε."
-
-#: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Permission not granted."
-msgstr "Η άδεια δεν δόθηκε."
 
 #: src/lego/pages/components/FourViews.tsx
 #, fuzzy
@@ -44833,6 +44828,7 @@ msgstr "Αυτοκαταστρέφεται"
 #: src/multiplayer/battle/BonusButton.tsx
 #: src/multiplayer/chat/ChatPane.tsx
 #: src/multiplayer/ConsoleDrawer.tsx
+#: src/notify/NotificationsSettings.tsx
 #, fuzzy
 msgid "Send"
 msgstr "Αποστολή"
@@ -44877,11 +44873,6 @@ msgstr "Αποστολή εικόνων των χαρτών σας"
 #, fuzzy
 msgid "Send reset email"
 msgstr "Αποστολή email επαναφοράς"
-
-#: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Send test notification"
-msgstr "Αποστολή δοκιμαστικής ειδοποίησης"
 
 #: src/workshop/pages/components/UnitFieldRow.tsx
 #, fuzzy
@@ -45936,11 +45927,6 @@ msgstr "Εμφάνιση {moreCount} ακόμη από {orderCount}"
 msgid "Show {pieceName}"
 msgstr "Εμφάνιση: {pieceName}"
 
-#: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Show a native notification when the app is in the background."
-msgstr "Εμφάνιση εγγενούς ειδοποίησης όταν η εφαρμογή είναι στο παρασκήνιο."
-
 #: src/content/pages/components/MatchStatsChart.tsx
 #, fuzzy
 msgid "Show all"
@@ -46051,6 +46037,10 @@ msgstr "Εμφάνιση σιγάσεων"
 #, fuzzy
 msgid "Show nano spray"
 msgstr "Εμφάνιση νανοψεκασμού"
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Show notifications"
+msgstr ""
 
 #: src/content/pages/GameDetailPage.tsx
 #: src/content/pages/MapDetailPage.tsx
@@ -48395,6 +48385,10 @@ msgstr ""
 #, fuzzy
 msgid "System"
 msgstr "Σύστημα"
+
+#: src/notify/NotificationsSettings.tsx
+msgid "System permission"
+msgstr ""
 
 #: src/content/pages/components/MatchStatsChart.tsx
 #: src/workshop/pages/components/CompiledLuaPanel.tsx
@@ -57782,6 +57776,10 @@ msgstr ""
 msgid "When collapsed, hide the sidebar and slide it out on hovering the left edge."
 msgstr "Όταν είναι συμπτυγμένη, η πλαϊνή στήλη κρύβεται και εμφανίζεται όταν ο δείκτης περνά από την αριστερή άκρη."
 
+#: src/notify/NotificationsSettings.tsx
+msgid "When the app is in the background"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "When the unit dies it comes apart along its joins. A light hit throws off a few of the biggest groups of parts, a heavy hit throws off every part one by one, smallest first, and the wreck follows what the hit left. A unit with no joins breaks along its piece tree."
@@ -59508,6 +59506,10 @@ msgstr "Το σκάφος σας κατέρρευσε. Το Μονοπάτι Μ�
 #, fuzzy
 msgid "Your start unit and unlocked units are all in {gameName}."
 msgstr "Η αρχική μονάδα σας και οι ξεκλειδωμένες μονάδες σας είναι όλες στο {gameName}."
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Your system plays this sound at its own volume, so Coilbox's volume does not change it. Muting all sound does turn it off."
+msgstr ""
 
 #: src/lego/pages/components/UnitCounts.tsx
 #, fuzzy

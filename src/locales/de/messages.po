@@ -10293,6 +10293,10 @@ msgstr ""
 msgid "About the music source"
 msgstr ""
 
+#: src/notify/NotificationsSettings.tsx
+msgid "About the notification sound"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "About the pivot point"
@@ -11452,6 +11456,10 @@ msgstr "Verbündete"
 msgid "Allies on one side each have their own figures. Only players who share control of one army have the same figures."
 msgstr "Verbündete auf einer Seite haben jeweils eigene Kennzahlen. Nur Spieler, die gemeinsam eine Armee steuern, haben dieselben Kennzahlen."
 
+#: src/notify/NotificationsSettings.tsx
+msgid "Allow"
+msgstr ""
+
 #: src/scenario/pages/components/RestrictionPanel.tsx
 #, fuzzy
 msgid "Allow {name} again"
@@ -11481,6 +11489,10 @@ msgstr "Durch die Firewall lassen"
 #, fuzzy
 msgid "allowed"
 msgstr "erlaubt"
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Allowed"
+msgstr ""
 
 #: src/multiplayer/battle/BattleMembersTable.tsx
 #: src/play/pages/components/ParticipantsTable.tsx
@@ -15769,11 +15781,6 @@ msgstr "Installierte Inhalte werden geprüft…"
 msgid "Checking match result…"
 msgstr "Partieergebnis wird geprüft…"
 
-#: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Checking permission…"
-msgstr "Berechtigung wird geprüft…"
-
 #: src/campaign/pages/MissionBriefingPage.tsx
 #, fuzzy
 msgid "Checking result…"
@@ -15850,6 +15857,7 @@ msgstr "wird geprüft…"
 #: src/deeplink/pages/ImportSection.tsx
 #: src/game-updates/pages/GameUpdatesSection.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
+#: src/notify/NotificationsSettings.tsx
 #: src/packs/pages/components/ImportPackForm.tsx
 #: src/scenario/pages/components/ImportScenarioForm.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
@@ -20516,9 +20524,8 @@ msgid "Desert"
 msgstr "Wüste"
 
 #: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Desktop notifications"
-msgstr "Desktop-Benachrichtigungen"
+msgid "Desktop"
+msgstr ""
 
 #: src/content/pages/components/ReplayStartUnitLayer.tsx
 #, fuzzy
@@ -25519,11 +25526,6 @@ msgstr "Geht über den Mutator-Weg. Direktes Schreiben überspringt diese ganze 
 msgid "Going away"
 msgstr "Entfernt sich"
 
-#: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Grant permission"
-msgstr "Berechtigung erteilen"
-
 #: src/content/index.ts
 #, fuzzy
 msgid "Graphics"
@@ -29508,11 +29510,6 @@ msgstr "Die Länge muss größer als 0 sein."
 #, fuzzy
 msgid "Let go of all of it (Esc)"
 msgstr "Alles loslassen (Esc)"
-
-#: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Let the banner make your system's notification sound. Your operating system owns that sound and its volume, so Coilbox's own volume does not apply, though muting all sound does."
-msgstr "Das Banner den Benachrichtigungston Ihres Systems abspielen lassen. Ihr Betriebssystem steuert diesen Ton und seine Lautstärke, daher gilt die Lautstärke von Coilbox nicht, das Stummschalten aller Töne aber schon."
 
 #: src/multiplayer/battles/HostZerokBattlePopover.tsx
 #, fuzzy
@@ -35382,6 +35379,14 @@ msgstr "Keine Zahl"
 msgid "not a Spring root"
 msgstr "kein Spring-Stammordner"
 
+#: src/notify/NotificationsSettings.tsx
+msgid "Not allowed"
+msgstr ""
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Not allowed. Turn on notifications for this app in your system settings."
+msgstr ""
+
 #: src/lego/scriptMarks.ts
 #, fuzzy
 msgid "not an effect the engine knows"
@@ -38500,16 +38505,6 @@ msgstr "Vorteil: {0}"
 #, fuzzy
 msgid "Perks earned"
 msgstr "Erhaltene Vorteile"
-
-#: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Permission granted."
-msgstr "Berechtigung erteilt."
-
-#: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Permission not granted."
-msgstr "Berechtigung nicht erteilt."
 
 #: src/lego/pages/components/FourViews.tsx
 #, fuzzy
@@ -44811,6 +44806,7 @@ msgstr "Zerstört sich selbst"
 #: src/multiplayer/battle/BonusButton.tsx
 #: src/multiplayer/chat/ChatPane.tsx
 #: src/multiplayer/ConsoleDrawer.tsx
+#: src/notify/NotificationsSettings.tsx
 #, fuzzy
 msgid "Send"
 msgstr "Senden"
@@ -44855,11 +44851,6 @@ msgstr "Bilder Ihrer Karten senden"
 #, fuzzy
 msgid "Send reset email"
 msgstr "E-Mail zum Zurücksetzen senden"
-
-#: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Send test notification"
-msgstr "Testbenachrichtigung senden"
 
 #: src/workshop/pages/components/UnitFieldRow.tsx
 #, fuzzy
@@ -45913,11 +45904,6 @@ msgstr "{moreCount} weitere von {orderCount} zeigen"
 msgid "Show {pieceName}"
 msgstr "{pieceName} zeigen"
 
-#: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Show a native notification when the app is in the background."
-msgstr "Native Benachrichtigung zeigen, wenn die App im Hintergrund ist."
-
 #: src/content/pages/components/MatchStatsChart.tsx
 #, fuzzy
 msgid "Show all"
@@ -46028,6 +46014,10 @@ msgstr "Stummschaltungen zeigen"
 #, fuzzy
 msgid "Show nano spray"
 msgstr "Nanostrahl zeigen"
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Show notifications"
+msgstr ""
 
 #: src/content/pages/GameDetailPage.tsx
 #: src/content/pages/MapDetailPage.tsx
@@ -48365,6 +48355,10 @@ msgstr ""
 #, fuzzy
 msgid "System"
 msgstr "System"
+
+#: src/notify/NotificationsSettings.tsx
+msgid "System permission"
+msgstr ""
 
 #: src/content/pages/components/MatchStatsChart.tsx
 #: src/workshop/pages/components/CompiledLuaPanel.tsx
@@ -57751,6 +57745,10 @@ msgstr ""
 msgid "When collapsed, hide the sidebar and slide it out on hovering the left edge."
 msgstr "Eingeklappt die Seitenleiste ausblenden und beim Überfahren des linken Rands einblenden."
 
+#: src/notify/NotificationsSettings.tsx
+msgid "When the app is in the background"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "When the unit dies it comes apart along its joins. A light hit throws off a few of the biggest groups of parts, a heavy hit throws off every part one by one, smallest first, and the wreck follows what the hit left. A unit with no joins breaks along its piece tree."
@@ -59476,6 +59474,10 @@ msgstr "Ihr Schiff hat versagt. Der Kriegspfad ist vorbei."
 #, fuzzy
 msgid "Your start unit and unlocked units are all in {gameName}."
 msgstr "Ihre Starteinheit und freigeschalteten Einheiten sind alle in {gameName}."
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Your system plays this sound at its own volume, so Coilbox's volume does not change it. Muting all sound does turn it off."
+msgstr ""
 
 #: src/lego/pages/components/UnitCounts.tsx
 #, fuzzy
