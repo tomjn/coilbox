@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
+import { SettingList, SettingRow } from "@/components/SettingRow";
 import { useDownloadsConfig } from "../../../downloads/config";
 import type { ContentRoot } from "../../bindings";
 
@@ -41,34 +41,43 @@ export function DownloadFolders({ roots }: { roots: ContentRoot[] }) {
     value === SAME_AS_DEFAULT ? undefined : value;
 
   return (
-    <section className="space-y-3">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+    <section className="flex flex-col gap-3">
+      <h2 className="text-sm font-semibold">
         <Trans>New content goes to</Trans>
       </h2>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Field label={t`Default`}>
+      <SettingList>
+        <SettingRow id="write-root-default" label={t`Default`}>
           <OptionSelect
+            id="write-root-default"
+            size="sm"
+            className="w-64"
             value={cfg.writeRootId ?? ""}
             onValueChange={(v) => setCfg({ ...cfg, writeRootId: v })}
             placeholder={t`Select a content folder…`}
             options={folders}
           />
-        </Field>
-        <Field label={t`Games`}>
+        </SettingRow>
+        <SettingRow id="write-root-games" label={t`Games`}>
           <OptionSelect
+            id="write-root-games"
+            size="sm"
+            className="w-64"
             value={own(cfg.gamesRootId)}
             onValueChange={(v) => setCfg({ ...cfg, gamesRootId: chosen(v) })}
             options={withDefault}
           />
-        </Field>
-        <Field label={t`Maps`}>
+        </SettingRow>
+        <SettingRow id="write-root-maps" label={t`Maps`}>
           <OptionSelect
+            id="write-root-maps"
+            size="sm"
+            className="w-64"
             value={own(cfg.mapsRootId)}
             onValueChange={(v) => setCfg({ ...cfg, mapsRootId: chosen(v) })}
             options={withDefault}
           />
-        </Field>
-      </div>
+        </SettingRow>
+      </SettingList>
     </section>
   );
 }

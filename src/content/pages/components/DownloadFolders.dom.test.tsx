@@ -15,15 +15,21 @@ vi.mock("../../../downloads/config", () => ({
 // The real one is a Radix select, which happy-dom cannot open.
 vi.mock("@/components/OptionSelect", () => ({
   OptionSelect: ({
+    id,
     value,
     onValueChange,
     options,
   }: {
+    id?: string;
     value: string;
     onValueChange: (value: string) => void;
     options: { value: string; label: string }[];
   }) => (
-    <select value={value} onChange={(e) => onValueChange(e.target.value)}>
+    <select
+      id={id}
+      value={value}
+      onChange={(e) => onValueChange(e.target.value)}
+    >
       <option value="" />
       {options.map((o) => (
         <option key={o.value} value={o.value}>

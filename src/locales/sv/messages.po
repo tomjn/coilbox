@@ -685,6 +685,11 @@ msgstr "{0, plural, one {# def-åsidosättning} other {# def-åsidosättningar}}
 msgid "{0, plural, one {# duplicate} other {# duplicates}}"
 msgstr "{0, plural, one {# dubblett} other {# dubbletter}}"
 
+#. placeholder {0}: counts.engines
+#: src/content/pages/components/FolderRow.tsx
+msgid "{0, plural, one {# engine} other {# engines}}"
+msgstr ""
+
 #. placeholder {0}: rows.length
 #: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
@@ -753,9 +758,11 @@ msgstr "{0, plural, one {# match · okänt utfall} other {# matcher · okänt ut
 msgid "{0, plural, one {# game indexed} other {# games indexed}}"
 msgstr "{0, plural, one {# match indexerad} other {# matcher indexerade}}"
 
+#. placeholder {0}: counts.games
 #. placeholder {0}: p.games
 #. placeholder {0}: record.games
 #: src/content/pages/components/AiRecordSection.tsx
+#: src/content/pages/components/FolderRow.tsx
 #: src/content/pages/components/PlayerPicker.tsx
 #, fuzzy
 msgid "{0, plural, one {# game} other {# games}}"
@@ -796,6 +803,11 @@ msgstr "{0, plural, one {# länkikon är okänd} other {# länkikoner är okänd
 #, fuzzy
 msgid "{0, plural, one {# loss} other {# losses}}"
 msgstr "{0, plural, one {# förlust} other {# förluster}}"
+
+#. placeholder {0}: counts.maps
+#: src/content/pages/components/FolderRow.tsx
+msgid "{0, plural, one {# map} other {# maps}}"
+msgstr ""
 
 #. placeholder {0}: metal.spotCount
 #: src/mapconv/pages/components/MetalFigures.tsx
@@ -882,6 +894,11 @@ msgstr "{0, plural, one {# order placerades utanför kartan och ritas inte.} oth
 #, fuzzy
 msgid "{0, plural, one {# orphaned blob} other {# orphaned blobs}}"
 msgstr "{0, plural, one {# övergiven blob} other {# övergivna blobbar}}"
+
+#. placeholder {0}: counts.packages
+#: src/content/pages/components/FolderRow.tsx
+msgid "{0, plural, one {# package} other {# packages}}"
+msgstr ""
 
 #. placeholder {0}: metal.closeCount
 #: src/mapconv/pages/components/MetalFigures.tsx
@@ -9481,6 +9498,10 @@ msgstr "En spelare som inte är allierad ser ingen hälsostapel och ingen hälsa
 msgid "A player's first unit has to be made for them at the start, not given to them, to count as a starting unit."
 msgstr "En spelares första enhet måste skapas åt spelaren vid starten, inte ges till spelaren, för att räknas som startenhet."
 
+#: src/content/pages/FoldersSection.tsx
+msgid "A portable folder is saved relative to the app, so it moves with a portable install. It must be inside the app folder."
+msgstr ""
+
 #: src/i18n/uiError.ts
 #, fuzzy
 msgid "A preset pack's address must be https."
@@ -9575,6 +9596,10 @@ msgstr "En omslumpning behåller den tillsammans med en behållen del"
 #, fuzzy
 msgid "A reroll replaces it"
 msgstr "En omslumpning ersätter den"
+
+#: src/content/pages/FoldersSection.tsx
+msgid "A rescan also checks Steam's install folders for Zero-K."
+msgstr ""
 
 #: src/scenario/pages/components/RestrictionPanel.tsx
 #, fuzzy
@@ -10054,6 +10079,10 @@ msgstr "Om Coilbox"
 msgid "About empty pieces"
 msgstr "Om tomma delar"
 
+#: src/content/pages/FoldersSection.tsx
+msgid "About fetching download lists"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "About fixing UVs and normals"
@@ -10069,6 +10098,10 @@ msgstr ""
 
 #: src/content/pages/components/KeyBindingEditor.tsx
 msgid "About keys with more than one action"
+msgstr ""
+
+#: src/content/pages/FoldersSection.tsx
+msgid "About looking for Zero-K"
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
@@ -10088,6 +10121,10 @@ msgstr "Om en dels låda"
 
 #: src/general/pages/SettingsSection.tsx
 msgid "About performance mode"
+msgstr ""
+
+#: src/content/pages/FoldersSection.tsx
+msgid "About portable folders"
 msgstr ""
 
 #: src/lego/pages/components/ProportionsPanel.tsx
@@ -10120,6 +10157,10 @@ msgstr ""
 
 #: src/content/pages/components/KeymapsPanel.tsx
 msgid "About saved keymaps"
+msgstr ""
+
+#: src/content/pages/FoldersSection.tsx
+msgid "About scanning on startup"
 msgstr ""
 
 #: src/lego/pages/components/CollisionPanel.tsx
@@ -10638,6 +10679,10 @@ msgstr "Lägg till en till inloggning"
 #, fuzzy
 msgid "Add anyway"
 msgstr "Lägg till ändå"
+
+#: src/content/pages/FoldersSection.tsx
+msgid "Add as portable"
+msgstr ""
 
 #: src/lobby-servers/pages/components/AutojoinChannels.tsx
 #, fuzzy
@@ -11436,11 +11481,6 @@ msgstr "Redan sedda"
 #, fuzzy
 msgid "Also buildable by"
 msgstr "Kan också byggas av"
-
-#: src/content/pages/FoldersSection.tsx
-#, fuzzy
-msgid "Also check Steam install locations for Zero-K during a rescan."
-msgstr "Sök även efter Zero-K i Steams installationsplatser vid en ny skanning."
 
 #: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
@@ -12692,11 +12732,6 @@ msgstr "Skapande"
 #, fuzzy
 msgid "Authoring tools"
 msgstr "Verktyg för skapare"
-
-#: src/content/pages/components/RootCard.tsx
-#, fuzzy
-msgid "auto"
-msgstr "auto"
 
 #: src/workshop/pages/components/CheckpointsDrawer.tsx
 #, fuzzy
@@ -14598,7 +14633,7 @@ msgstr "Medföljande innehåll: {summary}"
 msgid "Bundled map folder \"{folder}\""
 msgstr "Medföljande kartmapp ”{folder}”"
 
-#: src/content/pages/components/RootCard.tsx
+#: src/content/pages/components/FolderRow.tsx
 #, fuzzy
 msgid "bundled, read only"
 msgstr "medföljande, skrivskyddad"
@@ -19009,6 +19044,10 @@ msgstr "Kunde inte spara förinställningen"
 msgid "Count"
 msgstr "Antal"
 
+#: src/content/pages/components/FolderRow.tsx
+msgid "Count what is in this folder again"
+msgstr ""
+
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
 msgid "Counted"
@@ -20438,15 +20477,9 @@ msgstr "Detalj"
 msgid "Details"
 msgstr "Detaljer"
 
-#: src/content/pages/FoldersSection.tsx
-#, fuzzy
-msgid "Detect standard data roots the first time this section opens."
-msgstr "Hitta vanliga datarötter första gången det här avsnittet öppnas."
-
-#: src/content/pages/components/RootCard.tsx
-#, fuzzy
-msgid "detected via {origins}"
-msgstr "hittad via {origins}"
+#: src/content/pages/components/FolderRow.tsx
+msgid "Detected via {origins}"
+msgstr ""
 
 #: src/content/pages/FoldersSection.tsx
 #, fuzzy
@@ -22275,11 +22308,6 @@ msgstr "Motor att använda"
 msgid "Engine unknown"
 msgstr "Okänd motor"
 
-#: src/content/pages/components/RootCard.tsx
-#, fuzzy
-msgid "engines"
-msgstr "motorer"
-
 #: src/content/index.ts
 #: src/content/pages/StorageSection.tsx
 #, fuzzy
@@ -24007,6 +24035,10 @@ msgstr "Mappnamn"
 msgid "Folder writability not checked"
 msgstr "Mapparnas skrivbarhet är inte kontrollerad"
 
+#: src/content/pages/FoldersSection.tsx
+msgid "Folders"
+msgstr ""
+
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #: src/play/FollowedPacksView.tsx
 #, fuzzy
@@ -24222,7 +24254,7 @@ msgstr "För lagringsvapen förbrukas detta över tid medan det lagras upp, anna
 msgid "Force spectate"
 msgstr "Tvinga att titta på"
 
-#: src/content/pages/components/RootCard.tsx
+#: src/content/pages/components/FolderRow.tsx
 #, fuzzy
 msgid "forced"
 msgstr "tvingad"
@@ -25018,7 +25050,6 @@ msgstr "Spelupplägg"
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/content/pages/components/BuildTreeEmbed.tsx
 #: src/content/pages/components/RemixPanel.tsx
-#: src/content/pages/components/RootCard.tsx
 #: src/content/pages/GamesPage.tsx
 #: src/content/pages/KeybindsSection.tsx
 #: src/play/pages/components/GamePickerGrid.tsx
@@ -29692,11 +29723,6 @@ msgstr "Läs in en stil"
 msgid "Load from file"
 msgstr "Läs in från fil"
 
-#: src/content/pages/FoldersSection.tsx
-#, fuzzy
-msgid "Load map, game and engine lists after launch. Turn this off on a metered connection."
-msgstr "Läs in kart-, spel- och motorlistor efter start. Stäng av det här på en anslutning med datapott."
-
 #: src/play/PresetLoadGate.tsx
 #, fuzzy
 msgid "Load onto {game}"
@@ -29893,6 +29919,10 @@ msgstr "Utrustning"
 #, fuzzy
 msgid "Loadouts"
 msgstr "Utrustningar"
+
+#: src/content/pages/FoldersSection.tsx
+msgid "Loads the map, game and engine lists after launch. Turn this off on a metered connection."
+msgstr ""
 
 #: src/content/engineSettingText.ts
 msgid "Lobbies replace this with your lobby name, so it shows up in replays and when the engine is started on its own."
@@ -30113,6 +30143,10 @@ msgstr "lång"
 #, fuzzy
 msgid "Longest"
 msgstr "Längsta"
+
+#: src/content/pages/FoldersSection.tsx
+msgid "Look for Zero-K on Steam"
+msgstr ""
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
@@ -30460,7 +30494,7 @@ msgstr "Hantera kartor"
 msgid "Manoeuvre"
 msgstr "Manöver"
 
-#: src/content/pages/components/RootCard.tsx
+#: src/content/pages/components/FolderRow.tsx
 #, fuzzy
 msgid "manual"
 msgstr "manuell"
@@ -30741,7 +30775,6 @@ msgid "Mapping wiki"
 msgstr "Kartwiki"
 
 #: src/conquest/pages/GalaxyPage.tsx
-#: src/content/pages/components/RootCard.tsx
 #: src/content/pages/MapsPage.tsx
 #: src/play/pages/components/MapPickerGrid.tsx
 #, fuzzy
@@ -31518,7 +31551,7 @@ msgstr "Bara Missile, Torpedo och Starburst. Börjar riktad längs den avfyrande
 msgid "MissileLauncher only."
 msgstr "Bara MissileLauncher."
 
-#: src/content/pages/components/RootCard.tsx
+#: src/content/pages/components/FolderRow.tsx
 #, fuzzy
 msgid "missing"
 msgstr "saknas"
@@ -32721,7 +32754,6 @@ msgstr "Neutralt lag"
 msgid "Neutral team colour"
 msgstr "Neutralt lags färg"
 
-#: src/content/pages/components/RootCard.tsx
 #: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/MatchupPage.tsx
 #: src/content/pages/PlayerDossierPage.tsx
@@ -35244,7 +35276,7 @@ msgstr "Inget nytt bästa på {name}. Den här vinsten var {slower} långsammare
 msgid "Not a number"
 msgstr "Inte ett tal"
 
-#: src/content/pages/components/RootCard.tsx
+#: src/content/pages/components/FolderRow.tsx
 #, fuzzy
 msgid "not a Spring root"
 msgstr "inte en Spring-rot"
@@ -35533,6 +35565,10 @@ msgstr "Inte sparad: {saveError}"
 #, fuzzy
 msgid "Not saved. Leaving this page loses the change."
 msgstr "Inte sparat. Om du lämnar sidan förlorar du ändringen."
+
+#: src/content/pages/components/FolderRow.tsx
+msgid "Not scanned yet"
+msgstr ""
 
 #: src/multiplayer/battle/DeliveryProgressPanel.tsx
 #, fuzzy
@@ -36901,7 +36937,7 @@ msgid "Opcodes"
 msgstr "Opkoder"
 
 #: src/content/pages/components/EngineRow.tsx
-#: src/content/pages/components/RootCard.tsx
+#: src/content/pages/components/FolderRow.tsx
 #: src/deeplink/DeepLinkHandler.tsx
 #: src/hub/pages/BrowsePage.tsx
 #: src/hub/pages/ItemPage.tsx
@@ -37203,6 +37239,10 @@ msgstr ""
 
 #: src/content/pages/components/EngineRow.tsx
 msgid "Open the engine's folder"
+msgstr ""
+
+#: src/content/pages/components/FolderRow.tsx
+msgid "Open the folder"
 msgstr ""
 
 #: src/deeplink/actions.ts
@@ -37881,11 +37921,6 @@ msgstr "Paketera justeringsprojekt"
 #, fuzzy
 msgid "Packaged <0>{0}</0>"
 msgstr "Paketerade <0>{0}</0>"
-
-#: src/content/pages/components/RootCard.tsx
-#, fuzzy
-msgid "packages"
-msgstr "paket"
 
 #: src/content/bundle.ts
 #, fuzzy
@@ -39235,15 +39270,10 @@ msgstr "Port {port} används redan. En annan coilbox, eller ett rum som du lämn
 msgid "Port opened"
 msgstr "Port öppnad"
 
-#: src/content/pages/components/RootCard.tsx
+#: src/content/pages/components/FolderRow.tsx
 #, fuzzy
 msgid "portable"
 msgstr "portabel"
-
-#: src/content/pages/FoldersSection.tsx
-#, fuzzy
-msgid "Portable"
-msgstr "Portabel"
 
 #: src/profile/health.ts
 #, fuzzy
@@ -39556,11 +39586,6 @@ msgstr "Privat anteckning"
 #, fuzzy
 msgid "Private note, only visible to you…"
 msgstr "Privat anteckning, bara synlig för dig…"
-
-#: src/content/pages/FoldersSection.tsx
-#, fuzzy
-msgid "Probe Zero-K / Steam"
-msgstr "Sök efter Zero-K / Steam"
 
 #: src/lego/pages/components/ProblemsButton.tsx
 #, fuzzy
@@ -40279,7 +40304,7 @@ msgstr "Kör igen"
 msgid "Re-run validation"
 msgstr "Kör valideringen igen"
 
-#: src/content/pages/components/RootCard.tsx
+#: src/content/pages/components/FolderRow.tsx
 #, fuzzy
 msgid "Re-scan"
 msgstr "Skanna igen"
@@ -40332,12 +40357,7 @@ msgstr "Läses på plats från {bundlePath}. Bara motorn kopieras, en gång, til
 msgid "Read it"
 msgstr "Läs den"
 
-#: src/content/pages/components/RootCard.tsx
-#, fuzzy
-msgid "read only"
-msgstr "skrivskyddad"
-
-#: src/content/pages/components/RootCard.tsx
+#: src/content/pages/components/FolderRow.tsx
 #, fuzzy
 msgid "Read only"
 msgstr "Skrivskyddad"
@@ -41503,8 +41523,8 @@ msgstr "Remixad från"
 #: src/campaign/pages/components/MissionMediaFields.tsx
 #: src/campaign/pages/components/MissionRemoveButton.tsx
 #: src/content/pages/components/CompatMode.tsx
+#: src/content/pages/components/FolderRow.tsx
 #: src/content/pages/components/MissionRuntimeSection.tsx
-#: src/content/pages/components/RootCard.tsx
 #: src/hub/pages/ItemPage.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/BuildMenuSection.tsx
@@ -43782,10 +43802,9 @@ msgstr "Skannade {all} enheter på {time}: {counted}. {wroteText}."
 msgid "Scanned {done} of {total} units."
 msgstr "Skannade {done} av {total} enheter."
 
-#: src/content/pages/components/RootCard.tsx
-#, fuzzy
-msgid "scanned {scannedAt}"
-msgstr "skannad {scannedAt}"
+#: src/content/pages/components/FolderRow.tsx
+msgid "Scanned {scannedAt}"
+msgstr ""
 
 #: src/profile/health.ts
 #, fuzzy
@@ -47871,6 +47890,10 @@ msgstr "Sluta placera {what}"
 msgid "Stop placing a part, a module or a connector"
 msgstr "Sluta placera en komponent, en modul eller en koppling"
 
+#: src/content/pages/components/FolderRow.tsx
+msgid "Stop reading this folder. Nothing in it is deleted."
+msgstr ""
+
 #: src/direct/HostRoomControl.tsx
 #, fuzzy
 msgid "Stop room"
@@ -47964,11 +47987,6 @@ msgstr "Stannar för att skjuta"
 #, fuzzy
 msgid "Storage"
 msgstr "Lagring"
-
-#: src/content/pages/FoldersSection.tsx
-#, fuzzy
-msgid "Store the added folder as a path relative to the app dir, so it follows the executable in a portable install. The folder must be inside the app folder."
-msgstr "Spara den tillagda mappen som en sökväg relativt appmappen, så att den följer med den körbara filen i en portabel installation. Mappen måste ligga i appmappen."
 
 #: src/multiplayer/admin/ServerAdminHelp.tsx
 #, fuzzy
@@ -56525,11 +56543,6 @@ msgstr "Användarnamn, IP eller e-post att häva bannlysningen för"
 msgid "Uses the bench/DB settings on the Servers page. Uncheck to benchmark an external address."
 msgstr "Använder bench- och databasinställningarna på sidan Servrar. Avmarkera för att mäta prestanda mot en extern adress."
 
-#: src/content/pages/components/RootCard.tsx
-#, fuzzy
-msgid "valid"
-msgstr "giltig"
-
 #: src/profile/useHealthChecks.ts
 #, fuzzy
 msgid "valid JSON but does not match the campaign schema"
@@ -57649,6 +57662,10 @@ msgstr "När den aktiveras"
 #, fuzzy
 msgid "When ChangeHeading is sent"
 msgstr "När ChangeHeading skickas"
+
+#: src/content/pages/FoldersSection.tsx
+msgid "When coilbox starts, it looks for content folders if it has none yet, then reads the games and maps so the library opens quickly."
+msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
