@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import { describeError } from "@/i18n/uiError";
@@ -30,7 +31,10 @@ interface UpdaterContextValue {
   checking: boolean;
   /** Epoch ms of the last completed check, or null. */
   lastChecked: number | null;
-  error: string | null;
+  /** Why the last check failed, cleared when the next one starts. */
+  checkError: string | null;
+  /** Why the last install failed, cleared when the next one starts. */
+  installError: string | null;
   progress: DownloadPhase;
   /**
    * The download indicator's view of the transfer, for a progress bar with the
@@ -102,7 +106,11 @@ export function UpdaterProvider({ children }: { children: ReactNode }) {
   const [update, setUpdate] = useState<Update | null>(null);
   const [checking, setChecking] = useState(false);
   const [lastChecked, setLastChecked] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [checkError, setCheckError] = useState<string | null>(null);
+  const [installError, setInstallError] = useState<string | null>(null);
+  // The version the player was last told about, so checking again does not
+  // send the same notification each time.
+  const notifiedVersion = useRef<string | null>(null);
   const [progress, setProgress] = useState<DownloadPhase>({ status: "idle" });
   const [installed, setInstalled] = useState(false);
   const { report, reported } = useDownloadQueue();
@@ -110,11 +118,12 @@ export function UpdaterProvider({ children }: { children: ReactNode }) {
 
   const runCheck = useCallback(async () => {
     setChecking(true);
-    setError(null);
+    setCheckError(null);
     try {
       const found = await checkForUpdate();
       setUpdate(found);
-      if (found) {
+      if (found && found.version !== notifiedVersion.current) {
+        notifiedVersion.current = found.version;
         const newVersion = found.version;
         void notify({
           title: t`Update available`,
@@ -125,7 +134,7 @@ export function UpdaterProvider({ children }: { children: ReactNode }) {
       }
       setLastChecked(Date.now());
     } catch (e) {
-      setError(describeError(e));
+      setCheckError(describeError(e));
     } finally {
       setChecking(false);
     }
@@ -133,7 +142,7 @@ export function UpdaterProvider({ children }: { children: ReactNode }) {
 
   const runInstall = useCallback(async () => {
     if (!update) return;
-    setError(null);
+    setInstallError(null);
     try {
       await installUpdate(update, (phase) => {
         setProgress(phase);
@@ -154,7 +163,7 @@ export function UpdaterProvider({ children }: { children: ReactNode }) {
       });
       setInstalled(true);
     } catch (e) {
-      setError(describeError(e));
+      setInstallError(describeError(e));
       setProgress({ status: "idle" });
     } finally {
       // However it ended, nothing is transferring now. A failed or abandoned
@@ -187,7 +196,8 @@ export function UpdaterProvider({ children }: { children: ReactNode }) {
         update,
         checking,
         lastChecked,
-        error,
+        checkError,
+        installError,
         progress,
         download,
         installed,

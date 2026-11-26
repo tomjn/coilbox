@@ -15742,6 +15742,10 @@ msgstr "Controleren op updates"
 msgid "Check it loads"
 msgstr "Controleren of het laadt"
 
+#: src/updater/pages/UpdatesSettingsSection.tsx
+msgid "Check now"
+msgstr ""
+
 #: src/profile/SettingsSection.tsx
 msgid "Check profile"
 msgstr ""
@@ -19449,11 +19453,6 @@ msgstr "Huidig"
 #, fuzzy
 msgid "Current password"
 msgstr "Huidig wachtwoord"
-
-#: src/updater/pages/UpdatesSettingsSection.tsx
-#, fuzzy
-msgid "Current version"
-msgstr "Huidige versie"
 
 #: src/multiplayer/battle/BonusButton.tsx
 #, fuzzy
@@ -27719,11 +27718,6 @@ msgstr "Geïnstalleerd"
 msgid "Installed — restart to apply the updated profile."
 msgstr "Geïnstalleerd — start opnieuw om het bijgewerkte profiel toe te passen."
 
-#: src/updater/pages/UpdatesSettingsSection.tsx
-#, fuzzy
-msgid "Installed — restart to apply."
-msgstr "Geïnstalleerd — start opnieuw om toe te passen."
-
 #: src/deeplink/DeepLinkHandler.tsx
 #, fuzzy
 msgid "Installed {fileName}"
@@ -27766,6 +27760,10 @@ msgstr "Geïnstalleerd, en {staleCount} van {fileCount, plural, one {# bestand w
 #, fuzzy
 msgid "Installed, and its licence notice is missing or out of date"
 msgstr "Geïnstalleerd, en de licentievermelding ontbreekt of is verouderd"
+
+#: src/updater/pages/UpdatesSettingsSection.tsx
+msgid "Installed. Restart to apply."
+msgstr ""
 
 #: src/deeplink/DeepLinkHandler.tsx
 #, fuzzy
@@ -29059,11 +29057,6 @@ msgstr "Laatst gekoppeld"
 #, fuzzy
 msgid "Last changed"
 msgstr "Gewijzigd"
-
-#: src/updater/pages/UpdatesSettingsSection.tsx
-#, fuzzy
-msgid "Last checked {lastCheckedTime}"
-msgstr "Laatst gecontroleerd {lastCheckedTime}"
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
@@ -56223,6 +56216,10 @@ msgstr "Omhoog"
 msgid "Up to 30 minutes"
 msgstr "Tot 30 minuten"
 
+#: src/updater/pages/UpdatesSettingsSection.tsx
+msgid "Up to date. Last checked {lastCheckedText}"
+msgstr ""
+
 #: src/campaign/pages/components/MissionScenarioUpdateButton.tsx
 #: src/content/pages/components/GameCard.tsx
 #: src/content/pages/components/GameLibrarySummary.tsx
@@ -56341,14 +56338,12 @@ msgid "Updates"
 msgstr "Updates"
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
-#, fuzzy
-msgid "Updates are disabled in development builds."
-msgstr "Updates zijn uitgeschakeld in ontwikkelbuilds."
+msgid "Updates are off in development builds."
+msgstr ""
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
-#, fuzzy
-msgid "Updates for this build are managed by its distributor."
-msgstr "Updates voor deze build worden door de distributeur beheerd."
+msgid "Updates for this build come from its distributor."
+msgstr ""
 
 #: src/content/pages/StatsPage.tsx
 #, fuzzy
@@ -56763,6 +56758,7 @@ msgstr "Veelzijdig"
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+#: src/updater/pages/UpdatesSettingsSection.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Version"
@@ -56772,6 +56768,10 @@ msgstr "Versie"
 #, fuzzy
 msgid "Version {newVersion} available"
 msgstr "Versie {newVersion} beschikbaar"
+
+#: src/updater/pages/UpdatesSettingsSection.tsx
+msgid "Version {newVersion} available. Last checked {lastCheckedText}"
+msgstr ""
 
 #: src/workshop/pages/components/PackagePanel.tsx
 #, fuzzy
@@ -59216,11 +59216,6 @@ msgstr "Je zit nu niet in een gevecht. Blader door open gevechten om er aan een 
 #, fuzzy
 msgid "You're ready"
 msgstr "Je bent er klaar voor"
-
-#: src/updater/pages/UpdatesSettingsSection.tsx
-#, fuzzy
-msgid "You're up to date."
-msgstr "Je bent helemaal bij."
 
 #: src/multiplayer/LobbyStatusButton.tsx
 #, fuzzy

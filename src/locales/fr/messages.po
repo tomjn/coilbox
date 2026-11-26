@@ -15740,6 +15740,10 @@ msgstr "Vérifier les mises à jour"
 msgid "Check it loads"
 msgstr "Vérifier le chargement"
 
+#: src/updater/pages/UpdatesSettingsSection.tsx
+msgid "Check now"
+msgstr ""
+
 #: src/profile/SettingsSection.tsx
 msgid "Check profile"
 msgstr ""
@@ -19445,11 +19449,6 @@ msgstr "Actuel"
 #, fuzzy
 msgid "Current password"
 msgstr "Mot de passe actuel"
-
-#: src/updater/pages/UpdatesSettingsSection.tsx
-#, fuzzy
-msgid "Current version"
-msgstr "Version actuelle"
 
 #: src/multiplayer/battle/BonusButton.tsx
 #, fuzzy
@@ -27710,11 +27709,6 @@ msgstr "Installé"
 msgid "Installed — restart to apply the updated profile."
 msgstr "Installé : redémarrez pour appliquer le profil mis à jour."
 
-#: src/updater/pages/UpdatesSettingsSection.tsx
-#, fuzzy
-msgid "Installed — restart to apply."
-msgstr "Installée. Redémarrez pour l'appliquer."
-
 #: src/deeplink/DeepLinkHandler.tsx
 #, fuzzy
 msgid "Installed {fileName}"
@@ -27757,6 +27751,10 @@ msgstr "Installé, et {staleCount} sur {fileCount, plural, one {# fichier diffè
 #, fuzzy
 msgid "Installed, and its licence notice is missing or out of date"
 msgstr "Installé, mais sa notice de licence est absente ou périmée"
+
+#: src/updater/pages/UpdatesSettingsSection.tsx
+msgid "Installed. Restart to apply."
+msgstr ""
 
 #: src/deeplink/DeepLinkHandler.tsx
 #, fuzzy
@@ -29049,11 +29047,6 @@ msgstr "Dernière passerelle"
 #, fuzzy
 msgid "Last changed"
 msgstr "Modification"
-
-#: src/updater/pages/UpdatesSettingsSection.tsx
-#, fuzzy
-msgid "Last checked {lastCheckedTime}"
-msgstr "Dernière vérification : {lastCheckedTime}"
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
@@ -56192,6 +56185,10 @@ msgstr "Haut"
 msgid "Up to 30 minutes"
 msgstr "Jusqu’à 30 minutes"
 
+#: src/updater/pages/UpdatesSettingsSection.tsx
+msgid "Up to date. Last checked {lastCheckedText}"
+msgstr ""
+
 #: src/campaign/pages/components/MissionScenarioUpdateButton.tsx
 #: src/content/pages/components/GameCard.tsx
 #: src/content/pages/components/GameLibrarySummary.tsx
@@ -56310,14 +56307,12 @@ msgid "Updates"
 msgstr "Mises à jour"
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
-#, fuzzy
-msgid "Updates are disabled in development builds."
-msgstr "Les mises à jour sont désactivées dans les versions de développement."
+msgid "Updates are off in development builds."
+msgstr ""
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
-#, fuzzy
-msgid "Updates for this build are managed by its distributor."
-msgstr "Les mises à jour de cette version sont gérées par son distributeur."
+msgid "Updates for this build come from its distributor."
+msgstr ""
 
 #: src/content/pages/StatsPage.tsx
 #, fuzzy
@@ -56732,6 +56727,7 @@ msgstr "Polyvalent"
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+#: src/updater/pages/UpdatesSettingsSection.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Version"
@@ -56741,6 +56737,10 @@ msgstr "Version"
 #, fuzzy
 msgid "Version {newVersion} available"
 msgstr "Version {newVersion} disponible"
+
+#: src/updater/pages/UpdatesSettingsSection.tsx
+msgid "Version {newVersion} available. Last checked {lastCheckedText}"
+msgstr ""
 
 #: src/workshop/pages/components/PackagePanel.tsx
 #, fuzzy
@@ -59184,11 +59184,6 @@ msgstr "Vous n’êtes dans aucune partie. Parcourez les parties ouvertes pour e
 #: src/onboarding/pages/DonePage.tsx
 msgid "You're ready"
 msgstr "Tout est prêt"
-
-#: src/updater/pages/UpdatesSettingsSection.tsx
-#, fuzzy
-msgid "You're up to date."
-msgstr "Vous êtes à jour."
 
 #: src/multiplayer/LobbyStatusButton.tsx
 #, fuzzy
