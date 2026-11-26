@@ -150,6 +150,8 @@ Put each campaign in its own folder under `campaigns/` at the root of the game:
 
 Media goes beside `campaign.json`. A `"file"` reference in the document, such as `{ "kind": "file", "file": "intro-voice.ogg" }`, names a file in the same folder. This is how a game ships audio and video, which an export cannot carry. Images embedded in the export work too, so a still-image campaign can be the export file on its own.
 
+Put media in the panorama, side graphic, voiceover, cutscene, icon and background slots. Images and media written into a Markdown briefing do not load from the game yet ([issue #5468](https://github.com/tomjn/coilbox/issues/5468)). Neither do [units from the unit builder](#units-from-the-unit-builder) ([issue #5469](https://github.com/tomjn/coilbox/issues/5469)).
+
 A campaign in a game is read-only. Coilbox never writes into the game, and the campaign has no Edit or Delete in Campaign builder. Players can still Duplicate it to get an editable copy, and Export it.
 
 Progress is kept in coilbox's own data folder, keyed by the campaign's `id`, the same as any other campaign. Nothing is written to the game. Keep the `id` the same between releases of your game, or players lose their place.
