@@ -192,8 +192,12 @@
 -- scenario writes says it wants the actor followed, so no scenario can ask, and
 -- the version is how a game that vendored 17 is offered the fix.
 
+-- 19 adds no types and no format features either. It keeps a group's unit in the
+-- group through the same upgrade (issue #5475), where a runtime behind 19 drops
+-- it and can call the group dead while it is alive.
+
 return {
-	version = 18,
+	version = 19,
 
 	-- The compiled mission format this runtime reads.
 	schemaVersion = 1,
