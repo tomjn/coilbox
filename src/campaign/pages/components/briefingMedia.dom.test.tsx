@@ -65,6 +65,14 @@ describe("inline media in a bundled campaign's briefing", () => {
     );
     expect(scenarioGameCampaignFile).not.toHaveBeenCalled();
   });
+
+  it("encodes the name the author wrote once (issue #5483)", () => {
+    briefing("![the map](<images/my art é.jpg>)");
+
+    expect(screen.getByAltText("the map").getAttribute("src")).toBe(
+      "coilbox://localhost/portable/images/my%20art%20%C3%A9.jpg",
+    );
+  });
 });
 
 describe("inline media in a game campaign's briefing", () => {
