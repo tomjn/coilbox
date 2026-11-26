@@ -9990,6 +9990,10 @@ msgstr "Informazioni su {subject}"
 msgid "About actions"
 msgstr "Informazioni sulle azioni"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "About ambient effects"
+msgstr ""
+
 #: src/lego/pages/components/MovementSection.tsx
 #, fuzzy
 msgid "About banking"
@@ -10020,6 +10024,14 @@ msgstr "Informazioni sui pezzi vuoti"
 msgid "About fixing UVs and normals"
 msgstr "Informazioni sulla correzione di UV e normali"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "About fullscreen"
+msgstr ""
+
+#: src/general/pages/SettingsSection.tsx
+msgid "About interface size"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "About mirroring"
@@ -10035,10 +10047,18 @@ msgstr "Informazioni sullo spostamento di un gruppo"
 msgid "About one piece's box"
 msgstr "Informazioni sul riquadro di un pezzo"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "About performance mode"
+msgstr ""
+
 #: src/lego/pages/components/ProportionsPanel.tsx
 #, fuzzy
 msgid "About proportions"
 msgstr "Informazioni sulle proporzioni"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "About reduce motion"
+msgstr ""
 
 #: src/content/pages/components/ReplayTracksStorage.tsx
 #, fuzzy
@@ -10075,6 +10095,10 @@ msgstr "Informazioni sul volume di collisione"
 msgid "About the colour texture"
 msgstr "Informazioni sulla texture dei colori"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "About the frame rate"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "About the pivot point"
@@ -10084,6 +10108,10 @@ msgstr "Informazioni sul punto di rotazione"
 #, fuzzy
 msgid "About the shading map"
 msgstr "Informazioni sulla mappa di ombreggiatura"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "About the startup splash"
+msgstr ""
 
 #: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
@@ -16187,6 +16215,10 @@ msgstr "Fai clic sul modello per mettere lì un connettore. Esc per smettere"
 msgid "Click the second point"
 msgstr "Fai clic sul secondo punto"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "Click the splash or press Escape to close it early."
+msgstr ""
+
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #, fuzzy
 msgid "Click to edit its units, double click to rename"
@@ -16907,11 +16939,6 @@ msgstr "Coilbox sta creando le immagini delle unità di {subject} per l’hub."
 #, fuzzy
 msgid "Coilbox is making pictures of {subject}'s units. Nothing has been sent yet."
 msgstr "Coilbox sta creando le immagini delle unità di {subject}. Non è stato ancora inviato nulla."
-
-#: src/general/pages/AboutCoilbox.tsx
-#, fuzzy
-msgid "Coilbox is open source. Browse the code, report a bug, or star the project on GitHub."
-msgstr "Coilbox è open source. Sfoglia il codice, segnala un bug o metti una stella al progetto su GitHub."
 
 #: src/hub/uploadOutcomes.ts
 #, fuzzy
@@ -20568,7 +20595,6 @@ msgid "Dismiss the failed analysis of {0}"
 msgstr "Ignora l’analisi non riuscita di {0}"
 
 #: src/content/index.ts
-#: src/general/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Display"
 msgstr "Visualizzazione"
@@ -21192,6 +21218,10 @@ msgstr "Consumato mentre è occultata e in movimento. Di default vale il costo d
 #, fuzzy
 msgid "Drawn while cloaked and standing still."
 msgstr "Consumato mentre è occultata e ferma."
+
+#: src/general/pages/SettingsSection.tsx
+msgid "Draws 3D views at a lower resolution with fewer particles, for laptops and older graphics cards."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -22905,6 +22935,10 @@ msgstr "Estrazione…"
 #, fuzzy
 msgid "Extraction depth"
 msgstr "Profondità di estrazione"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "F11 and the button in the top bar also switch it."
+msgstr ""
 
 #: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
@@ -27489,6 +27523,7 @@ msgstr "Maschera di bit di intercettabilità"
 msgid "Interception radius"
 msgstr "Raggio di intercettazione"
 
+#: src/general/pages/SettingsSection.tsx
 #: src/sound/events.ts
 #: src/sound/library.ts
 #, fuzzy
@@ -31540,9 +31575,8 @@ msgid "Most of this game's PNG build pictures are {commonWidth} by {commonHeight
 msgstr "La maggior parte delle immagini di costruzione PNG di questo gioco è di {commonWidth} per {commonHeight} pixel. Questa è di {size} per {size}."
 
 #: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Motion & effects"
-msgstr "Movimento ed effetti"
+msgid "Motion and effects"
+msgstr ""
 
 #: src/workshop/weaponSlots.ts
 #, fuzzy
@@ -41693,11 +41727,6 @@ msgstr "Rendering…"
 msgid "Renders"
 msgstr "Render"
 
-#: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Renders 3D views at a lower resolution with fewer particles — for laptops and older GPUs."
-msgstr "Esegue il rendering delle viste 3D a risoluzione più bassa con meno particelle, per portatili e GPU più vecchie."
-
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
 msgid "Reopen the seed and rules this project was made from, to change one and replay it"
@@ -42800,11 +42829,6 @@ msgstr "Esegui"
 msgid "Run {at} with {game} on engine {engine}, in {took}."
 msgstr "Eseguito il {at} con {game} sul motore {engine}, in {took}."
 
-#: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Run Coilbox in fullscreen. Also toggleable with F11 or the top-bar button; the choice is remembered across restarts."
-msgstr "Avvia Coilbox a schermo intero. Si può attivare anche con F11 o con il pulsante della barra in alto. La scelta viene ricordata tra un riavvio e l’altro."
-
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
 msgid "Run complete"
@@ -43457,9 +43481,8 @@ msgid "Scales every sound Coilbox makes. Audio played by a campaign briefing or 
 msgstr "Regola il volume di tutti i suoni di Coilbox. L’audio riprodotto dal briefing di una campagna o da una pagina profilo ha i suoi controlli e non ne risente."
 
 #: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Scales the whole of Coilbox: text, spacing and the 3D views. Fit more on a small screen, or make everything easier to read on a large one. Cmd or Ctrl with plus and minus does the same, and with zero puts it back to 100%."
-msgstr "Scala tutto Coilbox: testo, spaziature e viste 3D. Fai stare più cose su uno schermo piccolo, o rendi tutto più leggibile su uno grande. Cmd o Ctrl con più e meno fa lo stesso, e con zero lo riporta al 100%."
+msgid "Scales text, spacing and the 3D views. Cmd or Ctrl with plus or minus changes it, and with zero sets it back to 100%."
+msgstr ""
 
 #: src/lego/pages/components/TransformFields.tsx
 #, fuzzy
@@ -45089,6 +45112,10 @@ msgstr "pacchetti di configurazione"
 msgid "Setup packs"
 msgstr "Pacchetti di configurazione"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "Setup wizard"
+msgstr ""
+
 #: src/lego/pages/components/SetPanel.tsx
 #, fuzzy
 msgid "Several"
@@ -45694,11 +45721,6 @@ msgstr "Mostra il modello {label}"
 #, fuzzy
 msgid "Show the back and forward navigation buttons in the top bar."
 msgstr "Mostra i pulsanti di navigazione indietro e avanti nella barra in alto."
-
-#: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Show the brand splash when Coilbox launches. Click it or press Escape to dismiss it early."
-msgstr "Mostra la schermata iniziale all’avvio di Coilbox. Fai clic o premi Escape per chiuderla prima."
 
 #: src/placement/PlacementSurface.tsx
 #, fuzzy
@@ -47006,9 +47028,8 @@ msgid "Star on GitHub"
 msgstr "Metti una stella su GitHub"
 
 #: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Star twinkle, nebulae and other decorative touches. Turn off for a plainer interface. Sound is controlled separately, in Sound settings."
-msgstr "Scintillio delle stelle, nebulose e altri tocchi decorativi. Disattiva per un’interfaccia più sobria. Il suono si controlla a parte, nelle impostazioni Suono."
+msgid "Star twinkle, nebulae and other decorative touches. Sound has its own settings page."
+msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #: src/hub/pages/components/ItemPreview.tsx
@@ -47674,9 +47695,8 @@ msgid "Stopping…"
 msgstr "Arresto…"
 
 #: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Stops ambient animation — the galaxy twinkle, scrolling panoramas, spinning map previews and result flourishes. \"Follow system\" respects your OS accessibility preference."
-msgstr "Ferma le animazioni di sfondo: lo scintillio della galassia, i panorami che scorrono, le anteprime rotanti delle mappe e gli effetti sui risultati. «Segui il sistema» rispetta la preferenza di accessibilità del tuo sistema operativo."
+msgid "Stops ambient animation, such as the galaxy twinkle, scrolling panoramas, spinning map previews and result flourishes. Follow system uses your operating system's accessibility setting."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy

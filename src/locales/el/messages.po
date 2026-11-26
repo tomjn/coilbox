@@ -9990,6 +9990,10 @@ msgstr "Σχετικά με: {subject}"
 msgid "About actions"
 msgstr "Σχετικά με τις ενέργειες"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "About ambient effects"
+msgstr ""
+
 #: src/lego/pages/components/MovementSection.tsx
 #, fuzzy
 msgid "About banking"
@@ -10020,6 +10024,14 @@ msgstr "Σχετικά με τα κενά τμήματα"
 msgid "About fixing UVs and normals"
 msgstr "Σχετικά με τη διόρθωση UV και κανονικών"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "About fullscreen"
+msgstr ""
+
+#: src/general/pages/SettingsSection.tsx
+msgid "About interface size"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "About mirroring"
@@ -10035,10 +10047,18 @@ msgstr "Σχετικά με τη μετακίνηση ομάδας"
 msgid "About one piece's box"
 msgstr "Σχετικά με το κουτί ενός τμήματος"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "About performance mode"
+msgstr ""
+
 #: src/lego/pages/components/ProportionsPanel.tsx
 #, fuzzy
 msgid "About proportions"
 msgstr "Σχετικά με τις αναλογίες"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "About reduce motion"
+msgstr ""
 
 #: src/content/pages/components/ReplayTracksStorage.tsx
 #, fuzzy
@@ -10075,6 +10095,10 @@ msgstr "Σχετικά με τον όγκο σύγκρουσης"
 msgid "About the colour texture"
 msgstr "Σχετικά με την υφή χρώματος"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "About the frame rate"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "About the pivot point"
@@ -10084,6 +10108,10 @@ msgstr "Σχετικά με το σημείο περιστροφής"
 #, fuzzy
 msgid "About the shading map"
 msgstr "Σχετικά με τον χάρτη σκίασης"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "About the startup splash"
+msgstr ""
 
 #: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
@@ -16187,6 +16215,10 @@ msgstr "Κάντε κλικ στο μοντέλο για να βάλετε εκ�
 msgid "Click the second point"
 msgstr "Κάντε κλικ στο δεύτερο σημείο"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "Click the splash or press Escape to close it early."
+msgstr ""
+
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #, fuzzy
 msgid "Click to edit its units, double click to rename"
@@ -16907,11 +16939,6 @@ msgstr "Το Coilbox δημιουργεί εικόνες των μονάδων �
 #, fuzzy
 msgid "Coilbox is making pictures of {subject}'s units. Nothing has been sent yet."
 msgstr "Το Coilbox δημιουργεί εικόνες των μονάδων του {subject}. Δεν έχει σταλεί τίποτα ακόμη."
-
-#: src/general/pages/AboutCoilbox.tsx
-#, fuzzy
-msgid "Coilbox is open source. Browse the code, report a bug, or star the project on GitHub."
-msgstr "Το Coilbox είναι ανοιχτού κώδικα. Δείτε τον κώδικα, αναφέρετε ένα σφάλμα ή προσθέστε αστέρι στο έργο στο GitHub."
 
 #: src/hub/uploadOutcomes.ts
 #, fuzzy
@@ -20568,7 +20595,6 @@ msgid "Dismiss the failed analysis of {0}"
 msgstr "Απόρριψη της αποτυχημένης ανάλυσης του {0}"
 
 #: src/content/index.ts
-#: src/general/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Display"
 msgstr "Οθόνη"
@@ -21192,6 +21218,10 @@ msgstr "Καταναλώνεται όσο είναι αόρατη και κιν�
 #, fuzzy
 msgid "Drawn while cloaked and standing still."
 msgstr "Καταναλώνεται όσο είναι αόρατη και ακίνητη."
+
+#: src/general/pages/SettingsSection.tsx
+msgid "Draws 3D views at a lower resolution with fewer particles, for laptops and older graphics cards."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -22905,6 +22935,10 @@ msgstr "Αποσυμπίεση…"
 #, fuzzy
 msgid "Extraction depth"
 msgstr "Βάθος εξόρυξης"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "F11 and the button in the top bar also switch it."
+msgstr ""
 
 #: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
@@ -27489,6 +27523,7 @@ msgstr "Μάσκα bit αναχαίτισης από"
 msgid "Interception radius"
 msgstr "Ακτίνα αναχαίτισης"
 
+#: src/general/pages/SettingsSection.tsx
 #: src/sound/events.ts
 #: src/sound/library.ts
 #, fuzzy
@@ -31540,9 +31575,8 @@ msgid "Most of this game's PNG build pictures are {commonWidth} by {commonHeight
 msgstr "Οι περισσότερες εικόνες κατασκευής PNG αυτού του παιχνιδιού είναι {commonWidth} επί {commonHeight} pixel. Αυτή είναι {size} επί {size}."
 
 #: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Motion & effects"
-msgstr "Κίνηση και εφέ"
+msgid "Motion and effects"
+msgstr ""
 
 #: src/workshop/weaponSlots.ts
 #, fuzzy
@@ -41693,11 +41727,6 @@ msgstr "Απόδοση…"
 msgid "Renders"
 msgstr "Αποδόσεις"
 
-#: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Renders 3D views at a lower resolution with fewer particles — for laptops and older GPUs."
-msgstr "Αποδίδει τις τρισδιάστατες προβολές σε χαμηλότερη ανάλυση με λιγότερα σωματίδια — για φορητούς υπολογιστές και παλαιότερες κάρτες γραφικών."
-
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
 msgid "Reopen the seed and rules this project was made from, to change one and replay it"
@@ -42800,11 +42829,6 @@ msgstr "Εκτέλεση"
 msgid "Run {at} with {game} on engine {engine}, in {took}."
 msgstr "Εκτελέστηκε στις {at} με {game} στη μηχανή {engine}, σε {took}."
 
-#: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Run Coilbox in fullscreen. Also toggleable with F11 or the top-bar button; the choice is remembered across restarts."
-msgstr "Εκτέλεση του Coilbox σε πλήρη οθόνη. Εναλλάσσεται επίσης με F11 ή με το κουμπί της πάνω γραμμής. Η επιλογή διατηρείται μετά από επανεκκίνηση."
-
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
 msgid "Run complete"
@@ -43457,9 +43481,8 @@ msgid "Scales every sound Coilbox makes. Audio played by a campaign briefing or 
 msgstr "Ρυθμίζει την ένταση κάθε ήχου του Coilbox. Ο ήχος που παίζει μια ενημέρωση αποστολής εκστρατείας ή μια σελίδα προφίλ έχει δικά του χειριστήρια και δεν επηρεάζεται."
 
 #: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Scales the whole of Coilbox: text, spacing and the 3D views. Fit more on a small screen, or make everything easier to read on a large one. Cmd or Ctrl with plus and minus does the same, and with zero puts it back to 100%."
-msgstr "Αλλάζει την κλίμακα όλου του Coilbox: κείμενο, αποστάσεις και τρισδιάστατες προβολές. Χωρέστε περισσότερα σε μικρή οθόνη ή κάντε τα πάντα πιο ευανάγνωστα σε μεγάλη. Το Cmd ή Ctrl με συν και πλην κάνει το ίδιο, και με μηδέν επαναφέρει στο 100%."
+msgid "Scales text, spacing and the 3D views. Cmd or Ctrl with plus or minus changes it, and with zero sets it back to 100%."
+msgstr ""
 
 #: src/lego/pages/components/TransformFields.tsx
 #, fuzzy
@@ -45089,6 +45112,10 @@ msgstr "πακέτα ρύθμισης"
 msgid "Setup packs"
 msgstr "Πακέτα ρύθμισης"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "Setup wizard"
+msgstr ""
+
 #: src/lego/pages/components/SetPanel.tsx
 #, fuzzy
 msgid "Several"
@@ -45694,11 +45721,6 @@ msgstr "Εμφάνιση του μοντέλου {label}"
 #, fuzzy
 msgid "Show the back and forward navigation buttons in the top bar."
 msgstr "Εμφάνιση των κουμπιών πλοήγησης πίσω και εμπρός στην πάνω γραμμή."
-
-#: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Show the brand splash when Coilbox launches. Click it or press Escape to dismiss it early."
-msgstr "Εμφάνιση της οθόνης υποδοχής όταν ξεκινά το Coilbox. Κάντε κλικ ή πατήστε Escape για να την κλείσετε νωρίτερα."
 
 #: src/placement/PlacementSurface.tsx
 #, fuzzy
@@ -47006,9 +47028,8 @@ msgid "Star on GitHub"
 msgstr "Αστέρι στο GitHub"
 
 #: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Star twinkle, nebulae and other decorative touches. Turn off for a plainer interface. Sound is controlled separately, in Sound settings."
-msgstr "Τρεμόπαιγμα αστεριών, νεφελώματα και άλλες διακοσμητικές πινελιές. Απενεργοποιήστε τα για πιο λιτή διεπαφή. Ο ήχος ρυθμίζεται χωριστά, στις ρυθμίσεις Ήχου."
+msgid "Star twinkle, nebulae and other decorative touches. Sound has its own settings page."
+msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #: src/hub/pages/components/ItemPreview.tsx
@@ -47674,9 +47695,8 @@ msgid "Stopping…"
 msgstr "Διακοπή…"
 
 #: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Stops ambient animation — the galaxy twinkle, scrolling panoramas, spinning map previews and result flourishes. \"Follow system\" respects your OS accessibility preference."
-msgstr "Σταματά τις κινήσεις περιβάλλοντος — το τρεμόπαιγμα του γαλαξία, τα πανοράματα που κυλούν, τις περιστρεφόμενες προεπισκοπήσεις χαρτών και τα εφέ αποτελεσμάτων. Το «Ακολούθηση συστήματος» σέβεται την προτίμηση προσβασιμότητας του λειτουργικού σας συστήματος."
+msgid "Stops ambient animation, such as the galaxy twinkle, scrolling panoramas, spinning map previews and result flourishes. Follow system uses your operating system's accessibility setting."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy

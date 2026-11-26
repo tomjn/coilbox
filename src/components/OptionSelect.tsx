@@ -119,6 +119,7 @@ export function OptionSelect({
   disabled,
   className,
   size,
+  id,
   ariaLabel,
   ariaInvalid,
   describedBy,
@@ -130,6 +131,8 @@ export function OptionSelect({
   disabled?: boolean;
   className?: string;
   size?: "sm" | "default";
+  /** The trigger's id, so a `<label htmlFor>` elsewhere can name it. */
+  id?: string;
   ariaLabel?: string;
   /** Marks the trigger invalid, for a field a validator has flagged (issue
    *  #2287). */
@@ -143,6 +146,7 @@ export function OptionSelect({
   return (
     <Select value={value} onValueChange={onValueChange} disabled={disabled}>
       <SelectTrigger
+        id={id}
         size={size}
         className={cn("w-full", className)}
         aria-label={ariaLabel}

@@ -1,10 +1,9 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
-import { Maximize2, Sparkles, Wrench } from "lucide-react";
-import { Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
-import { Label } from "@/components/ui/label";
+import { SettingList, SettingRow } from "@/components/SettingRow";
 import { Switch } from "@/components/ui/switch";
+import { formatNumber } from "@/lib/format";
 import { useLanguageSetting } from "../../i18n/language";
 import { pickerLocales, SYSTEM_LANGUAGE } from "../../i18n/locales";
 import { languageLabel, packOnlyLocales } from "../../i18n/packs";
@@ -45,222 +44,214 @@ export default function GeneralSettings() {
   const showSplashToggle = hasProfileSplash();
 
   return (
-    <div className="space-y-8">
-      <section className="space-y-3">
-        <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          <Wrench size={15} /> <Trans>Tools</Trans>
+    <div className="flex flex-col gap-10">
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold">
+          <Trans>Tools</Trans>
         </h2>
         <FeatureToggles />
       </section>
 
-      <section className="space-y-3">
-        <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          <Maximize2 size={15} /> <Trans>Display</Trans>
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold">
+          <Trans>Interface</Trans>
         </h2>
-        <Field label={t`Language`} className="w-56">
-          <OptionSelect
-            value={language}
-            onValueChange={setLanguage}
-            size="sm"
-            options={[
-              { value: SYSTEM_LANGUAGE, label: t`System` },
-              ...pickerLocales(packOnlyLocales()).map((code) => ({
-                value: code,
-                label: languageLabel(code),
-                hint: code,
-              })),
-            ]}
-          />
-        </Field>
-        <div className="flex items-start gap-3">
-          <div className="w-40">
+        <SettingList>
+          <SettingRow id="language" label={t`Language`}>
             <OptionSelect
+              id="language"
+              value={language}
+              onValueChange={setLanguage}
+              size="sm"
+              className="w-56"
+              options={[
+                { value: SYSTEM_LANGUAGE, label: t`System` },
+                ...pickerLocales(packOnlyLocales()).map((code) => ({
+                  value: code,
+                  label: languageLabel(code),
+                  hint: code,
+                })),
+              ]}
+            />
+          </SettingRow>
+          <SettingRow
+            id="interface-size"
+            label={t`Interface size`}
+            helpLabel={t`About interface size`}
+            help={
+              <p>
+                <Trans>
+                  Scales text, spacing and the 3D views. Cmd or Ctrl with plus
+                  or minus changes it, and with zero sets it back to 100%.
+                </Trans>
+              </p>
+            }
+          >
+            <OptionSelect
+              id="interface-size"
               value={String(clampUiZoom(zoom))}
               onValueChange={(v) => setZoom(Number(v))}
               size="sm"
+              className="w-28"
               options={UI_ZOOM_LEVELS.map((level) => ({
                 value: String(level),
-                label: `${Math.round(level * 100)}%`,
+                label: formatNumber(level, {
+                  style: "percent",
+                  maximumFractionDigits: 0,
+                }),
               }))}
             />
-          </div>
-          <span className="space-y-1">
-            <span className="block text-sm font-medium">
-              <Trans>Interface size</Trans>
-            </span>
-            <span className="block text-xs text-muted-foreground">
-              <Trans>
-                Scales the whole of Coilbox: text, spacing and the 3D views. Fit
-                more on a small screen, or make everything easier to read on a
-                large one. Cmd or Ctrl with plus and minus does the same, and
-                with zero puts it back to 100%.
-              </Trans>
-            </span>
-          </span>
-        </div>
-        {!fullscreenLocked && (
-          <Label
-            htmlFor="fullscreen-mode"
-            className="flex cursor-pointer items-start gap-3 font-normal"
-          >
-            <Switch
+          </SettingRow>
+          {!fullscreenLocked && (
+            <SettingRow
               id="fullscreen-mode"
-              checked={fullscreen}
-              onCheckedChange={(v) => setFullscreen(v === true)}
-              className="mt-0.5"
-            />
-            <span className="space-y-1">
-              <span className="block text-sm font-medium">
-                <Trans>Fullscreen</Trans>
-              </span>
-              <span className="block text-xs text-muted-foreground">
+              label={t`Fullscreen`}
+              helpLabel={t`About fullscreen`}
+              help={
+                <p>
+                  <Trans>
+                    F11 and the button in the top bar also switch it.
+                  </Trans>
+                </p>
+              }
+            >
+              <Switch
+                id="fullscreen-mode"
+                checked={fullscreen}
+                onCheckedChange={(v) => setFullscreen(v === true)}
+              />
+            </SettingRow>
+          )}
+          {showSplashToggle && (
+            <SettingRow
+              id="startup-splash"
+              label={t`Startup splash`}
+              helpLabel={t`About the startup splash`}
+              help={
+                <p>
+                  <Trans>
+                    Click the splash or press Escape to close it early.
+                  </Trans>
+                </p>
+              }
+            >
+              <Switch
+                id="startup-splash"
+                checked={splash}
+                onCheckedChange={(v) => setSplash(v === true)}
+              />
+            </SettingRow>
+          )}
+          <SettingRow
+            id="show-frame-rate"
+            label={t`Show frame rate`}
+            helpLabel={t`About the frame rate`}
+            help={
+              <p>
                 <Trans>
-                  Run Coilbox in fullscreen. Also toggleable with F11 or the
-                  top-bar button; the choice is remembered across restarts.
+                  Shows how many frames a second each 3D view draws, in its
+                  bottom right corner.
                 </Trans>
-              </span>
-            </span>
-          </Label>
-        )}
-        {showSplashToggle && (
-          <Label
-            htmlFor="startup-splash"
-            className="flex cursor-pointer items-start gap-3 font-normal"
+              </p>
+            }
           >
             <Switch
-              id="startup-splash"
-              checked={splash}
-              onCheckedChange={(v) => setSplash(v === true)}
-              className="mt-0.5"
+              id="show-frame-rate"
+              checked={showFrameRate}
+              onCheckedChange={(v) => setShowFrameRate(v === true)}
             />
-            <span className="space-y-1">
-              <span className="block text-sm font-medium">
-                <Trans>Startup splash</Trans>
-              </span>
-              <span className="block text-xs text-muted-foreground">
-                <Trans>
-                  Show the brand splash when Coilbox launches. Click it or press
-                  Escape to dismiss it early.
-                </Trans>
-              </span>
-            </span>
-          </Label>
-        )}
-        <Label
-          htmlFor="show-frame-rate"
-          className="flex cursor-pointer items-start gap-3 font-normal"
-        >
-          <Switch
-            id="show-frame-rate"
-            checked={showFrameRate}
-            onCheckedChange={(v) => setShowFrameRate(v === true)}
-            className="mt-0.5"
-          />
-          <span className="space-y-1">
-            <span className="block text-sm font-medium">
-              <Trans>Show frame rate</Trans>
-            </span>
-            <span className="block text-xs text-muted-foreground">
-              <Trans>
-                Shows how many frames a second each 3D view draws, in its bottom
-                right corner.
-              </Trans>
-            </span>
-          </span>
-        </Label>
+          </SettingRow>
+        </SettingList>
       </section>
 
-      <section className="space-y-3">
-        <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          <Sparkles size={15} /> <Trans>Motion &amp; effects</Trans>
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold">
+          <Trans>Motion and effects</Trans>
         </h2>
-        <div className="flex items-start gap-3">
-          <div className="w-52 shrink-0">
+        <SettingList>
+          <SettingRow
+            id="reduce-motion"
+            label={t`Reduce motion`}
+            helpLabel={t`About reduce motion`}
+            help={
+              <p>
+                <Trans>
+                  Stops ambient animation, such as the galaxy twinkle, scrolling
+                  panoramas, spinning map previews and result flourishes. Follow
+                  system uses your operating system's accessibility setting.
+                </Trans>
+              </p>
+            }
+          >
             <OptionSelect
+              id="reduce-motion"
               value={reduceMotion}
               onValueChange={(v) => setReduceMotion(v as ReduceMotionSetting)}
               size="sm"
+              className="w-44"
               options={[
                 { value: "system", label: t`Follow system` },
                 { value: "on", label: t`Reduce motion` },
                 { value: "off", label: t`Full motion` },
               ]}
             />
-          </div>
-          <span className="space-y-1">
-            <span className="block text-sm font-medium">
-              <Trans>Reduce motion</Trans>
-            </span>
-            <span className="block text-xs text-muted-foreground">
-              <Trans>
-                Stops ambient animation — the galaxy twinkle, scrolling
-                panoramas, spinning map previews and result flourishes. "Follow
-                system" respects your OS accessibility preference.
-              </Trans>
-            </span>
-          </span>
-        </div>
-        <Label
-          htmlFor="display-effects"
-          className="flex cursor-pointer items-start gap-3 font-normal"
-        >
-          <Switch
+          </SettingRow>
+          <SettingRow
             id="display-effects"
-            checked={effects}
-            onCheckedChange={(v) => setEffects(v === true)}
-            className="mt-0.5"
-          />
-          <span className="space-y-1">
-            <span className="block text-sm font-medium">
-              <Trans>Ambient effects</Trans>
-            </span>
-            <span className="block text-xs text-muted-foreground">
-              <Trans>
-                Star twinkle, nebulae and other decorative touches. Turn off for
-                a plainer interface. Sound is controlled separately, in Sound
-                settings.
-              </Trans>
-            </span>
-          </span>
-        </Label>
-        <Label
-          htmlFor="display-performance"
-          className="flex cursor-pointer items-start gap-3 font-normal"
-        >
-          <Switch
+            label={t`Ambient effects`}
+            helpLabel={t`About ambient effects`}
+            help={
+              <p>
+                <Trans>
+                  Star twinkle, nebulae and other decorative touches. Sound has
+                  its own settings page.
+                </Trans>
+              </p>
+            }
+          >
+            <Switch
+              id="display-effects"
+              checked={effects}
+              onCheckedChange={(v) => setEffects(v === true)}
+            />
+          </SettingRow>
+          <SettingRow
             id="display-performance"
-            checked={performance}
-            onCheckedChange={(v) => setPerformance(v === true)}
-            className="mt-0.5"
-          />
-          <span className="space-y-1">
-            <span className="block text-sm font-medium">
-              <Trans>Performance mode</Trans>
-            </span>
-            <span className="block text-xs text-muted-foreground">
-              <Trans>
-                Renders 3D views at a lower resolution with fewer particles —
-                for laptops and older GPUs.
-              </Trans>
-            </span>
-          </span>
-        </Label>
+            label={t`Performance mode`}
+            helpLabel={t`About performance mode`}
+            help={
+              <p>
+                <Trans>
+                  Draws 3D views at a lower resolution with fewer particles, for
+                  laptops and older graphics cards.
+                </Trans>
+              </p>
+            }
+          >
+            <Switch
+              id="display-performance"
+              checked={performance}
+              onCheckedChange={(v) => setPerformance(v === true)}
+            />
+          </SettingRow>
+        </SettingList>
       </section>
 
-      <section
-        aria-labelledby="setup-heading"
-        className="flex items-center gap-3"
-      >
-        <span id="setup-heading" className="text-sm font-medium">
+      <section aria-labelledby="setup-heading" className="flex flex-col gap-3">
+        <h2 id="setup-heading" className="text-sm font-semibold">
           <Trans>Setup</Trans>
-        </span>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => requestOnboardingRerun()}
-        >
-          <Trans>Run setup again</Trans>
-        </Button>
+        </h2>
+        <SettingList>
+          <SettingRow label={t`Setup wizard`}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => requestOnboardingRerun()}
+            >
+              <Trans>Run setup again</Trans>
+            </Button>
+          </SettingRow>
+        </SettingList>
       </section>
 
       <AboutCoilbox />
