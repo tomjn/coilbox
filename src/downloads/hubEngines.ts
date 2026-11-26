@@ -121,3 +121,14 @@ export function offeredHubEngines(
       !hasOfficialBuild(builds, e.version, e.platform),
   );
 }
+
+/** Whether an engine of this version is already installed, by its folder
+ *  name or the version the engine reported once checked. */
+export function isEngineInstalled(
+  installed: readonly { version: string; syncVersion?: string }[],
+  version: string,
+): boolean {
+  return installed.some(
+    (e) => e.version === version || e.syncVersion?.split(" ")[0] === version,
+  );
+}

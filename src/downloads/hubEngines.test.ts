@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   fetchHubEngines,
   hasOfficialBuild,
+  isEngineInstalled,
   offeredHubEngines,
   parseHubEngines,
 } from "./hubEngines";
@@ -104,5 +105,22 @@ describe("fetchHubEngines", () => {
     await expect(
       fetchHubEngines("https://hub.example", "arm64-macos"),
     ).rejects.toThrow("hub.example");
+  });
+});
+
+describe("isEngineInstalled", () => {
+  it("matches the folder name or the version the engine reported", () => {
+    expect(isEngineInstalled([{ version: "2026.09.03" }], "2026.09.03")).toBe(
+      true,
+    );
+    expect(
+      isEngineInstalled(
+        [{ version: "recoil-test", syncVersion: "2026.09.03 BAR" }],
+        "2026.09.03",
+      ),
+    ).toBe(true);
+    expect(isEngineInstalled([{ version: "2026.09.02" }], "2026.09.03")).toBe(
+      false,
+    );
   });
 });

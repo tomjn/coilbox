@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { formatBytes } from "@/lib/format";
 import { errorText } from "@/lib/helpers";
+import { useInstalledEngines } from "../../../content/replayAnalysisOffer";
 import { useHubAccount } from "../../../hub/account";
 import { canUploadEngines } from "../../../hub/archiveUploads";
 import { useHubUrl, useTrustedHubUrl } from "../../../hub/config";
@@ -28,6 +29,7 @@ import {
   fetchHubEngines,
   HUB_ENGINE_WARNING,
   type HubEngine,
+  isEngineInstalled,
   offeredHubEngines,
 } from "../../hubEngines";
 import { EngineUpload } from "./EngineUpload";
@@ -46,6 +48,7 @@ export function HubEngineList() {
   const account = useHubAccount(hubUrl);
   const { path: writePath } = useWriteRoot();
   const { enqueue, itemFor, active } = useDownloadQueue();
+  const installed = useInstalledEngines();
   const [platform, setPlatform] = useState<string | null>(null);
   const [engines, setEngines] = useState<HubEngine[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -155,8 +158,11 @@ export function HubEngineList() {
           {engines.map((engine) => {
             const input = engineInput(engine);
             const queueItem = input ? itemFor(identityOf(input)) : null;
-            const status = queueItem?.status ?? null;
             const version = engine.version;
+            // An engine already on disk shows as installed, however it got there.
+            const status =
+              queueItem?.status ??
+              (isEngineInstalled(installed, version) ? "done" : null);
             const listed = engine.listedAt
               ? i18n.date(new Date(engine.listedAt), { dateStyle: "medium" })
               : "";
@@ -210,7 +216,7 @@ export function HubEngineList() {
                         : status === "queued"
                           ? t`Queued`
                           : status === "done"
-                            ? t`Done`
+                            ? t`Installed`
                             : active
                               ? t`Add to queue`
                               : t`Install`}
