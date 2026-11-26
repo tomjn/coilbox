@@ -256,6 +256,17 @@ describe("a campaign's units in an export file", () => {
     expect(imported.units?.map((u) => u.unitName)).toEqual(["jeep"]);
   });
 
+  // Issue #5469. A game's campaign still carries its files, and the folder the
+  // last launch wrote may be older than the game.
+  it("exports the files a campaign carries rather than its folder's", async () => {
+    const shipped = await sent(await campaignWithUnits());
+    disk.get("c1")?.get("tank")?.set("unit.json", uri("stale"));
+
+    const again = await sent(shipped);
+
+    expect(again.units).toEqual(shipped.units);
+  });
+
   it("keeps only inline files under a bare file name when reading an export", () => {
     const campaign = parseCampaignJson(
       JSON.stringify({

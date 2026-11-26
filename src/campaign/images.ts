@@ -90,7 +90,8 @@ async function mapCampaignImages(
 /**
  * Give each attached unit the list of files its copy holds, as `file` refs for
  * the walker to inline. A unit whose copy is not on disk gets none, and exports
- * as an entry with no files.
+ * as an entry with no files. A unit that already carries its files, as a game's
+ * or a bundled campaign's does, keeps those (issue #5469).
  */
 async function withUnitFileRefs(campaign: Campaign): Promise<Campaign> {
   if (!campaign.units?.length) return campaign;
@@ -99,7 +100,7 @@ async function withUnitFileRefs(campaign: Campaign): Promise<Campaign> {
     ...campaign,
     units: campaign.units.map((unit) => {
       const copy = stored.find((s) => s.unitName === unit.unitName);
-      if (!copy) return unit;
+      if (unit.files || !copy) return unit;
       const files: Record<string, ImageRef> = {};
       for (const file of [UNIT_FILE, ...copy.files]) {
         files[file] = { kind: "file", file };

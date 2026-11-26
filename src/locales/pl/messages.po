@@ -6316,13 +6316,13 @@ msgstr "{scenarioName} jako mission.lua"
 
 #: src/campaign/units.ts
 #, fuzzy
-msgid "{scope, select, campaign {This campaign's copy of {unitLabel} is missing. Attach it again from the unit builder.} conquest {This conquest's copy of {unitLabel} is missing. Attach it again from the unit builder.} warpath {This warpath's copy of {unitLabel} is missing. Attach it again from the unit builder.} other {This run's copy of {unitLabel} is missing. Attach it again from the unit builder.}}"
-msgstr "{scope, select, campaign {Brakuje kopii jednostki {unitLabel} w tej kampanii. Dołącz ją ponownie z kreatora jednostek.} conquest {Brakuje kopii jednostki {unitLabel} w tym podboju. Dołącz ją ponownie z kreatora jednostek.} warpath {Brakuje kopii jednostki {unitLabel} w tej Ścieżce wojennej. Dołącz ją ponownie z kreatora jednostek.} other {Brakuje kopii jednostki {unitLabel} w tej wyprawie. Dołącz ją ponownie z kreatora jednostek.}}"
+msgid "{scope, select, campaign {This campaign's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} conquest {This conquest's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} warpath {This warpath's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} other {This run's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.}}"
+msgstr "{scope, select, campaign {Identyfikator tej kampanii, {ownerId}, nie może być nazwą folderu gry, więc nie można wczytać jej jednostek.} conquest {Identyfikator tego podboju, {ownerId}, nie może być nazwą folderu gry, więc nie można wczytać jego jednostek.} warpath {Identyfikator tej Ścieżki wojennej, {ownerId}, nie może być nazwą folderu gry, więc nie można wczytać jej jednostek.} other {Identyfikator tej wyprawy, {ownerId}, nie może być nazwą folderu gry, więc nie można wczytać jej jednostek.}}"
 
 #: src/campaign/units.ts
 #, fuzzy
-msgid "{scope, select, campaign {This campaign's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} conquest {This conquest's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} warpath {This warpath's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} other {This run's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.}}"
-msgstr "{scope, select, campaign {Identyfikator tej kampanii, {ownerId}, nie może być nazwą folderu gry, więc nie można wczytać jej jednostek.} conquest {Identyfikator tego podboju, {ownerId}, nie może być nazwą folderu gry, więc nie można wczytać jego jednostek.} warpath {Identyfikator tej Ścieżki wojennej, {ownerId}, nie może być nazwą folderu gry, więc nie można wczytać jej jednostek.} other {Identyfikator tej wyprawy, {ownerId}, nie może być nazwą folderu gry, więc nie można wczytać jej jednostek.}}"
+msgid "{scope, select, conquest {This conquest's copy of {unitLabel} is missing. Attach it again from the unit builder.} warpath {This warpath's copy of {unitLabel} is missing. Attach it again from the unit builder.} other {This run's copy of {unitLabel} is missing. Attach it again from the unit builder.}}"
+msgstr "{scope, select, conquest {Brakuje kopii jednostki {unitLabel} w tym podboju. Dołącz ją ponownie z kreatora jednostek.} warpath {Brakuje kopii jednostki {unitLabel} w tej Ścieżce wojennej. Dołącz ją ponownie z kreatora jednostek.} other {Brakuje kopii jednostki {unitLabel} w tej wyprawie. Dołącz ją ponownie z kreatora jednostek.}}"
 
 #: src/direct/roomSeed.ts
 #, fuzzy
@@ -49405,6 +49405,10 @@ msgstr "Zapisane bajty, po szesnaście w wierszu."
 msgid "The caches are already empty."
 msgstr ""
 
+#: src/campaign/units.ts
+msgid "The campaign's copy of {name} could not be stored: {reason}"
+msgstr ""
+
 #: src/conquest/pages/GalaxyPage.tsx
 #, fuzzy
 msgid "The challenge code sets this conquest up: fog of war is off and the threat level is {level}. Pick a faction and start."
@@ -52798,6 +52802,10 @@ msgstr "Ta wersja nie zawiera muzyki."
 #, fuzzy
 msgid "This builder has nothing on its menu. Add a unit to give it one."
 msgstr "Ta jednostka budująca nie ma nic w menu. Dodaj jednostkę, aby je wypełnić."
+
+#: src/campaign/units.ts
+msgid "This campaign has no copy of {unitNames}. Attach it again from the unit builder. A campaign that came with a game has to be exported again by its author."
+msgstr ""
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #, fuzzy

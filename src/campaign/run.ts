@@ -31,7 +31,12 @@ import {
   runDifficulty,
 } from "./results";
 import { ensureCampaignScenarioMedia } from "./scenarioMedia";
-import { composeUnits, loadUnitCopies, missingAtlasPacks } from "./units";
+import {
+  composeUnits,
+  loadUnitCopies,
+  missingAtlasPacks,
+  writeCarriedCopies,
+} from "./units";
 
 /* -------------------------------------------------------------------------- *
  * The mission run hook — install check, launch, automatic result detection from
@@ -77,6 +82,9 @@ function useMissingAtlasPacks(campaign: Campaign) {
   const [missing, setMissing] = useState<string[]>([]);
   const [rechecks, setRechecks] = useState(0);
   const hasUnits = (campaign.units?.length ?? 0) > 0;
+  // Read through a ref, so a new campaign object alone does not re-run the read.
+  const latest = useRef(campaign);
+  latest.current = campaign;
   // biome-ignore lint/correctness/useExhaustiveDependencies: rechecks only re-runs the read
   useEffect(() => {
     if (!hasUnits) {
@@ -84,7 +92,8 @@ function useMissingAtlasPacks(campaign: Campaign) {
       return;
     }
     let cancelled = false;
-    Promise.all([loadUnitCopies(campaign.id), loadPack()])
+    writeCarriedCopies(latest.current)
+      .then(() => Promise.all([loadUnitCopies(campaign.id), loadPack()]))
       .then(([copies, pack]) => {
         const installed = new Set(
           pack.library.atlases.flatMap((a) => (a.folder ? [a.folder] : [])),

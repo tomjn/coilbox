@@ -6317,13 +6317,13 @@ msgstr "{scenarioName} som mission.lua"
 
 #: src/campaign/units.ts
 #, fuzzy
-msgid "{scope, select, campaign {This campaign's copy of {unitLabel} is missing. Attach it again from the unit builder.} conquest {This conquest's copy of {unitLabel} is missing. Attach it again from the unit builder.} warpath {This warpath's copy of {unitLabel} is missing. Attach it again from the unit builder.} other {This run's copy of {unitLabel} is missing. Attach it again from the unit builder.}}"
-msgstr "{scope, select, campaign {Kampanjens kopia av {unitLabel} saknas. Bifoga den igen från enhetsbyggaren.} conquest {Erövringens kopia av {unitLabel} saknas. Bifoga den igen från enhetsbyggaren.} warpath {Krigsstigen-rädens kopia av {unitLabel} saknas. Bifoga den igen från enhetsbyggaren.} other {Rädens kopia av {unitLabel} saknas. Bifoga den igen från enhetsbyggaren.}}"
+msgid "{scope, select, campaign {This campaign's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} conquest {This conquest's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} warpath {This warpath's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} other {This run's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.}}"
+msgstr "{scope, select, campaign {Kampanjens id, {ownerId}, kan inte användas som namn på en spelmapp, så dess enheter kan inte läsas in.} conquest {Erövringens id, {ownerId}, kan inte användas som namn på en spelmapp, så dess enheter kan inte läsas in.} warpath {Krigsstigen-rädens id, {ownerId}, kan inte användas som namn på en spelmapp, så dess enheter kan inte läsas in.} other {Rädens id, {ownerId}, kan inte användas som namn på en spelmapp, så dess enheter kan inte läsas in.}}"
 
 #: src/campaign/units.ts
 #, fuzzy
-msgid "{scope, select, campaign {This campaign's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} conquest {This conquest's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} warpath {This warpath's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} other {This run's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.}}"
-msgstr "{scope, select, campaign {Kampanjens id, {ownerId}, kan inte användas som namn på en spelmapp, så dess enheter kan inte läsas in.} conquest {Erövringens id, {ownerId}, kan inte användas som namn på en spelmapp, så dess enheter kan inte läsas in.} warpath {Krigsstigen-rädens id, {ownerId}, kan inte användas som namn på en spelmapp, så dess enheter kan inte läsas in.} other {Rädens id, {ownerId}, kan inte användas som namn på en spelmapp, så dess enheter kan inte läsas in.}}"
+msgid "{scope, select, conquest {This conquest's copy of {unitLabel} is missing. Attach it again from the unit builder.} warpath {This warpath's copy of {unitLabel} is missing. Attach it again from the unit builder.} other {This run's copy of {unitLabel} is missing. Attach it again from the unit builder.}}"
+msgstr "{scope, select, conquest {Erövringens kopia av {unitLabel} saknas. Bifoga den igen från enhetsbyggaren.} warpath {Krigsstigen-rädens kopia av {unitLabel} saknas. Bifoga den igen från enhetsbyggaren.} other {Rädens kopia av {unitLabel} saknas. Bifoga den igen från enhetsbyggaren.}}"
 
 #: src/direct/roomSeed.ts
 #, fuzzy
@@ -49435,6 +49435,10 @@ msgstr "De byte som skrevs, sexton per rad."
 msgid "The caches are already empty."
 msgstr ""
 
+#: src/campaign/units.ts
+msgid "The campaign's copy of {name} could not be stored: {reason}"
+msgstr ""
+
 #: src/conquest/pages/GalaxyPage.tsx
 #, fuzzy
 msgid "The challenge code sets this conquest up: fog of war is off and the threat level is {level}. Pick a faction and start."
@@ -52828,6 +52832,10 @@ msgstr "Den här versionen har ingen musik med."
 #, fuzzy
 msgid "This builder has nothing on its menu. Add a unit to give it one."
 msgstr "Den här byggaren har inget i sin meny. Lägg till en enhet för att ge den en."
+
+#: src/campaign/units.ts
+msgid "This campaign has no copy of {unitNames}. Attach it again from the unit builder. A campaign that came with a game has to be exported again by its author."
+msgstr ""
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #, fuzzy

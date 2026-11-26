@@ -31,6 +31,7 @@ import { gameCampaignFileUrl, gameCampaignOrigin } from "./gameCampaigns";
 import { inlineCampaignImages, materializeCampaignImages } from "./images";
 import type { Campaign, ImageRef } from "./model";
 import { ensureCampaignScenarioMedia } from "./scenarioMedia";
+import { writeCarriedCopies } from "./units";
 
 /**
  * The title for a copy of `title`, unused by any of `taken`.
@@ -185,16 +186,20 @@ export async function duplicateCampaign(
 ): Promise<CampaignCopy> {
   const id = crypto.randomUUID();
   await ensureCampaignScenarioMedia(source.id);
+  // A game's or a bundled campaign's unit copies are in its document until now
+  // (issue #5469).
+  await writeCarriedCopies(source);
 
+  const units = source.units?.map(({ files: _files, ...unit }) => unit);
   const withImages = await materializeCampaignImages(
-    await inlineCampaignImages(source),
+    await inlineCampaignImages({ ...source, units }),
     id,
   );
   const copied = await copyCampaignMedia(withImages, source.id, id);
   // The copies of builder units are files, not media refs, so they go across
   // whole. A failure stops the duplicate, since a copy naming units it does not
   // hold would refuse every mission (issue #4516).
-  if (source.units?.length) {
+  if (units?.length) {
     await campaignUnitsCopy({ fromId: source.id, toId: id });
   }
 

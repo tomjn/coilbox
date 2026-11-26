@@ -6317,13 +6317,13 @@ msgstr "{scenarioName} ως mission.lua"
 
 #: src/campaign/units.ts
 #, fuzzy
-msgid "{scope, select, campaign {This campaign's copy of {unitLabel} is missing. Attach it again from the unit builder.} conquest {This conquest's copy of {unitLabel} is missing. Attach it again from the unit builder.} warpath {This warpath's copy of {unitLabel} is missing. Attach it again from the unit builder.} other {This run's copy of {unitLabel} is missing. Attach it again from the unit builder.}}"
-msgstr "{scope, select, campaign {Λείπει το αντίγραφο του {unitLabel} αυτής της εκστρατείας. Συνδέστε το ξανά από τον συναρμολογητή μονάδων.} conquest {Λείπει το αντίγραφο του {unitLabel} αυτής της Κατάκτησης. Συνδέστε το ξανά από τον συναρμολογητή μονάδων.} warpath {Λείπει το αντίγραφο του {unitLabel} αυτού του Μονοπατιού Μάχης. Συνδέστε το ξανά από τον συναρμολογητή μονάδων.} other {Λείπει το αντίγραφο του {unitLabel} αυτής της πορείας. Συνδέστε το ξανά από τον συναρμολογητή μονάδων.}}"
+msgid "{scope, select, campaign {This campaign's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} conquest {This conquest's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} warpath {This warpath's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} other {This run's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.}}"
+msgstr "{scope, select, campaign {Το id αυτής της εκστρατείας, {ownerId}, δεν μπορεί να είναι όνομα φακέλου παιχνιδιού, οπότε οι μονάδες της δεν μπορούν να φορτωθούν.} conquest {Το id αυτής της Κατάκτησης, {ownerId}, δεν μπορεί να είναι όνομα φακέλου παιχνιδιού, οπότε οι μονάδες της δεν μπορούν να φορτωθούν.} warpath {Το id αυτού του Μονοπατιού Μάχης, {ownerId}, δεν μπορεί να είναι όνομα φακέλου παιχνιδιού, οπότε οι μονάδες του δεν μπορούν να φορτωθούν.} other {Το id αυτής της πορείας, {ownerId}, δεν μπορεί να είναι όνομα φακέλου παιχνιδιού, οπότε οι μονάδες της δεν μπορούν να φορτωθούν.}}"
 
 #: src/campaign/units.ts
 #, fuzzy
-msgid "{scope, select, campaign {This campaign's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} conquest {This conquest's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} warpath {This warpath's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} other {This run's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.}}"
-msgstr "{scope, select, campaign {Το id αυτής της εκστρατείας, {ownerId}, δεν μπορεί να είναι όνομα φακέλου παιχνιδιού, οπότε οι μονάδες της δεν μπορούν να φορτωθούν.} conquest {Το id αυτής της Κατάκτησης, {ownerId}, δεν μπορεί να είναι όνομα φακέλου παιχνιδιού, οπότε οι μονάδες της δεν μπορούν να φορτωθούν.} warpath {Το id αυτού του Μονοπατιού Μάχης, {ownerId}, δεν μπορεί να είναι όνομα φακέλου παιχνιδιού, οπότε οι μονάδες του δεν μπορούν να φορτωθούν.} other {Το id αυτής της πορείας, {ownerId}, δεν μπορεί να είναι όνομα φακέλου παιχνιδιού, οπότε οι μονάδες της δεν μπορούν να φορτωθούν.}}"
+msgid "{scope, select, conquest {This conquest's copy of {unitLabel} is missing. Attach it again from the unit builder.} warpath {This warpath's copy of {unitLabel} is missing. Attach it again from the unit builder.} other {This run's copy of {unitLabel} is missing. Attach it again from the unit builder.}}"
+msgstr "{scope, select, conquest {Λείπει το αντίγραφο του {unitLabel} αυτής της Κατάκτησης. Συνδέστε το ξανά από τον συναρμολογητή μονάδων.} warpath {Λείπει το αντίγραφο του {unitLabel} αυτού του Μονοπατιού Μάχης. Συνδέστε το ξανά από τον συναρμολογητή μονάδων.} other {Λείπει το αντίγραφο του {unitLabel} αυτής της πορείας. Συνδέστε το ξανά από τον συναρμολογητή μονάδων.}}"
 
 #: src/direct/roomSeed.ts
 #, fuzzy
@@ -49435,6 +49435,10 @@ msgstr "Τα byte που γράφτηκαν, δεκαέξι ανά γραμμή.
 msgid "The caches are already empty."
 msgstr ""
 
+#: src/campaign/units.ts
+msgid "The campaign's copy of {name} could not be stored: {reason}"
+msgstr ""
+
 #: src/conquest/pages/GalaxyPage.tsx
 #, fuzzy
 msgid "The challenge code sets this conquest up: fog of war is off and the threat level is {level}. Pick a faction and start."
@@ -52828,6 +52832,10 @@ msgstr "Αυτή η έκδοση δεν περιέχει μουσική."
 #, fuzzy
 msgid "This builder has nothing on its menu. Add a unit to give it one."
 msgstr "Αυτός ο κατασκευαστής δεν έχει τίποτα στο μενού του. Προσθέστε μια μονάδα για να αποκτήσει."
+
+#: src/campaign/units.ts
+msgid "This campaign has no copy of {unitNames}. Attach it again from the unit builder. A campaign that came with a game has to be exported again by its author."
+msgstr ""
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #, fuzzy

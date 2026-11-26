@@ -20,9 +20,14 @@
  *
  * Singleplayer only: a mutator written on one machine cannot be synced to a
  * lobby.
+ *
+ * A game's campaign and a bundled one carry their copies inline in the
+ * document, and {@link writeCarriedCopies} stores them before anything reads
+ * them.
  */
 
 import { select, t } from "@lingui/core/macro";
+import { describeError } from "@/i18n/uiError";
 import type { GameItem } from "../content/bindings";
 import { loadContentState } from "../content/contentState";
 import { legoScratchRemove } from "../lego/bindings";
@@ -50,12 +55,13 @@ import { loadUnitDefs } from "../workshop/config";
 import { type ModProject, PROJECTS_KEY } from "../workshop/project";
 import {
   campaignUnitDelete,
+  campaignUnitFileWrite,
   campaignUnitList,
   campaignUnitSave,
   campaignUnitsDelete,
   type UnitsScope,
 } from "./bindings";
-import type { CampaignUnit } from "./model";
+import { type CampaignUnit, UNIT_FILE } from "./model";
 
 /** Where a set of unit copies is kept: whose they are, and its id. */
 export interface UnitsRef {
@@ -353,6 +359,94 @@ export function parseUnitCopy(json: string): CampaignUnitCopy | null {
   }
 }
 
+/** The text a base64 `data:` URI holds, or null when it will not decode. */
+function dataUriText(dataUri: string): string | null {
+  try {
+    const binary = atob(dataUri.slice(dataUri.indexOf(",") + 1));
+    return new TextDecoder().decode(
+      Uint8Array.from(binary, (c) => c.charCodeAt(0)),
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Write one carried copy into its folder, unless the folder already holds the
+ * same `unit.json` and the same textures by name.
+ */
+async function writeCarriedCopy(
+  campaignId: string,
+  unit: CampaignUnit,
+  files: NonNullable<CampaignUnit["files"]>,
+  onDisk: { json: string; files: string[] } | undefined,
+): Promise<void> {
+  const { [UNIT_FILE]: unitFile, ...textures } = files;
+  if (unitFile?.kind !== "data") return;
+  const names = Object.keys(textures).sort();
+  if (
+    onDisk &&
+    onDisk.json === dataUriText(unitFile.dataUri) &&
+    JSON.stringify([...onDisk.files].sort()) === JSON.stringify(names)
+  ) {
+    return;
+  }
+  const { unitName, name } = unit;
+  try {
+    await campaignUnitDelete({ campaignId, unitName });
+    // `unit.json` last: a folder without it is not a copy.
+    for (const file of [...names, UNIT_FILE]) {
+      const ref = files[file];
+      if (ref.kind !== "data") continue;
+      await campaignUnitFileWrite({
+        campaignId,
+        unitName,
+        file,
+        dataUri: ref.dataUri,
+      });
+    }
+  } catch (e) {
+    const reason = describeError(e);
+    throw new Error(
+      t`The campaign's copy of ${name} could not be stored: ${reason}`,
+    );
+  }
+}
+
+/** The write in progress for each campaign, so two never share a folder. */
+const carriedWrites = new Map<string, Promise<void>>();
+
+/**
+ * Store the unit copies a campaign carries in its own document (issue #5469).
+ *
+ * A game's campaign and a bundled one are the file Campaign builder exports,
+ * read as it is and never imported, so each unit's files are still inline on
+ * its entry. A launch reads copies from the campaign's units folder, so they
+ * are written there first, the way `ensureCampaignScenarioMedia` writes the
+ * dialogue clips. A stored campaign carries no files, and this does nothing
+ * for it.
+ */
+export function writeCarriedCopies(owner: UnitsOwner): Promise<void> {
+  const carried = (owner.units ?? []).filter((u) => u.files?.[UNIT_FILE]);
+  if (carried.length === 0) return Promise.resolve();
+  const write = async () => {
+    const { units } = await campaignUnitList({ campaignId: owner.id });
+    for (const unit of carried) {
+      await writeCarriedCopy(
+        owner.id,
+        unit,
+        unit.files ?? {},
+        units.find((u) => u.unitName === unit.unitName),
+      );
+    }
+  };
+  const next = (carriedWrites.get(owner.id) ?? Promise.resolve())
+    .catch(() => {})
+    .then(write);
+  carriedWrites.set(owner.id, next);
+  return next;
+}
+
 /** A stored copy that will read, with its folder and the textures in it. */
 export interface StoredCopy {
   copy: CampaignUnitCopy;
@@ -559,7 +653,17 @@ export async function composeUnits(
       }),
     );
   }
+  await writeCarriedCopies(owner);
   const copies = await loadUnitCopies(owner.id, owner.scope);
+  if (scope === "campaign") {
+    const missing = units.filter((u) => !copies.has(u.unitName));
+    if (missing.length > 0) {
+      const unitNames = missing.map((u) => u.name).join(", ");
+      throw new Error(
+        t`This campaign has no copy of ${unitNames}. Attach it again from the unit builder. A campaign that came with a game has to be exported again by its author.`,
+      );
+    }
+  }
   const game = await gameMovement(target, base.archive);
   const prepared: PreparedUnit[] = [];
   const movementLeftOut: string[] = [];
@@ -570,7 +674,6 @@ export async function composeUnits(
       const unitLabel = unit.name;
       throw new Error(
         select(scope, {
-          campaign: `This campaign's copy of ${unitLabel} is missing. Attach it again from the unit builder.`,
           conquest: `This conquest's copy of ${unitLabel} is missing. Attach it again from the unit builder.`,
           warpath: `This warpath's copy of ${unitLabel} is missing. Attach it again from the unit builder.`,
           other: `This run's copy of ${unitLabel} is missing. Attach it again from the unit builder.`,

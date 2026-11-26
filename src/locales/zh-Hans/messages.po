@@ -6316,13 +6316,13 @@ msgstr "{scenarioName}（mission.lua 格式）"
 
 #: src/campaign/units.ts
 #, fuzzy
-msgid "{scope, select, campaign {This campaign's copy of {unitLabel} is missing. Attach it again from the unit builder.} conquest {This conquest's copy of {unitLabel} is missing. Attach it again from the unit builder.} warpath {This warpath's copy of {unitLabel} is missing. Attach it again from the unit builder.} other {This run's copy of {unitLabel} is missing. Attach it again from the unit builder.}}"
-msgstr "{scope, select, campaign {此战役中的 {unitLabel} 副本缺失。请从单位构建器重新附加。} conquest {此征服中的 {unitLabel} 副本缺失。请从单位构建器重新附加。} warpath {此征途中的 {unitLabel} 副本缺失。请从单位构建器重新附加。} other {本局中的 {unitLabel} 副本缺失。请从单位构建器重新附加。}}"
+msgid "{scope, select, campaign {This campaign's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} conquest {This conquest's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} warpath {This warpath's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} other {This run's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.}}"
+msgstr "{scope, select, campaign {此战役的 id {ownerId} 无法用作游戏文件夹名称，因此无法加载其单位。} conquest {此征服的 id {ownerId} 无法用作游戏文件夹名称，因此无法加载其单位。} warpath {此征途的 id {ownerId} 无法用作游戏文件夹名称，因此无法加载其单位。} other {本局的 id {ownerId} 无法用作游戏文件夹名称，因此无法加载其单位。}}"
 
 #: src/campaign/units.ts
 #, fuzzy
-msgid "{scope, select, campaign {This campaign's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} conquest {This conquest's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} warpath {This warpath's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} other {This run's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.}}"
-msgstr "{scope, select, campaign {此战役的 id {ownerId} 无法用作游戏文件夹名称，因此无法加载其单位。} conquest {此征服的 id {ownerId} 无法用作游戏文件夹名称，因此无法加载其单位。} warpath {此征途的 id {ownerId} 无法用作游戏文件夹名称，因此无法加载其单位。} other {本局的 id {ownerId} 无法用作游戏文件夹名称，因此无法加载其单位。}}"
+msgid "{scope, select, conquest {This conquest's copy of {unitLabel} is missing. Attach it again from the unit builder.} warpath {This warpath's copy of {unitLabel} is missing. Attach it again from the unit builder.} other {This run's copy of {unitLabel} is missing. Attach it again from the unit builder.}}"
+msgstr "{scope, select, conquest {此征服中的 {unitLabel} 副本缺失。请从单位构建器重新附加。} warpath {此征途中的 {unitLabel} 副本缺失。请从单位构建器重新附加。} other {本局中的 {unitLabel} 副本缺失。请从单位构建器重新附加。}}"
 
 #: src/direct/roomSeed.ts
 #, fuzzy
@@ -49405,6 +49405,10 @@ msgstr "已写入的字节，每行十六个。"
 msgid "The caches are already empty."
 msgstr ""
 
+#: src/campaign/units.ts
+msgid "The campaign's copy of {name} could not be stored: {reason}"
+msgstr ""
+
 #: src/conquest/pages/GalaxyPage.tsx
 #, fuzzy
 msgid "The challenge code sets this conquest up: fog of war is off and the threat level is {level}. Pick a faction and start."
@@ -52798,6 +52802,10 @@ msgstr "此版本没有附带音乐。"
 #, fuzzy
 msgid "This builder has nothing on its menu. Add a unit to give it one."
 msgstr "此建造单位的菜单上没有任何内容。添加一个单位即可为它添加菜单。"
+
+#: src/campaign/units.ts
+msgid "This campaign has no copy of {unitNames}. Attach it again from the unit builder. A campaign that came with a game has to be exported again by its author."
+msgstr ""
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #, fuzzy

@@ -54,6 +54,11 @@ const { ensureCampaignScenarioMedia } = vi.hoisted(() => ({
 }));
 vi.mock("./scenarioMedia", () => ({ ensureCampaignScenarioMedia }));
 
+const { writeCarriedCopies } = vi.hoisted(() => ({
+  writeCarriedCopies: vi.fn(async () => {}),
+}));
+vi.mock("./units", () => ({ writeCarriedCopies }));
+
 import { copyTitle, duplicateCampaign } from "./duplicate";
 import type { Campaign, CampaignMission } from "./model";
 
@@ -130,6 +135,53 @@ describe("a copy of a campaign", () => {
       toId: campaign.id,
     });
     expect(campaign.units).toEqual([unit]);
+  });
+
+  // Issue #5469. A game's campaign carries its copies in the document, so they
+  // are written under its own id and then copied like any other.
+  it("stores a game campaign's carried units before copying them", async () => {
+    const unit = {
+      unitName: "tank",
+      projectId: "p-tank",
+      name: "Tank",
+      builtBy: [],
+      copiedAt: "",
+    };
+    const source = campaignNamed({
+      units: [
+        {
+          ...unit,
+          files: { "unit.json": { kind: "data", dataUri: "data:,{}" } },
+        },
+      ],
+    });
+    const { campaign } = await duplicateCampaign(source, "Copy of Beachhead");
+
+    expect(writeCarriedCopies).toHaveBeenCalledWith(source);
+    expect(writeCarriedCopies.mock.invocationCallOrder[0]).toBeLessThan(
+      campaignUnitsCopy.mock.invocationCallOrder[0],
+    );
+    // The copy is a stored campaign, whose entries carry no files.
+    expect(campaign.units).toEqual([unit]);
+  });
+
+  it("stops when a carried unit cannot be stored", async () => {
+    writeCarriedCopies.mockRejectedValueOnce(new Error("disk full"));
+    const source = campaignNamed({
+      units: [
+        {
+          unitName: "tank",
+          projectId: "p-tank",
+          name: "Tank",
+          builtBy: [],
+          copiedAt: "",
+        },
+      ],
+    });
+    await expect(duplicateCampaign(source, "Copy")).rejects.toThrow(
+      "disk full",
+    );
+    expect(campaignUnitsCopy).not.toHaveBeenCalled();
   });
 
   it("copies no units for a campaign with none", async () => {
