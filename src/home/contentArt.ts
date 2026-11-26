@@ -152,9 +152,11 @@
  * wash of the terrain rather than as detail competing with the label.
  */
 
+import { gameCampaignOrigin } from "../campaign/gameCampaigns";
 import type {
   Campaign,
   CampaignMission,
+  ImageRef,
   ProgressFile,
 } from "../campaign/model";
 import { hashString } from "../conquest/rng";
@@ -275,7 +277,17 @@ function panoramaUrl(
   if (mission.panoramaMap || mission.panoramaUnit || !mission.panorama) {
     return undefined;
   }
-  return imageRefUrl(campaignId, mission.panorama);
+  return campaignRefUrl(campaignId, mission.panorama);
+}
+
+/**
+ * {@link imageRefUrl}, except for a file a game's campaign keeps inside its game
+ * (issue #2161). That has no synchronous URL, so the card falls through to the
+ * next pick rather than drawing a broken image.
+ */
+function campaignRefUrl(campaignId: string, ref: ImageRef): string | undefined {
+  if (ref.kind === "file" && gameCampaignOrigin(campaignId)) return undefined;
+  return imageRefUrl(campaignId, ref);
 }
 
 /**
@@ -306,7 +318,7 @@ export function campaignPicks(
     );
     const panorama = mission && panoramaUrl(campaign.id, mission);
     const background =
-      campaign.background && imageRefUrl(campaign.id, campaign.background);
+      campaign.background && campaignRefUrl(campaign.id, campaign.background);
     const mapName = mission?.snapshot?.mapName;
     const picks: ContentPick[] = [
       ...imagePicks([panorama, background]),

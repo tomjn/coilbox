@@ -12,6 +12,7 @@
 //!
 //! The Tauri commands that expose these to the frontend
 //! (`scenario_game_missions`, `scenario_game_mission_file`,
+//! `scenario_game_campaigns`, `scenario_game_campaign_file`,
 //! `scenario_game_runtime`) live in `lib.rs`.
 
 use coilbox_portable::is_safe_rel;
@@ -300,6 +301,49 @@ fn read_member(root: &Path, member: &str) -> Result<Vec<u8>, String> {
     }
 }
 
+/// The document a campaign folder holds to count as one (issue #2161).
+const CAMPAIGN_DOCUMENT: &str = "campaign.json";
+
+/// Every campaign folder the game at `root` ships under `campaigns/`, sorted. A
+/// folder counts when it holds `campaign.json`, and the files beside it are that
+/// campaign's media. A game with no `campaigns/` has none, which is not an error.
+pub fn list_campaigns(root: &Path) -> Result<Vec<String>, String> {
+    let mut found: Vec<String> = if root.is_dir() {
+        let Ok(entries) = std::fs::read_dir(root.join("campaigns")) else {
+            return Ok(Vec::new());
+        };
+        entries
+            .flatten()
+            .filter_map(|e| e.file_name().to_str().map(str::to_string))
+            .filter(|folder| !folder.starts_with('.'))
+            .filter(|folder| {
+                root.join("campaigns")
+                    .join(folder)
+                    .join(CAMPAIGN_DOCUMENT)
+                    .is_file()
+            })
+            .collect()
+    } else {
+        member_names(root)?
+            .iter()
+            .filter_map(|name| name.strip_prefix("campaigns/"))
+            .filter_map(|rest| rest.split_once('/'))
+            .filter(|(_, file)| *file == CAMPAIGN_DOCUMENT)
+            .map(|(folder, _)| folder.to_string())
+            .collect()
+    };
+    found.sort();
+    found.dedup();
+    Ok(found)
+}
+
+/// One file out of one campaign folder, whatever the game is packaged as.
+pub fn read_campaign_file(root: &Path, folder: &str, file: &str) -> Result<Vec<u8>, String> {
+    safe_part(folder)?;
+    safe_part(file)?;
+    read_member(root, &format!("campaigns/{folder}/{file}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -320,8 +364,25 @@ mod tests {
         std::fs::create_dir_all(missions.join("compiled-only")).unwrap();
         std::fs::write(missions.join("compiled-only/mission.lua"), "return {}").unwrap();
         std::fs::write(missions.join("runtime.lua"), "return { version = 3 }").unwrap();
+        let campaigns = dir.path().join("campaigns");
+        std::fs::create_dir_all(campaigns.join("rise")).unwrap();
+        std::fs::write(campaigns.join("rise/campaign.json"), "{}").unwrap();
+        std::fs::write(campaigns.join("rise/briefing.png"), "png").unwrap();
+        std::fs::create_dir_all(campaigns.join("notes")).unwrap();
+        std::fs::write(campaigns.join("notes/readme.txt"), "not a campaign").unwrap();
         dir
     }
+
+    /// Every file the packaged fixtures hold: the loose game's tree.
+    const PACKAGED: [(&str, &str); 7] = [
+        ("missions/first-contact/mission.lua", "return {}"),
+        ("missions/first-contact/scenario.json", "{}"),
+        ("missions/compiled-only/mission.lua", "return {}"),
+        ("missions/runtime.lua", "return { version = 3 }"),
+        ("campaigns/rise/campaign.json", "{}"),
+        ("campaigns/rise/briefing.png", "png"),
+        ("campaigns/notes/readme.txt", "not a campaign"),
+    ];
 
     /// The same tree as a `.sdz`.
     fn zipped_game(dir: &Path) -> PathBuf {
@@ -329,12 +390,7 @@ mod tests {
         let file = std::fs::File::create(&path).unwrap();
         let mut zip = zip::ZipWriter::new(file);
         let opts = zip::write::SimpleFileOptions::default();
-        for (name, body) in [
-            ("missions/first-contact/mission.lua", "return {}"),
-            ("missions/first-contact/scenario.json", "{}"),
-            ("missions/compiled-only/mission.lua", "return {}"),
-            ("missions/runtime.lua", "return { version = 3 }"),
-        ] {
+        for (name, body) in PACKAGED {
             zip.start_file(name, opts).unwrap();
             zip.write_all(body.as_bytes()).unwrap();
         }
@@ -346,12 +402,7 @@ mod tests {
     fn sevenzipped_game(dir: &Path) -> PathBuf {
         let path = dir.join("game.sd7");
         let mut writer = sevenz_rust2::ArchiveWriter::create(&path).unwrap();
-        for (name, body) in [
-            ("missions/first-contact/mission.lua", "return {}"),
-            ("missions/first-contact/scenario.json", "{}"),
-            ("missions/compiled-only/mission.lua", "return {}"),
-            ("missions/runtime.lua", "return { version = 3 }"),
-        ] {
+        for (name, body) in PACKAGED {
             writer
                 .push_archive_entry(
                     sevenz_rust2::ArchiveEntry::new_file(name),
@@ -374,15 +425,7 @@ mod tests {
     /// bytes do.
     fn rapid_game(dir: &Path) -> PathBuf {
         let mut index = Vec::new();
-        for (n, (name, body)) in [
-            ("missions/first-contact/mission.lua", "return {}"),
-            ("missions/first-contact/scenario.json", "{}"),
-            ("missions/compiled-only/mission.lua", "return {}"),
-            ("missions/runtime.lua", "return { version = 3 }"),
-        ]
-        .into_iter()
-        .enumerate()
-        {
+        for (n, (name, body)) in PACKAGED.into_iter().enumerate() {
             let md5 = [n as u8 + 0xa0; 16];
             let pool = pool_file(&dir.join("packages/game.sdp"), &md5).unwrap();
             std::fs::create_dir_all(pool.parent().unwrap()).unwrap();
@@ -526,5 +569,57 @@ mod tests {
 
         assert_eq!(stamp(loose.path()), None);
         assert!(stamp(&packaged).is_some());
+    }
+
+    #[test]
+    fn lists_only_campaign_folders_that_hold_a_document_in_every_kind() {
+        let loose = loose_game();
+        let dir = tempfile::tempdir().unwrap();
+
+        for root in [
+            loose.path().to_path_buf(),
+            zipped_game(dir.path()),
+            sevenzipped_game(dir.path()),
+            rapid_game(dir.path()),
+        ] {
+            assert_eq!(
+                list_campaigns(&root).unwrap(),
+                vec!["rise".to_string()],
+                "in {}",
+                root.display()
+            );
+        }
+    }
+
+    #[test]
+    fn reads_a_campaign_file_out_of_every_kind() {
+        let loose = loose_game();
+        let dir = tempfile::tempdir().unwrap();
+
+        for root in [
+            loose.path().to_path_buf(),
+            zipped_game(dir.path()),
+            sevenzipped_game(dir.path()),
+            rapid_game(dir.path()),
+        ] {
+            let bytes = read_campaign_file(&root, "rise", "briefing.png").unwrap();
+
+            assert_eq!(bytes, b"png", "in {}", root.display());
+        }
+    }
+
+    #[test]
+    fn a_campaign_file_cannot_climb_out() {
+        let game = loose_game();
+
+        assert!(read_campaign_file(game.path(), "..", "missions").is_err());
+        assert!(read_campaign_file(game.path(), "rise", "../notes/readme.txt").is_err());
+    }
+
+    #[test]
+    fn a_game_with_no_campaigns_is_not_an_error() {
+        let dir = tempfile::tempdir().unwrap();
+
+        assert_eq!(list_campaigns(dir.path()).unwrap(), Vec::<String>::new());
     }
 }

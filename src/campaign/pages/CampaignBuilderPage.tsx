@@ -31,7 +31,11 @@ import {
 import { refreshCampaigns, useCampaigns } from "../campaigns";
 import { copyTitle, duplicateCampaign } from "../duplicate";
 import { inlineCampaignImages, materializeCampaignImages } from "../images";
-import { campaignIsPlayable, campaignSummary } from "../listing";
+import {
+  campaignIsPlayable,
+  campaignSourceBadge,
+  campaignSummary,
+} from "../listing";
 import type { Campaign } from "../model";
 import {
   collectCampaignScenarioMedia,
@@ -312,8 +316,12 @@ export default function CampaignBuilderPage() {
         />
       ) : (
         <ul className="flex flex-col gap-2">
-          {campaigns.map(({ campaign, source }) => {
-            const bundled = source === "bundled";
+          {campaigns.map((loaded) => {
+            const { campaign } = loaded;
+            // Bundled and game campaigns are files coilbox never writes back
+            // or removes (issue #2161).
+            const readOnly = loaded.source !== "local";
+            const badge = campaignSourceBadge(loaded);
             // Nobody can play this one end to end: it has no missions, or one
             // of its missions names no game or no map (issue #2190). The row's
             // second line counts the missions and the editor's own mission list
@@ -354,9 +362,9 @@ export default function CampaignBuilderPage() {
                           <Trans>Draft</Trans>
                         </Badge>
                       )}
-                      {bundled && (
+                      {badge && (
                         <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                          <Trans>Bundled</Trans>
+                          {badge}
                         </span>
                       )}
                     </div>
@@ -381,8 +389,8 @@ export default function CampaignBuilderPage() {
                     followed by an import. */}
                 <CampaignRowMenu
                   campaign={campaign}
-                  editable={!bundled}
-                  deletable={!bundled}
+                  editable={!readOnly}
+                  deletable={!readOnly}
                   onDuplicate={() => void duplicate(campaign)}
                   onExport={() => void exportCampaign(campaign)}
                   onDelete={() => remove(campaign.id)}

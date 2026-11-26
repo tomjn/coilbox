@@ -17,6 +17,7 @@
 
 import { plural, t } from "@lingui/core/macro";
 import { relativeTime } from "../lib/relativeTime";
+import type { CampaignGameOrigin } from "./gameCampaigns";
 import type { Campaign } from "./model";
 
 /**
@@ -107,8 +108,11 @@ export function campaignUnplayableReason(campaign: Campaign): string | null {
   return t`Mission ${position} has no map`;
 }
 
-/** Local campaigns before bundled ones, as the plugin already reads them. */
-const sourceRank = { local: 0, bundled: 1 } as const;
+/**
+ * Local campaigns before bundled ones, as the plugin already reads them, and a
+ * game's own campaigns last (issue #2161).
+ */
+const sourceRank = { local: 0, bundled: 1, game: 2 } as const;
 
 /**
  * The campaign list in the order an author wants to read it: their own
@@ -134,7 +138,7 @@ const sourceRank = { local: 0, bundled: 1 } as const;
  * than shuffling between sessions.
  */
 export function sortCampaigns<
-  T extends { campaign: Campaign; source: "local" | "bundled" },
+  T extends { campaign: Campaign; source: "local" | "bundled" | "game" },
 >(loaded: readonly T[]): T[] {
   return [...loaded].sort(
     (a, b) =>
@@ -151,4 +155,21 @@ export function sortCampaigns<
  */
 export function campaignFallbackMap(campaign: Campaign): string | null {
   return campaign.missions[0]?.snapshot?.mapName || null;
+}
+
+/**
+ * The badge a read-only campaign carries in a list, or null for the player's
+ * own. A game's campaign (issue #2161) names its game, which is where a player
+ * would go to find out more and what has to stay installed for it to be listed.
+ */
+export function campaignSourceBadge(loaded: {
+  source: "local" | "bundled" | "game";
+  origin?: CampaignGameOrigin;
+}): string | null {
+  if (loaded.source === "bundled") return t`Bundled`;
+  if (loaded.source === "game") {
+    const game = loaded.origin?.gameName ?? "";
+    return game ? t`From ${game}` : t`From a game`;
+  }
+  return null;
 }

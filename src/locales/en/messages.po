@@ -12031,9 +12031,7 @@ msgstr "Bumpmapped"
 msgid "Bundle or download the game archive (.sdz/.sd7). {scanned}"
 msgstr "Bundle or download the game archive (.sdz/.sd7). {scanned}"
 
-#: src/campaign/pages/CampaignBuilderPage.tsx
-#: src/campaign/pages/CampaignDetailPage.tsx
-#: src/campaign/pages/CampaignsPage.tsx
+#: src/campaign/listing.ts
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/downloads/activityRows.ts
 #: src/scenario/pages/components/scenarioList.ts
@@ -20099,6 +20097,10 @@ msgstr "From {fileName}"
 msgid "From {fromGame}"
 msgstr "From {fromGame}"
 
+#: src/campaign/listing.ts
+msgid "From {game}"
+msgstr "From {game}"
+
 #: src/lego/liftPiece.ts
 msgid "From {gameName}, model {member}"
 msgstr "From {gameName}, model {member}"
@@ -20128,6 +20130,7 @@ msgstr "From {scenarioName}"
 msgid "from {source}"
 msgstr "from {source}"
 
+#: src/campaign/listing.ts
 #: src/sound/MusicSource.tsx
 msgid "From a game"
 msgstr "From a game"
@@ -38729,6 +38732,10 @@ msgid "start campaign ''{campaignId}'' is not bundled. Put its export in .coilbo
 msgstr "start campaign ''{campaignId}'' is not bundled. Put its export in .coilbox/campaigns/ and use the `id` from that file"
 
 #: src/profile/start.ts
+msgid "start campaign ''{campaignId}'' ships inside a game, not with this distribution. Players will not have it until its export is in .coilbox/campaigns/"
+msgstr "start campaign ''{campaignId}'' ships inside a game, not with this distribution. Players will not have it until its export is in .coilbox/campaigns/"
+
+#: src/profile/start.ts
 msgid "start campaign ''{campaignTitle}'' has no missions"
 msgstr "start campaign ''{campaignTitle}'' has no missions"
 
@@ -42959,6 +42966,10 @@ msgstr "This campaign is bundled and read-only. Import it or create a new one to
 #: src/campaign/pages/CampaignDetailPage.tsx
 msgid "This campaign isn't installed."
 msgstr "This campaign isn't installed."
+
+#: src/campaign/pages/CampaignEditPage.tsx
+msgid "This campaign ships inside {game} and is read-only. Duplicate it to edit a copy."
+msgstr "This campaign ships inside {game} and is read-only. Duplicate it to edit a copy."
 
 #: src/campaign/pages/components/MissionRemoveButton.tsx
 msgid "This can't be undone, though nothing has been written on this mission yet beyond its place in the campaign."

@@ -3,6 +3,7 @@ import {
   campaignFallbackMap,
   campaignGameLabel,
   campaignIsPlayable,
+  campaignSourceBadge,
   campaignSummary,
   campaignUnplayableReason,
   sortCampaigns,
@@ -244,5 +245,24 @@ describe("sortCampaigns", () => {
     ];
     sortCampaigns(list);
     expect(ids(list)).toEqual(["old", "new"]);
+  });
+});
+
+describe("campaignSourceBadge", () => {
+  it("names the game a game's campaign ships in", () => {
+    const origin = {
+      gameName: "Splinter Faction",
+      archivePath: "/g.sd7",
+      folder: "c",
+      loose: false,
+    };
+    expect(campaignSourceBadge({ source: "game", origin })).toBe(
+      "From Splinter Faction",
+    );
+  });
+
+  it("marks a bundled campaign and leaves the player's own alone", () => {
+    expect(campaignSourceBadge({ source: "bundled" })).toBe("Bundled");
+    expect(campaignSourceBadge({ source: "local" })).toBeNull();
   });
 });

@@ -13,7 +13,7 @@ import {
   SkeletonList,
 } from "../../content/pages/components/states";
 import { useCampaignProgress, useCampaigns } from "../campaigns";
-import { campaignUnplayableReason } from "../listing";
+import { campaignSourceBadge, campaignUnplayableReason } from "../listing";
 import type { Campaign } from "../model";
 import { resumeMissionId } from "../progress";
 import { CampaignIconBox } from "./components/CampaignImage";
@@ -40,7 +40,7 @@ function findResumeTarget(
 }
 
 /**
- * The Campaigns landing page: lists every stored campaign (local and bundled),
+ * The Campaigns landing page: lists every campaign (local, bundled and game),
  * each card linking to its detail page and showing how many missions are
  * complete. Progress comes from {@link useCampaignProgress}, which reloads on
  * mount so returning here after a mission reflects the new count.
@@ -85,17 +85,17 @@ export default function CampaignsPage() {
         <EmptyState label={t`No campaigns yet.`} />
       ) : (
         <ul className="flex flex-col gap-2">
-          {campaigns.map(({ campaign, source }) => (
-            <li key={campaign.id}>
+          {campaigns.map((loaded) => (
+            <li key={loaded.campaign.id}>
               <CampaignCard
-                campaign={campaign}
-                bundled={source === "bundled"}
+                campaign={loaded.campaign}
+                badge={campaignSourceBadge(loaded)}
                 completed={completedCount(
-                  campaign,
-                  progress.campaigns[campaign.id],
+                  loaded.campaign,
+                  progress.campaigns[loaded.campaign.id],
                 )}
                 continueMissionId={
-                  resumeTarget?.campaignId === campaign.id
+                  resumeTarget?.campaignId === loaded.campaign.id
                     ? resumeTarget.missionId
                     : undefined
                 }
@@ -120,12 +120,13 @@ function completedCount(
 
 function CampaignCard({
   campaign,
-  bundled,
+  badge,
   completed,
   continueMissionId,
 }: {
   campaign: Campaign;
-  bundled: boolean;
+  /** "Bundled" or the game a campaign ships in, or null for the player's own. */
+  badge: string | null;
   completed: number;
   /** Set only for the single most-recently-touched campaign with something to
    * resume (issue #374): swaps the trailing chevron for a "Continue" link
@@ -161,9 +162,9 @@ function CampaignCard({
               <Trans>Draft</Trans>
             </Badge>
           )}
-          {bundled && (
+          {badge && (
             <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-              <Trans>Bundled</Trans>
+              {badge}
             </span>
           )}
         </div>

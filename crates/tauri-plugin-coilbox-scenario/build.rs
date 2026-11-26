@@ -26,6 +26,8 @@ const COMMANDS: &[&str] = &[
     "scenario_game_missions",
     "scenario_game_mission_file",
     "scenario_game_runtime",
+    "scenario_game_campaigns",
+    "scenario_game_campaign_file",
 ];
 
 fn main() {

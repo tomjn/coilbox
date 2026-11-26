@@ -129,6 +129,33 @@ A profile can name a bundled campaign as where a new player starts, which puts a
 
 One exception: a bundled campaign whose missions carry a [scenario](scenarios.md) brings the scenario but not its dialogue portraits and voice clips, so those lines play silent. Import the campaign rather than bundling it until [issue #877](https://github.com/tomjn/coilbox/issues/877) is done.
 
+## Ship a campaign inside your game
+
+A game can carry its own campaigns. Anyone who installs the game and opens coilbox finds them in the Campaigns list, in the order you wrote them, with no distribution and no import. This works for a loose `.sdd` folder, a packaged `.sdz` or `.sd7`, and a rapid install.
+
+Put each campaign in its own folder under `campaigns/` at the root of the game:
+
+```
+<your game>/
+  modinfo.lua
+  campaigns/
+    act-one/
+      campaign.json
+      landing.jpg
+      intro-voice.ogg
+      intro.mp4
+```
+
+`campaign.json` is the file Campaign builder exports, saved under that name. A folder without `campaign.json` is not listed.
+
+Media goes beside `campaign.json`. A `"file"` reference in the document, such as `{ "kind": "file", "file": "intro-voice.ogg" }`, names a file in the same folder. This is how a game ships audio and video, which an export cannot carry. Images embedded in the export work too, so a still-image campaign can be the export file on its own.
+
+A campaign in a game is read-only. Coilbox never writes into the game, and the campaign has no Edit or Delete in Campaign builder. Players can still Duplicate it to get an editable copy, and Export it.
+
+Progress is kept in coilbox's own data folder, keyed by the campaign's `id`, the same as any other campaign. Nothing is written to the game. Keep the `id` the same between releases of your game, or players lose their place.
+
+If a player has a local campaign with the same `id`, for example one they imported, coilbox lists theirs and not the game's. If two installed games ship a campaign with the same `id`, only the first is listed.
+
 ## How coilbox detects a win or a loss
 
 After a mission's game exits (and wasn't cancelled), Coilbox tries to work out the result automatically instead of asking:

@@ -336,6 +336,25 @@ export default function CampaignEditPage() {
   const { drag, listProps } = useMissionDrag(moveTo);
 
   if (loading && !campaign) return <DetailLoading backTo={BACK} />;
+  if (loaded?.source === "game") {
+    const game = loaded.origin?.gameName ?? "";
+    return (
+      <div className="flex flex-col gap-4 p-4">
+        <Link
+          to={BACK}
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
+        >
+          <ArrowLeft className="size-3.5" /> <Trans>Back</Trans>
+        </Link>
+        <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
+          <Trans>
+            This campaign ships inside {game} and is read-only. Duplicate it to
+            edit a copy.
+          </Trans>
+        </div>
+      </div>
+    );
+  }
   if (loaded?.source === "bundled") {
     return (
       <div className="flex flex-col gap-4 p-4">
