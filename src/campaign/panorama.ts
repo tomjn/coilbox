@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { assetUrl, campaignMediaUrl, mediaKind } from "../lib/assetUrl";
 import { campaignImageRead } from "./bindings";
+import {
+  gameCampaignFileDataUri,
+  gameCampaignFileUrl,
+  gameCampaignOrigin,
+} from "./gameCampaigns";
 import type { ImageRef } from "./model";
 
 /**
@@ -18,7 +23,10 @@ export function resolvePanoramaDataUri(
   const key = `${campaignId}::${file}`;
   let promise = panoramaCache.get(key);
   if (!promise) {
-    promise = campaignImageRead({ campaignId, file }).then((r) => r.dataUrl);
+    const origin = gameCampaignOrigin(campaignId);
+    promise = origin
+      ? gameCampaignFileDataUri(origin, file)
+      : campaignImageRead({ campaignId, file }).then((r) => r.dataUrl);
     panoramaCache.set(key, promise);
   }
   return promise;
@@ -36,9 +44,14 @@ export function useCampaignPanorama(
   campaignId: string,
   panorama?: ImageRef,
 ): string | undefined {
+  // A game's campaign keeps its media in the game (issue #2161), so a `file`
+  // ref there is read out of the archive rather than coilbox's media folder.
+  const origin =
+    panorama?.kind === "file" ? gameCampaignOrigin(campaignId) : undefined;
   // Synchronous URLs, decided from the ref kind + extension.
-  const syncSrc =
-    panorama?.kind === "data"
+  const syncSrc = origin
+    ? undefined
+    : panorama?.kind === "data"
       ? panorama.dataUri
       : panorama?.kind === "local"
         ? assetUrl(panorama.path)
@@ -50,12 +63,27 @@ export function useCampaignPanorama(
     panorama?.kind === "file" && mediaKind(panorama.file) === "image"
       ? panorama.file
       : undefined;
+  const gameFile = origin && panorama?.kind === "file" ? panorama.file : "";
   const [src, setSrc] = useState<string | undefined>(syncSrc);
 
   useEffect(() => {
     if (syncSrc) {
       setSrc(syncSrc);
       return;
+    }
+    if (origin && gameFile) {
+      let cancelled = false;
+      gameCampaignFileUrl(origin, gameFile)
+        .then((url) => {
+          if (!cancelled) setSrc(url);
+        })
+        .catch((e) => {
+          console.warn("could not read campaign media from its game", e);
+          if (!cancelled) setSrc(undefined);
+        });
+      return () => {
+        cancelled = true;
+      };
     }
     if (!imageFile) {
       setSrc(undefined);
@@ -74,7 +102,7 @@ export function useCampaignPanorama(
     return () => {
       cancelled = true;
     };
-  }, [campaignId, imageFile, syncSrc]);
+  }, [campaignId, imageFile, syncSrc, origin, gameFile]);
 
   return src;
 }

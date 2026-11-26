@@ -10,6 +10,7 @@ import {
   scenarioMediaFiles,
 } from "../scenario/transfer";
 import { campaignList } from "./bindings";
+import { gameCampaignJson } from "./gameCampaigns";
 import type { Campaign } from "./model";
 import { type CampaignScenarioMedia, parseCampaignExport } from "./transfer";
 
@@ -161,6 +162,14 @@ export async function ensureCampaignScenarioMedia(
   if (materialised.has(campaignId)) return;
   materialised.add(campaignId);
   try {
+    // A game's campaign (issue #2161) carries its clips the same way, in the
+    // document the game ships.
+    const gameJson = gameCampaignJson(campaignId);
+    if (gameJson !== undefined) {
+      const parsed = parseCampaignExport(gameJson);
+      if (parsed?.media) await restoreCampaignScenarioMedia(parsed.media);
+      return;
+    }
     const { items } = await campaignList({});
     for (const item of items) {
       if (item.source !== "bundled") continue;

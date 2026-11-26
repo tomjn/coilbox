@@ -27,6 +27,7 @@ import { t } from "@lingui/core/macro";
 import { campaignMediaUrl, mediaKind } from "../lib/assetUrl";
 import { fetchAsDataUrl } from "../lib/dataUrl";
 import { campaignMediaImportData, campaignUnitsCopy } from "./bindings";
+import { gameCampaignFileUrl, gameCampaignOrigin } from "./gameCampaigns";
 import { inlineCampaignImages, materializeCampaignImages } from "./images";
 import type { Campaign, ImageRef } from "./model";
 import { ensureCampaignScenarioMedia } from "./scenarioMedia";
@@ -101,7 +102,13 @@ async function copyStoredMedia(
   ref: ImageRef | undefined,
 ): Promise<ImageRef | undefined> {
   if (ref?.kind !== "file" || mediaKind(ref.file) === "image") return ref;
-  const dataUri = await fetchAsDataUrl(campaignMediaUrl(sourceId, ref.file));
+  // A game's campaign keeps its media in the game (issue #2161).
+  const origin = gameCampaignOrigin(sourceId);
+  const url = origin
+    ? await gameCampaignFileUrl(origin, ref.file).catch(() => undefined)
+    : campaignMediaUrl(sourceId, ref.file);
+  if (!url) return undefined;
+  const dataUri = await fetchAsDataUrl(url);
   if (!dataUri) return undefined;
   try {
     const { file } = await campaignMediaImportData({

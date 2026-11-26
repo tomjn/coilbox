@@ -6,6 +6,7 @@ import type { CSSProperties } from "react";
 import { Link, useParams } from "react-router";
 import { SkeletonList } from "../../content/pages/components/states";
 import { useCampaignProgress, useCampaigns } from "../campaigns";
+import { campaignSourceBadge } from "../listing";
 import type { CampaignMission } from "../model";
 import { type MissionState, missionStates } from "../progress";
 import { CampaignIconBox, CampaignImage } from "./components/CampaignImage";
@@ -51,7 +52,8 @@ export default function CampaignDetailPage() {
     );
   }
 
-  const { campaign, source } = loaded;
+  const { campaign } = loaded;
+  const badge = campaignSourceBadge(loaded);
   const states = missionStates(campaign, progress.campaigns[campaign.id]);
   const total = campaign.missions.length;
   const completed = campaign.missions.filter(
@@ -102,9 +104,9 @@ export default function CampaignDetailPage() {
               <div className="flex min-w-0 flex-col gap-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-lg font-semibold">{campaign.title}</h1>
-                  {source === "bundled" && (
+                  {badge && (
                     <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                      <Trans>Bundled</Trans>
+                      {badge}
                     </span>
                   )}
                 </div>

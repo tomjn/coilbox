@@ -14793,9 +14793,7 @@ msgstr ""
 msgid "Bundle or download the game archive (.sdz/.sd7). {scanned}"
 msgstr "Dołącz lub pobierz archiwum gry (.sdz/.sd7). {scanned}"
 
-#: src/campaign/pages/CampaignBuilderPage.tsx
-#: src/campaign/pages/CampaignDetailPage.tsx
-#: src/campaign/pages/CampaignsPage.tsx
+#: src/campaign/listing.ts
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/downloads/activityRows.ts
 #: src/scenario/pages/components/scenarioList.ts
@@ -24654,6 +24652,10 @@ msgstr "Z {fileName}"
 msgid "From {fromGame}"
 msgstr "Z {fromGame}"
 
+#: src/campaign/listing.ts
+msgid "From {game}"
+msgstr ""
+
 #: src/lego/liftPiece.ts
 #, fuzzy
 msgid "From {gameName}, model {member}"
@@ -24690,6 +24692,7 @@ msgstr "Z {scenarioName}"
 msgid "from {source}"
 msgstr "z {source}"
 
+#: src/campaign/listing.ts
 #: src/sound/MusicSource.tsx
 #, fuzzy
 msgid "From a game"
@@ -47515,6 +47518,10 @@ msgid "start campaign ''{campaignId}'' is not bundled. Put its export in .coilbo
 msgstr "kampania startowa \"{campaignId}\" nie jest dołączona. Umieść jej eksport w .coilbox/campaigns/ i użyj `id` z tego pliku"
 
 #: src/profile/start.ts
+msgid "start campaign ''{campaignId}'' ships inside a game, not with this distribution. Players will not have it until its export is in .coilbox/campaigns/"
+msgstr ""
+
+#: src/profile/start.ts
 #, fuzzy
 msgid "start campaign ''{campaignTitle}'' has no missions"
 msgstr "kampania startowa „{campaignTitle}” nie ma misji"
@@ -52753,6 +52760,10 @@ msgstr "Ta kampania jest dołączona i tylko do odczytu. Zaimportuj ją albo utw
 #, fuzzy
 msgid "This campaign isn't installed."
 msgstr "Ta kampania nie jest zainstalowana."
+
+#: src/campaign/pages/CampaignEditPage.tsx
+msgid "This campaign ships inside {game} and is read-only. Duplicate it to edit a copy."
+msgstr ""
 
 #: src/campaign/pages/components/MissionRemoveButton.tsx
 #, fuzzy

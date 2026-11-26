@@ -728,6 +728,31 @@ async fn scenario_game_mission_file(root: String, folder: String, file: String) 
     }
 }
 
+/// `scenario_game_campaigns`, the campaigns a game ships under its own
+/// `campaigns/` folder (issue #2161), with the same `stamp` as
+/// [`scenario_game_missions`] so a packaged archive can be cached for the session.
+#[tauri::command]
+async fn scenario_game_campaigns(root: String) -> CliResult {
+    let path = Path::new(&root);
+    match archive::list_campaigns(path) {
+        Ok(campaigns) => {
+            CliResult::ok(json!({ "campaigns": campaigns, "stamp": archive::stamp(path) }))
+        }
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// `scenario_game_campaign_file`, one file out of one of a game's campaign
+/// folders: the document itself or one of its media files. Base64 for the same
+/// reason as [`scenario_game_mission_file`], and nothing is written to disk.
+#[tauri::command]
+async fn scenario_game_campaign_file(root: String, folder: String, file: String) -> CliResult {
+    match archive::read_campaign_file(Path::new(&root), &folder, &file) {
+        Ok(bytes) => CliResult::ok(json!({ "base64": STANDARD.encode(bytes) })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
 /// Read and evaluate `missions/runtime.lua` out of the game at `root`, however
 /// it is packaged. Uses `eval_value_raw`, not `eval_value`. The marker's keys
 /// are author data, the same "don't lowercase" contract `runtime::read_marker`
@@ -1000,6 +1025,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             scenario_write_game_mission,
             scenario_game_missions,
             scenario_game_mission_file,
+            scenario_game_campaigns,
+            scenario_game_campaign_file,
             scenario_game_runtime
         ])
         .build()

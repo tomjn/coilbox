@@ -23,7 +23,7 @@ export interface StartConfig {
 /** A loaded campaign reduced to what resolving `start` reads. */
 export interface StartCampaign {
   campaign: Campaign;
-  source: "local" | "bundled";
+  source: "local" | "bundled" | "game";
 }
 
 /** A loaded scenario reduced to what resolving `start` reads. */
@@ -92,6 +92,12 @@ export function resolveStart(
     return {
       status: "problem",
       issue: t`start campaign ''${campaignId}'' is not bundled. Put its export in .coilbox/campaigns/ and use the \`id\` from that file`,
+    };
+  }
+  if (found.source === "game") {
+    return {
+      status: "problem",
+      issue: t`start campaign ''${campaignId}'' ships inside a game, not with this distribution. Players will not have it until its export is in .coilbox/campaigns/`,
     };
   }
   if (found.source !== "bundled") {

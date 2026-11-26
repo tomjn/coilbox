@@ -1,19 +1,32 @@
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { describeError } from "@/i18n/uiError";
+import { useUnitsyncScan } from "../content/config";
 import { createDocumentStore } from "../lib/documentStore";
+import { usePreferredTarget } from "../play/config";
 import {
   campaignList,
   campaignProgressLoad,
   campaignProgressSave,
 } from "./bindings";
+import { type CampaignGameOrigin, gameCampaigns } from "./gameCampaigns";
 import { sortCampaigns } from "./listing";
 import { type Campaign, type ProgressFile, parseCampaignJson } from "./model";
 import { sweepOrphanedScenarioMedia } from "./scenarioMedia";
 
-/** A parsed campaign plus where it came from (bundled campaigns are read-only). */
+/**
+ * A parsed campaign plus where it came from. Bundled campaigns and a game's own
+ * (issue #2161) are read-only. `origin` is only set on a `"game"` campaign.
+ */
 export interface LoadedCampaign {
   campaign: Campaign;
-  source: "local" | "bundled";
+  source: "local" | "bundled" | "game";
+  origin?: CampaignGameOrigin;
 }
 
 /**
@@ -45,6 +58,89 @@ async function fetchCampaigns(): Promise<LoadedCampaign[]> {
 const store = createDocumentStore<LoadedCampaign[]>(fetchCampaigns, []);
 
 /**
+ * The campaigns installed games ship (issue #2161), read separately because
+ * they depend on the content scan rather than on coilbox's own storage, the
+ * way `scenario/scenarios.ts` reads a game's missions.
+ */
+let gameCache: LoadedCampaign[] = [];
+/** Whether the games half has settled at least once this session. */
+let gamesRead = false;
+const gameListeners = new Set<() => void>();
+
+/** Replace the games half and tell every mounted {@link useCampaigns}. */
+export function publishGameCampaigns(loaded: LoadedCampaign[]): void {
+  gameCache = loaded;
+  gamesRead = true;
+  for (const listener of gameListeners) listener();
+}
+
+function subscribeGames(onChange: () => void): () => void {
+  gameListeners.add(onChange);
+  return () => {
+    gameListeners.delete(onChange);
+  };
+}
+
+/**
+ * Stored and game campaigns in one list. A game campaign whose id a stored one
+ * already has is left out: the stored one is a copy the player imported or
+ * made, and progress is keyed by id, so the two cannot both be listed.
+ */
+export function mergeCampaigns(
+  stored: readonly LoadedCampaign[],
+  games: readonly LoadedCampaign[],
+): LoadedCampaign[] {
+  const ids = new Set(stored.map((l) => l.campaign.id));
+  return sortCampaigns([
+    ...stored,
+    ...games.filter((l) => !ids.has(l.campaign.id)),
+  ]);
+}
+
+/**
+ * Read the games half once the content scan answers. Settles on an empty half
+ * when there is no engine, or the scan failed or was cancelled, so the list
+ * never waits on a scan that will not come.
+ */
+function useGameCampaignsLoader(): boolean {
+  const { target, loading: targetLoading } = usePreferredTarget();
+  const enginePath = target?.enginePath;
+  const dataDir = target?.dataDir;
+  const {
+    data: scan,
+    error: scanError,
+    cancelled: scanCancelled,
+  } = useUnitsyncScan(enginePath, dataDir);
+  const [done, setDone] = useState(gamesRead);
+
+  useEffect(() => {
+    if (targetLoading) return;
+    if (!enginePath || !dataDir || (!scan && (scanError || scanCancelled))) {
+      gamesRead = true;
+      setDone(true);
+      return;
+    }
+    if (!scan) return;
+    let cancelled = false;
+    gameCampaigns(scan.games)
+      .then((loaded) => {
+        if (!cancelled) publishGameCampaigns(loaded);
+      })
+      .catch((e) => console.warn("could not read a game's own campaigns", e))
+      .finally(() => {
+        if (cancelled) return;
+        gamesRead = true;
+        setDone(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [scan, scanError, scanCancelled, targetLoading, enginePath, dataDir]);
+
+  return done;
+}
+
+/**
  * Re-read the campaign list from disk, refresh the shared session cache, and push
  * the result to every mounted {@link useCampaigns}. Call after a builder
  * save/delete/import so a newly-added (or removed) campaign updates the sidebar
@@ -59,8 +155,16 @@ export const refreshCampaigns = store.refresh;
  * list. Stays in lockstep with a mutation from any other consumer.
  */
 export function useCampaigns() {
-  const { data: campaigns, loading, error, refresh } = store.useStore();
-  return { campaigns, loading, error, refresh };
+  const { data: stored, loading, error, refresh } = store.useStore();
+  const games = useSyncExternalStore(subscribeGames, () => gameCache);
+  const gamesDone = useGameCampaignsLoader();
+  const campaigns = useMemo(
+    () => mergeCampaigns(stored, games),
+    [stored, games],
+  );
+  // Loading covers both halves, so a player whose only campaigns come from a
+  // game does not see "No campaigns yet" before the real list.
+  return { campaigns, loading: loading || !gamesDone, error, refresh };
 }
 
 /**
@@ -70,7 +174,8 @@ export function useCampaigns() {
  * whether deleting something would strip a campaign of what it plays.
  */
 export async function loadedCampaigns(): Promise<LoadedCampaign[]> {
-  return store.getCached() ?? (await refreshCampaigns());
+  const stored = store.getCached() ?? (await refreshCampaigns());
+  return mergeCampaigns(stored, gameCache);
 }
 
 /**
@@ -80,7 +185,10 @@ export async function loadedCampaigns(): Promise<LoadedCampaign[]> {
  * outside React and only have the route's id params to work with.
  */
 export function getCachedCampaign(id: string): LoadedCampaign | undefined {
-  return store.getCached()?.find((l) => l.campaign.id === id);
+  return (
+    store.getCached()?.find((l) => l.campaign.id === id) ??
+    gameCache.find((l) => l.campaign.id === id)
+  );
 }
 
 /**
@@ -98,7 +206,8 @@ const emptyProgress: ProgressFile = { schemaVersion: 1, campaigns: {} };
 
 /**
  * Load / save wrappers around the progress commands. Progress is stored separately
- * from campaign documents so bundled (read-only) campaigns still track progress.
+ * from campaign documents so read-only campaigns, bundled or shipped in a game,
+ * still track progress, in coilbox's own data folder.
  * The document is opaque to Rust; parse failures fall back to the empty default.
  */
 export function useCampaignProgress() {

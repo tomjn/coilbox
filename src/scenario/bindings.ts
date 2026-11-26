@@ -329,6 +329,25 @@ export const scenarioGameMissionFile = defineCommand<
 >("coilbox-scenario", "scenario_game_mission_file");
 
 /**
+ * The campaign folders a game ships under its own `campaigns/` (issue #2161).
+ * A folder counts when it holds `campaign.json`. `stamp` is as for
+ * {@link scenarioGameMissions}.
+ */
+export const scenarioGameCampaigns = defineCommand<
+  { root: string },
+  { campaigns: string[]; stamp: string | null }
+>("coilbox-scenario", "scenario_game_campaigns");
+
+/**
+ * One file out of one of a game's campaign folders, base64 encoded: the
+ * document or one of its media files. Nothing is written to disk.
+ */
+export const scenarioGameCampaignFile = defineCommand<
+  { root: string; folder: string; file: string },
+  { base64: string }
+>("coilbox-scenario", "scenario_game_campaign_file");
+
+/**
  * The runtime version marker a game declares for itself in its own
  * `missions/runtime.lua`. Same shape as {@link scenarioRuntimeStatus}'s
  * `installed`, but works on a packaged `.sd7`/`.sdz` too: reach for this one
