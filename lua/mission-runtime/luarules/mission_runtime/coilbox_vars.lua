@@ -23,8 +23,87 @@
 -- reloaded runtime takes its numbers back from it instead of starting from the
 -- scenario's. The engine keeps a param as a float, so a number with more
 -- precision than that comes back rounded to it.
+--
+-- A var the scenario lists in `persistentVars` is carried from one campaign
+-- mission to the next (issue #5294). Coilbox hands the campaign's saved values
+-- in through the coilbox_campaign_vars modoption, which this module reads in
+-- place of the scenario's starting value, and the gadget's unsynced half writes
+-- what they end at to a file coilbox reads back. A var not listed never reads a
+-- saved value, whatever the modoption says.
 
 local M = {}
+
+--- The saved values the coilbox_campaign_vars modoption carries: `name=value`
+-- pairs joined by commas, each name percent-encoded. A pair that does not read
+-- as a name and a number is dropped, and reported in the second return.
+--
+-- @param text the raw modoption, or nil
+-- @return name -> number, and a list of the pairs dropped
+function M.decode(text)
+	local values, dropped = {}, {}
+	if type(text) ~= "string" then
+		return values, dropped
+	end
+	for pair in text:gmatch("[^,]+") do
+		local name, number = pair:match("^([^=]+)=(.+)$")
+		local value = number and tonumber(number)
+		if name and value then
+			name = name:gsub("%%(%x%x)", function(hex)
+				return string.char(tonumber(hex, 16))
+			end)
+			values[name] = value
+		else
+			dropped[#dropped + 1] = pair
+		end
+	end
+	return values, dropped
+end
+
+--- A string as a JSON string literal.
+local function jsonString(text)
+	return '"' .. text:gsub('[%c"\\]', function(char)
+		if char == '"' then
+			return '\\"'
+		elseif char == "\\" then
+			return "\\\\"
+		end
+		return string.format("\\u%04x", char:byte())
+	end) .. '"'
+end
+
+--- The file the unsynced half writes when a campaign mission's persistent vars
+-- change: the launch's token, so coilbox can tell it from a file an earlier
+-- launch left, and each var's value. Names are sorted so the same values make
+-- the same file. Nine significant digits, which is all the engine's float
+-- numbers hold. A value that is not a finite number is left out, because JSON
+-- has no spelling for it.
+--
+-- @param run the coilbox_campaign_run token
+-- @param values name -> number
+function M.encodeFile(run, values)
+	local names = {}
+	for name in pairs(values) do
+		names[#names + 1] = name
+	end
+	table.sort(names)
+	local fields = {}
+	for _, name in ipairs(names) do
+		local value = values[name]
+		if type(value) == "number" and value == value and value ~= math.huge and value ~= -math.huge then
+			fields[#fields + 1] = jsonString(name) .. ":" .. string.format("%.9g", value)
+		end
+	end
+	return "{\"run\":" .. jsonString(run) .. ",\"vars\":{" .. table.concat(fields, ",") .. "}}\n"
+end
+
+--- The names a mission carries between campaign missions, as a set.
+function M.persistentNames(mission)
+	local names = {}
+	for _, name in ipairs((mission or {}).persistentVars or {}) do
+		names[name] = true
+	end
+	return names
+end
 
 --- What a var is called once mirrored. Prefixed because a game's own gadgets
 -- share that namespace and a mission's var names are whatever its author typed.
@@ -55,10 +134,17 @@ local COMPARE = {
 --- Register the var condition and the two var actions on a trigger engine.
 --
 -- @param engine the trigger engine
--- @param state the published mission state, GG.CoilboxMission
+-- @param state the published mission state, GG.CoilboxMission. Its
+--   `campaignVars` is the decoded modoption, the saved values a campaign hands
+--   this mission.
+-- @param hooks optional. `changed(name)` is called after a persistent var is
+--   written, so the gadget can save it where coilbox reads it.
 -- @return the vars themselves, so a game's own actions read and write them the
 --   way these do rather than around them
-function M.register(engine, state)
+function M.register(engine, state, hooks)
+	hooks = hooks or {}
+	local persistent = M.persistentNames(state.mission)
+	local saved = state.campaignVars or {}
 	-- Var name -> its number now.
 	local values = {}
 	-- The names the scenario declared. A name that is not one of these can only
@@ -87,6 +173,9 @@ function M.register(engine, state)
 		announce(name)
 		values[name] = value
 		Spring.SetGameRulesParam(M.RULES_PREFIX .. name, value)
+		if persistent[name] and hooks.changed then
+			hooks.changed(name)
+		end
 	end
 
 	--- Read a var. One never declared and never written reads as zero.
@@ -122,6 +211,10 @@ function M.register(engine, state)
 		local kept = state.resumed and Spring.GetGameRulesParam(M.RULES_PREFIX .. name)
 		if type(kept) == "number" then
 			values[name] = kept
+		elseif persistent[name] and type(saved[name]) == "number" then
+			-- The value the campaign saved from an earlier mission. Only on a
+			-- fresh start: a reloaded runtime has the mirror, which is newer.
+			vars.set(name, saved[name])
 		else
 			vars.set(name, tonumber(initial) or 0)
 		end

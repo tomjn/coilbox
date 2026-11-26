@@ -242,6 +242,9 @@ function M.newEngine(modOptions, files, options)
 		-- with the ground under it then. That order is the claim a base's terrain
 		-- makes: its ground is set before its buildings stand on it.
 		events = {},
+		-- What the unsynced half wrote through io.open, by path, as the whole of
+		-- what the file last held. Nothing reaches the real disk.
+		written = {},
 	}
 
 	local previous = options.survivors
@@ -918,6 +921,25 @@ function M.newEngine(modOptions, files, options)
 			end,
 		},
 		GG = engine.GG,
+		-- The unsynced half's file access. `options.unwritable` makes every open
+		-- fail, the way a write directory the engine may not write to does.
+		io = {
+			open = function(path, mode)
+				if options.unwritable then
+					return nil, path .. ": Permission denied"
+				end
+				assert(mode == "w", "the stub only writes whole files")
+				local parts = {}
+				return {
+					write = function(_, text)
+						parts[#parts + 1] = text
+					end,
+					close = function()
+						engine.written[path] = table.concat(parts)
+					end,
+				}
+			end,
+		},
 		SendToUnsynced = function(...)
 			table.insert(engine.sent, { ... })
 		end,

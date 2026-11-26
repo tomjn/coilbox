@@ -232,6 +232,25 @@ if difficultyProblem then
 end
 local DIFFICULTY_GATE = DIFFICULTY.gate(DIFFICULTY_LEVEL)
 
+-- A campaign's persistent vars (issue #5294). Modoptions for the reason the
+-- difficulty is one. coilbox_campaign_run is a token new to each launch from a
+-- campaign, and without it this is no campaign mission and nothing is written
+-- back. coilbox_campaign_vars is the values the campaign saved.
+local CAMPAIGN_RUN = Spring.GetModOptions().coilbox_campaign_run
+if CAMPAIGN_RUN == "" then
+	CAMPAIGN_RUN = nil
+end
+local CAMPAIGN_VARS, campaignVarsDropped = VARS.decode(Spring.GetModOptions().coilbox_campaign_vars)
+for _, pair in ipairs(campaignVarsDropped) do
+	log("warning", "ignoring a saved campaign var that is not a name and a number: " .. pair)
+end
+
+-- Where the unsynced half writes a campaign mission's persistent vars, relative
+-- to the engine's write directory. Coilbox reads it from the folder that holds
+-- the replay's demos/ folder, which is that directory. The replay itself cannot
+-- carry them: it records no game rules params.
+local VARS_FILE = "coilbox-campaign-vars.json"
+
 -- Not fatal. The mission will spawn its units at coordinates that mean nothing
 -- on this map, but saying so beats a silent sea of drowned commanders.
 if MISSION.map and MISSION.map ~= Game.mapName then
@@ -272,6 +291,9 @@ local MARKER_MESSAGE = "coilbox_mission_marker"
 -- And the one that asks this client to pause the game or start it again, which
 -- synced Lua cannot do for itself.
 local PAUSE_MESSAGE = "coilbox_mission_pause"
+-- And the one that says a persistent var changed, so the unsynced half writes
+-- the vars file again.
+local VARS_MESSAGE = "coilbox_mission_vars"
 
 -- The global the widget registers on the widget handler to hear a line. A
 -- missing one is a no-op in the engine, so a game with no LuaUI, or a player who
@@ -358,6 +380,10 @@ local function publish()
 		-- inventing its own ladder (issue #2164).
 		difficulty = DIFFICULTY_LEVEL,
 		difficultyGate = DIFFICULTY_GATE,
+		-- The values a campaign saved from its earlier missions, by var name, and
+		-- the launch's token, nil outside a campaign (issue #5294).
+		campaignVars = CAMPAIGN_VARS,
+		campaignRun = CAMPAIGN_RUN,
 		-- Per-participant setup with the engine team number resolved.
 		teams = teams,
 		--- Whether the mission places this engine team's opening units itself, and
@@ -791,7 +817,18 @@ if gadgetHandler:IsSyncedCode() then
 		published.zones = ZONES.register(triggers, published)
 		-- Before the first frame, so a var is at the number its author gave it
 		-- from the first trigger that reads it.
-		published.vars = VARS.register(triggers, published)
+		-- A persistent var's change is told to the unsynced half, which writes
+		-- the file coilbox reads back. Not during this registration: the unsynced
+		-- half is loaded after this one and writes the starting values itself.
+		local varsReady = false
+		published.vars = VARS.register(triggers, published, {
+			changed = function()
+				if varsReady and CAMPAIGN_RUN then
+					SendToUnsynced(VARS_MESSAGE)
+				end
+			end,
+		})
+		varsReady = true
 		-- After the vars, because every field of an economy action is an amount and
 		-- an amount may name one. Before the first frame, so the income it is
 		-- holding is the scenario's own from the frame the game starts paying.
@@ -1413,9 +1450,40 @@ else
 		end
 	end
 
+	local PERSISTENT = VARS.persistentNames(MISSION)
+	local varsFileFailed = false
+
+	--- Write the persistent vars where coilbox reads them back (issue #5294),
+	-- from the mirror the synced half keeps. Only in a campaign launch, which is
+	-- one with a run token, and never while a replay plays, because coilbox reads
+	-- the file only straight after the launch that wrote it.
+	local function writeVars()
+		if not CAMPAIGN_RUN or next(PERSISTENT) == nil or Spring.IsReplay() then
+			return
+		end
+		local values = {}
+		for name in pairs(PERSISTENT) do
+			local value = Spring.GetGameRulesParam(VARS.RULES_PREFIX .. name)
+			if type(value) == "number" then
+				values[name] = value
+			end
+		end
+		local file, reason = io.open(VARS_FILE, "w")
+		if not file then
+			if not varsFileFailed then
+				varsFileFailed = true
+				log("error", "could not write " .. VARS_FILE .. ": " .. tostring(reason))
+			end
+			return
+		end
+		file:write(VARS.encodeFile(CAMPAIGN_RUN, values))
+		file:close()
+	end
+
 	function gadget:Initialize()
 		published = publish()
 		paintNeutral()
+		writeVars()
 	end
 
 	--- Which unit an actor became. Anything about an actor that is local to this
@@ -1591,6 +1659,8 @@ else
 			end
 		elseif message == PAUSE_MESSAGE then
 			setPaused(first)
+		elseif message == VARS_MESSAGE then
+			writeVars()
 		elseif message == SOUND_MESSAGE then
 			-- Played here rather than in the widget, because a sound is not part of
 			-- the conversation and has nothing to queue behind.
