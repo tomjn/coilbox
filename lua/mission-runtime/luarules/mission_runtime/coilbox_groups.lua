@@ -402,6 +402,12 @@ function M.register(engine, state, hooks)
 		return out
 	end
 
+	--- The group a living unit belongs to, gifted or released since or not, or
+	-- nil for a unit that is no group's.
+	function handle.of(unitID)
+		return groupOf[unitID]
+	end
+
 	--- Whether a group has ever had units on the map. A group waiting for its
 	-- spawn has not, and is not dead for it.
 	function handle.hasBeenPlaced(id)

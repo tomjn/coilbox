@@ -300,8 +300,8 @@ local TRIGGER_HELD_PREFIX = "coilbox_mission_trigger_held_"
 -- of, so there is nothing to read it back from.
 local NOT_KEPT = "which units are in a group and what a group was ordered to do, "
 	.. "which reveals are lit, how long a zone has been held, how many units a team has "
-	.. "built or captured since the mission began, what a player has selected or ordered, "
-	.. "and which held lines of dialogue are on screen"
+	.. "built or captured since the mission began, which units have been attacked, "
+	.. "what a player has selected or ordered, and which held lines of dialogue are on screen"
 
 -- The rest of the runtime reads the mission through GG, in both halves. Both
 -- compute the team plan, because it is derived from the mission and deriving it
@@ -1052,6 +1052,32 @@ if gadgetHandler:IsSyncedCode() then
 				return true
 			end
 			return restrictions.allowsCommand(cmdID, unitTeam)
+		end
+	end
+
+	-- Who hit whom, for unit_attacked (issue #5298). Defined only when a trigger
+	-- asks, because the engine calls UnitDamaged for every hit in the game.
+	if PLAYER_ACTIONS.uses(MISSION, "unit_attacked") then
+		--- A unit took damage. A hit with no attacker, such as a fall or terrain,
+		-- is not an attack, and neither is one that does no damage or heals. A unit
+		-- the mission made invulnerable never gets here: UnitPreDamaged below takes
+		-- the hit to nothing and the engine stops there.
+		function gadget:UnitDamaged(unitID, unitDefID, unitTeam, damage, _, _, _,
+				attackerID, attackerDefID, attackerTeam)
+			if suppressing or not attackerID or damage <= 0 then
+				return
+			end
+			local actor = actorOfUnit[unitID]
+			if unitHooks.damaged(unitID, actor, attackerDefID, attackerTeam) then
+				raise("unit_attacked", {
+					unitID = unitID,
+					unitDefID = unitDefID,
+					actor = actor,
+					team = unitTeam,
+					attacker = attackerID,
+					attackerTeam = attackerTeam,
+				})
+			end
 		end
 	end
 

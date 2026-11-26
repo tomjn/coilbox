@@ -1,10 +1,10 @@
 -- Coilbox mission runtime: the trigger conditions that read units.
 --
--- These are the conditions the engine can answer on its own, without zones,
--- vars or groups: an actor's death, its health, what a team has built, what it
--- owns, and who took an actor off it. They are registered onto the trigger
--- engine the same way every other module registers its own, and the gadget
--- feeds the hooks this returns from its unit callins.
+-- These are the conditions the engine can answer without zones or vars: an
+-- actor's death and its health, who has hit an actor or a group, what a team has
+-- built, what it owns, and who took an actor off it. They are registered onto
+-- the trigger engine the same way every other module registers its own, and the
+-- gadget feeds the hooks this returns from its unit callins.
 --
 -- Read-only. It calls the engine to count and measure, and changes nothing.
 
@@ -41,6 +41,24 @@ function M.register(engine, state)
 	local built = {}
 	-- Actor id -> the engine team that last took it.
 	local captured = {}
+
+	-- Who has hit each actor and each group a unit_attacked condition names, as
+	-- id -> attacking engine team -> attacking def name -> the stamp of the last
+	-- such hit. Only those named are kept, because every hit in the game comes
+	-- past here.
+	local actorHits, groupHits = {}, {}
+	for _, trigger in ipairs((state.mission or {}).triggers or {}) do
+		for _, condition in ipairs((trigger.conditions or {}).conditions or {}) do
+			if condition.type == "unit_attacked" then
+				local params = condition.params or {}
+				if params.group ~= nil then
+					groupHits[params.group] = {}
+				elseif params.actor ~= nil then
+					actorHits[params.actor] = {}
+				end
+			end
+		end
+	end
 
 	--- The actor's unit, or nil when the actor is dead or never spawned.
 	local function unitOf(params)
@@ -113,10 +131,10 @@ function M.register(engine, state)
 		return count
 	end
 
-	--- The types `exceptDefs` leaves out of a count, as a set (issue #5293).
-	local function excepted(params)
+	--- A list of def names as a set.
+	local function setOf(names)
 		local set = {}
-		for _, name in ipairs(params.exceptDefs or {}) do
+		for _, name in ipairs(names or {}) do
 			set[name] = true
 		end
 		return set
@@ -132,15 +150,9 @@ function M.register(engine, state)
 			return nil
 		end
 
-		local wanted
-		if params.unitDefs and #params.unitDefs > 0 then
-			wanted = {}
-			for _, name in ipairs(params.unitDefs) do
-				wanted[name] = true
-			end
-		end
-
-		local except = excepted(params)
+		local wanted = params.unitDefs and #params.unitDefs > 0 and setOf(params.unitDefs)
+		-- The types `exceptDefs` leaves out of a count (issue #5293).
+		local except = setOf(params.exceptDefs)
 		local count = 0
 		for _, unitID in ipairs(living) do
 			local def = UnitDefs[Spring.GetUnitDefID(unitID)]
@@ -185,7 +197,7 @@ function M.register(engine, state)
 			end
 
 			local count = 0
-			local except = excepted(params)
+			local except = setOf(params.exceptDefs)
 			local defs = params.unitDefs
 			if defs and #defs > 0 then
 				for _, name in ipairs(defs) do
@@ -204,7 +216,79 @@ function M.register(engine, state)
 		end,
 	})
 
+	--- Whether some hit in `byTeam`, from the team and the types asked for, is
+	-- later than `since`.
+	local function hitSince(byTeam, team, wanted, since)
+		for attackerTeam, byDef in pairs(byTeam) do
+			if team == nil or attackerTeam == team then
+				for name, stamp in pairs(byDef) do
+					if stamp > since and (not wanted or wanted[name]) then
+						return true
+					end
+				end
+			end
+		end
+		return false
+	end
+
+	-- Holds once the actor, or a unit of the group, has been hit since the
+	-- trigger was armed, or since it last fired (issue #5298). A hit is a moment
+	-- rather than a state, so it is counted the way an order given is. A `group`
+	-- takes the place of the actor.
+	engine:addCondition("unit_attacked", {
+		events = { "unit_attacked" },
+		test = function(params, ctx)
+			local hits
+			if params.group ~= nil then
+				-- Reports a group the scenario does not have.
+				if not (state.groups and state.groups.living(params.group)) then
+					return false
+				end
+				hits = groupHits[params.group]
+			else
+				hits = actorHits[params.actor]
+			end
+
+			local team
+			if params.attackerTeam ~= nil then
+				team = engineTeam[params.attackerTeam]
+				if not team then
+					return false
+				end
+			end
+			local wanted = params.attackerDefs and #params.attackerDefs > 0 and setOf(params.attackerDefs)
+
+			return hits ~= nil and hitSince(hits, team, wanted, ctx.armedAt or 0)
+		end,
+	})
+
 	local hooks = {}
+
+	--- A unit took damage from another. Returns whether a unit_attacked condition
+	-- names it, which is whether there is anything for a trigger to hear about.
+	function hooks.damaged(unitID, actorId, attackerDefID, attackerTeam)
+		local def = UnitDefs[attackerDefID]
+		local name = def and def.name or ""
+		local stamp
+
+		local function record(byTeam)
+			if not byTeam then
+				return
+			end
+			stamp = stamp or engine:stamp()
+			byTeam[attackerTeam] = byTeam[attackerTeam] or {}
+			byTeam[attackerTeam][name] = stamp
+		end
+
+		if actorId then
+			record(actorHits[actorId])
+		end
+		local group = state.groups and state.groups.of(unitID)
+		if group then
+			record(groupHits[group])
+		end
+		return stamp ~= nil
+	end
 
 	--- A unit finished building. Counted against the team that owns it, by def
 	-- name, because that is what a scenario names.
