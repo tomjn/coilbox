@@ -29,16 +29,25 @@ function entry(file: ProgressFile, campaignId: string): CampaignProgress {
 /**
  * Record a mission win: add its id to `completedMissionIds` (deduped) and mark it
  * as last-played. Returns a new {@link ProgressFile}.
+ *
+ * `vars` is what the mission ended with for its persistent vars (issue #5294).
+ * Each one replaces the saved value of the same name, and a saved var the
+ * mission did not carry is kept, because a later mission may still read it.
  */
 export function applyVictory(
   file: ProgressFile,
   campaignId: string,
   missionId: string,
   now: string = new Date().toISOString(),
+  vars?: Record<string, number>,
 ): ProgressFile {
   const prev = entry(file, campaignId);
   const completed = new Set(prev.completedMissionIds);
   completed.add(missionId);
+  const carried =
+    vars && Object.keys(vars).length > 0
+      ? { ...prev.vars, ...vars }
+      : prev.vars;
   return {
     schemaVersion: 1,
     campaigns: {
@@ -47,6 +56,7 @@ export function applyVictory(
         ...prev,
         completedMissionIds: [...completed],
         lastPlayedMissionId: missionId,
+        ...(carried ? { vars: carried } : {}),
         updatedAt: now,
       },
     },
@@ -55,7 +65,9 @@ export function applyVictory(
 
 /**
  * Record a mission loss: update `lastPlayedMissionId` only, leaving completion
- * untouched (a defeat never advances the campaign). Returns a new
+ * untouched (a defeat never advances the campaign). It takes no vars: the
+ * mission will be played again, and what a failed attempt left its vars at is
+ * not where the next attempt should start (issue #5294). Returns a new
  * {@link ProgressFile}.
  */
 export function applyDefeat(

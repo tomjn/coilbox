@@ -289,6 +289,11 @@ A var is a named number belonging to one mission: a kill counter, a phase number
 
 Every write is mirrored into a game rules param named `coilbox_mission_var_<name>`, because a var nothing outside synced Lua can read is no use to an objectives panel, a debrief or a debug view. Reading the mirror needs no line of sight and no channel of our own: the engine keeps one table of game rules params for every Lua handle and answers `Spring.GetGameRulesParam` from all of them, LuaUI included. It stores each one as a float, so the mirror is a copy for readers and `GG.CoilboxMission.vars` stays the table the mission runs on.
 
+A mission may list var names in `persistentVars`, and those are carried from one campaign mission to the next ([issue #5294](https://github.com/tomjn/coilbox/issues/5294)). It needs runtime 21.
+
+- In: the `coilbox_campaign_vars` modoption holds the campaign's saved values as `name=value` pairs joined by commas, each name percent-encoded. A persistent var starts from its saved value when there is one, and from the scenario's otherwise. A var not in `persistentVars` never reads a saved value. A reloaded runtime takes the mirror instead, which is newer.
+- Out: a launch from a campaign carries a `coilbox_campaign_run` token. With one, the unsynced half writes `coilbox-campaign-vars.json` in the engine's write directory when it loads and each time a persistent var changes, as `{"run":"<token>","vars":{"name":1}}`. It writes nothing while a replay plays. The replay records no game rules params, so it cannot carry the values itself. Coilbox reads the file from the folder that holds the replay's `demos/` folder, checks the token and, if the mission was won, saves the values with the campaign's progress.
+
 A game's own actions read and write a var through that table rather than around it, so the mirror follows:
 
 ```lua
@@ -573,6 +578,8 @@ scripts/mission-tests.sh
 Every `tests/*_test.lua` file, each in its own `luajit`. Adding a suite is adding a file, and running one on its own is still `luajit lua/mission-runtime/tests/<name>_test.lua`. This is what the lint workflow runs.
 
 `tests/support.lua` holds the shared scaffolding: a stub of the slice of the engine the runtime touches, which records what the runtime asked for and plays back the callins it reacts to.
+
+`persistent_test.lua` proves a persistent var starts from the saved value, a var not marked never does, and the unsynced half writes the file only in a campaign launch and never during a replay.
 
 `latched_test.lua` plays "visit both ridges, in either order" with a reload between the two visits.
 

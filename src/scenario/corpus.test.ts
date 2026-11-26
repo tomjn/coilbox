@@ -180,6 +180,10 @@ describe("scenario fixture corpus", () => {
       "a condition that counts once it has held": allTriggers.some((t) =>
         t.conditions.conditions.some((c) => c.latched === true),
       ),
+      // Issue #5294.
+      "a var a campaign carries to its next mission": fixtures.some(
+        ({ scenario }) => (scenario.persistentVars?.length ?? 0) > 0,
+      ),
       "a trigger disarmed at start": allTriggers.some((t) => !t.enabled),
       "a base": allBases.length > 0,
       "a base building with a factory queue": allBuildings.some(

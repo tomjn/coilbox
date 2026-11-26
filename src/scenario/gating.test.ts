@@ -578,6 +578,19 @@ describe("requiredRuntimeVersion", () => {
   });
 
   /**
+   * Issue #5294. A runtime behind 21 ignores the saved values, so only a
+   * scenario that marks a var asks for it.
+   */
+  it("asks for 21 for a persistent var, and only then", () => {
+    const scenario = withTrigger(["unit_dead"], []);
+    const declared: Scenario = { ...scenario, vars: { rescued: 0 } };
+    expect(requiredRuntimeVersion(declared)).toBe(1);
+    expect(
+      requiredRuntimeVersion({ ...declared, persistentVars: ["rescued"] }),
+    ).toBe(21);
+  });
+
+  /**
    * Issue #5298. A runtime behind 17 has no `unit_attacked`, so it reports it
    * once and the condition never holds.
    */

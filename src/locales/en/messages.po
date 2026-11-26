@@ -12505,6 +12505,10 @@ msgstr "Career"
 msgid "Carried as written ({readOnlyCount})"
 msgstr "Carried as written ({readOnlyCount})"
 
+#: src/scenario/pages/components/VarPanel.tsx
+msgid "Carry {name} to the next mission"
+msgstr "Carry {name} to the next mission"
+
 #: src/content/achievements.ts
 msgid "Cartographer"
 msgstr "Cartographer"
@@ -31489,6 +31493,10 @@ msgstr "Perk: {0}"
 #: src/runlite/pages/components/RunEndScreen.tsx
 msgid "Perks earned"
 msgstr "Perks earned"
+
+#: src/scenario/pages/components/VarPanel.tsx
+msgid "Persistent"
+msgstr "Persistent"
 
 #: src/lego/pages/components/FourViews.tsx
 msgctxt "view"

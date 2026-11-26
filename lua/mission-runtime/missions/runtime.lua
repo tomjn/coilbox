@@ -206,8 +206,20 @@
 -- both ridges" waits for a unit on each at the same moment. So a scenario using
 -- it asks for 20.
 
+-- 21 carries a var from one campaign mission to the next (issue #5294). One
+-- format feature:
+--
+--   * a mission may carry `persistentVars`, a list of var names. Each starts from
+--     the value the coilbox_campaign_vars modoption names, when it names one, and
+--     a launch carrying coilbox_campaign_run has the unsynced half write them to
+--     coilbox-campaign-vars.json in the write directory whenever they change
+--
+-- A runtime behind 21 starts every var from the scenario's value and writes
+-- nothing back, so a choice made in one mission is forgotten by the next. So a
+-- scenario using it asks for 21.
+
 return {
-	version = 20,
+	version = 21,
 
 	-- The compiled mission format this runtime reads.
 	schemaVersion = 1,

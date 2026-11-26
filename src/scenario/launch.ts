@@ -92,6 +92,57 @@ export const MISSION_MODOPTION = "coilbox_mission";
  */
 export const DIFFICULTY_MODOPTION = "coilbox_difficulty";
 
+/**
+ * The modoptions that carry a campaign's persistent vars in and out of a
+ * mission (issue #5294). Modoptions for the reason difficulty is one: a mission
+ * a game ships in a packaged archive cannot be rewritten per launch.
+ *
+ * `coilbox_campaign_run` is a token new to each launch. It is what tells the
+ * runtime this is a campaign mission at all, so it writes the vars back, and
+ * the runtime copies it into the file it writes, so coilbox can tell that file
+ * from one an earlier launch left behind.
+ *
+ * `coilbox_campaign_vars` is the saved values, as {@link encodeCampaignVars}
+ * writes them. Left out when nothing is saved yet.
+ */
+export const CAMPAIGN_RUN_MODOPTION = "coilbox_campaign_run";
+export const CAMPAIGN_VARS_MODOPTION = "coilbox_campaign_vars";
+
+/**
+ * Saved var values as one modoption value: `name=value` pairs joined by commas,
+ * each name percent-encoded. A start script line ends at the first `;` and a
+ * var name is whatever the author typed, so the name is encoded, and
+ * `encodeURIComponent` also encodes the `,` and `=` this format splits on.
+ * Sorted by name so the same values always make the same start script.
+ */
+export function encodeCampaignVars(values: Record<string, number>): string {
+  return Object.keys(values)
+    .sort()
+    .filter((name) => Number.isFinite(values[name]))
+    .map((name) => `${encodeURIComponent(name)}=${String(values[name])}`)
+    .join(",");
+}
+
+/** What a campaign hands one launch of its mission (issue #5294). */
+export interface CampaignVarsLaunch {
+  /** A token new to this launch, see {@link CAMPAIGN_RUN_MODOPTION}. */
+  run: string;
+  /** The saved value of each persistent var that has one. */
+  values: Record<string, number>;
+}
+
+/** The two campaign modoptions for one launch, or none outside a campaign. */
+function campaignModOptions(
+  campaignVars: CampaignVarsLaunch | undefined,
+): Record<string, string> {
+  if (!campaignVars) return {};
+  const encoded = encodeCampaignVars(campaignVars.values);
+  return {
+    [CAMPAIGN_RUN_MODOPTION]: campaignVars.run,
+    ...(encoded ? { [CAMPAIGN_VARS_MODOPTION]: encoded } : {}),
+  };
+}
+
 /** How a scenario reaches the engine. */
 export type ScenarioRoute = "adopted" | "mutator";
 
@@ -343,6 +394,12 @@ export interface ScenarioLaunchInput {
    * nothing about the mission is a picker worth leaving out.
    */
   difficulty?: Difficulty;
+  /**
+   * The campaign's saved vars and this launch's token, for a mission played
+   * from a campaign (issue #5294). Absent for every other launch, which then
+   * writes neither modoption and leaves no file behind.
+   */
+  campaignVars?: CampaignVarsLaunch;
   /**
    * A generated game carrying units from the unit builder, which depends on
    * the scenario's game (issue #4516). The scenario plays on top of it: an
@@ -598,6 +655,7 @@ export async function launchScenario(
     units,
     origin,
     difficulty,
+    campaignVars,
     unitsGame,
     compat,
   } = input;
@@ -730,6 +788,7 @@ export async function launchScenario(
         ...scenario.setup.modOptionValues,
         [MISSION_MODOPTION]: folder,
         ...(difficulty ? { [DIFFICULTY_MODOPTION]: difficulty } : {}),
+        ...campaignModOptions(campaignVars),
       },
     }),
     captured,

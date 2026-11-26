@@ -1100,6 +1100,22 @@ describe("parseScenario — teams, vars and restrictions", () => {
     expect(s?.vars).toEqual({ kills: 0, phase: 2 });
   });
 
+  // Issue #5294.
+  it("keeps only declared persistent vars, deduped and sorted", () => {
+    const s = parseScenario(
+      doc({
+        vars: { kills: 0, phase: 2 },
+        persistentVars: ["phase", "kills", "phase", "ghost", 4],
+      }),
+    );
+    expect(s?.persistentVars).toEqual(["kills", "phase"]);
+  });
+
+  it("leaves persistentVars off a document that marks nothing", () => {
+    const s = parseScenario(doc({ vars: { kills: 0 }, persistentVars: [] }));
+    expect(JSON.parse(JSON.stringify(s))).not.toHaveProperty("persistentVars");
+  });
+
   it("parses buildable restrictions, defaulting the mode to deny", () => {
     const s = parseScenario(
       doc({

@@ -457,6 +457,12 @@ function mission(scenario: Scenario): LuaTable {
     ],
     ["restrictions", restrictions(scenario)],
     ["vars", sortedTbl(scenario.vars, (v) => v)],
+    // Left out when nothing is marked, so a mission that carries nothing on
+    // compiles to the bytes it always did (issue #5294).
+    [
+      "persistentVars",
+      scenario.persistentVars?.length ? scenario.persistentVars : undefined,
+    ],
     ["triggers", scenario.triggers.map(trigger)],
     ["objectives", scenario.objectives.map(objective)],
     ["dialogue", scenario.dialogue.map(dialogue)],

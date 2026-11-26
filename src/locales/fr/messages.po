@@ -15360,6 +15360,10 @@ msgstr "Carrière"
 msgid "Carried as written ({readOnlyCount})"
 msgstr "Transportés tels qu’écrits ({readOnlyCount})"
 
+#: src/scenario/pages/components/VarPanel.tsx
+msgid "Carry {name} to the next mission"
+msgstr ""
+
 #: src/content/achievements.ts
 #, fuzzy
 msgid "Cartographer"
@@ -38640,6 +38644,10 @@ msgstr "Atout : {0}"
 #, fuzzy
 msgid "Perks earned"
 msgstr "Atouts obtenus"
+
+#: src/scenario/pages/components/VarPanel.tsx
+msgid "Persistent"
+msgstr ""
 
 #: src/lego/pages/components/FourViews.tsx
 #, fuzzy

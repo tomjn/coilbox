@@ -31,7 +31,10 @@ import { MUTATOR_FOLDER } from "../lib/generatedGames";
 import type { Participant } from "../play/participants";
 import { compileScenario } from "./compile";
 import {
+  CAMPAIGN_RUN_MODOPTION,
+  CAMPAIGN_VARS_MODOPTION,
   DIFFICULTY_MODOPTION,
+  encodeCampaignVars,
   launchScenario,
   MISSION_MODOPTION,
   missionIssueMessage,
@@ -340,6 +343,36 @@ describe("launchScenario", () => {
       [MISSION_MODOPTION]: "s1",
       [DIFFICULTY_MODOPTION]: "hard",
     });
+  });
+
+  // Issue #5294.
+  it("hands a campaign mission its run token and saved vars", async () => {
+    const result = await run(build(), [LOOSE], {
+      campaignVars: { run: "tok", values: { rescued: 2 } },
+    });
+
+    expect(result.ok && result.config.modOptions).toEqual({
+      deathmode: "com",
+      [MISSION_MODOPTION]: "s1",
+      [CAMPAIGN_RUN_MODOPTION]: "tok",
+      [CAMPAIGN_VARS_MODOPTION]: "rescued=2",
+    });
+  });
+
+  it("sends the token without a vars modoption when nothing is saved yet", async () => {
+    const result = await run(build(), [LOOSE], {
+      campaignVars: { run: "tok", values: {} },
+    });
+
+    const options = result.ok ? (result.config.modOptions ?? {}) : {};
+    expect(options[CAMPAIGN_RUN_MODOPTION]).toBe("tok");
+    expect(CAMPAIGN_VARS_MODOPTION in options).toBe(false);
+  });
+
+  it("encodes a var name so it cannot end the start script line", () => {
+    expect(encodeCampaignVars({ "b;x": 1, "a,=": -0.5 })).toBe(
+      "a%2C%3D=-0.5,b%3Bx=1",
+    );
   });
 
   it("says nothing about difficulty when none was chosen", async () => {

@@ -132,6 +132,9 @@ function PanelHarness({ vars }: { vars: Record<string, number> }) {
         Undo
       </button>
       <output>{JSON.stringify(document.vars)}</output>
+      <p data-testid="persistent">
+        {JSON.stringify(document.persistentVars ?? [])}
+      </p>
     </>
   );
 }
@@ -199,6 +202,35 @@ describe("a variable's starting value commit rules", () => {
     commit(valueBox(), "-2");
 
     expect(stored()).toEqual({ waves: -2 });
+  });
+});
+
+// Issue #5294.
+describe("a variable's persistent switch", () => {
+  const persistent = (): string[] =>
+    JSON.parse(screen.getByTestId("persistent").textContent ?? "[]");
+  const toggle = () =>
+    screen.getByRole("switch", { name: "Carry waves to the next mission" });
+
+  it("marks the variable persistent in the document, and unmarks it", () => {
+    openPanel({ waves: 3, timer: 0 });
+
+    expect(toggle().getAttribute("aria-checked")).toBe("false");
+    fireEvent.click(toggle());
+    expect(persistent()).toEqual(["waves"]);
+    expect(toggle().getAttribute("aria-checked")).toBe("true");
+
+    fireEvent.click(toggle());
+    expect(persistent()).toEqual([]);
+  });
+
+  it("is undoable", () => {
+    openPanel({ waves: 3 });
+
+    fireEvent.click(toggle());
+    undo();
+
+    expect(persistent()).toEqual([]);
   });
 });
 
