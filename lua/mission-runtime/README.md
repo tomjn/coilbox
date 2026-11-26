@@ -170,6 +170,19 @@ A hit is a moment rather than a state, so it is counted by the stamps `command_g
 
 `UnitDamaged` runs for every hit in the game, so the gadget defines it only when a trigger in the mission uses the condition. Only the actors and groups those conditions name are recorded and raise `unit_attacked`.
 
+## Upgrades
+
+An actor that a game upgrades is followed to its new unit ([issue #5297](https://github.com/tomjn/coilbox/issues/5297)). Beyond All Reason's evolving commanders and Splinter Faction's morphs both upgrade a unit by creating a new one where it stands and destroying the old one. Headless runs on both, on engine 2026.09.03, gave the new unit a new id every time. Beyond All Reason destroys the old unit in the same frame. Splinter Faction destroys it on the next frame. The engine reports the destruction with no attacker and weapon id -21. That is what runtime 18 added.
+
+The rule is the replay logger's from [issue #3898](https://github.com/tomjn/coilbox/issues/3898), and it names no game and no unit:
+
+- The new unit was created by no builder, for the actor's team, while the actor was alive.
+- It was created exactly where the actor stood. For a building, which a game snaps to the build grid, it was created no further away on each axis than half its footprint or one build square, whichever is less.
+- A script destroyed the actor with no attacker, on the frame the new unit was created or the next. A gadget handler as old as Balanced Annihilation's passes no weapon id at all, and then the other rules decide.
+- Exactly one unit fits. With two, the actor dies.
+
+The runtime's own units are never taken for a successor. Once followed, the actor is the new unit everywhere: `GG.CoilboxMission.units`, the rules param the panel reads, the unsynced half and invulnerability. The death raises `unit_destroyed` with no actor, so `unit_dead` stays false. A group's unit is not followed.
+
 ## What the player did
 
 Three conditions read the player rather than the world, and `coilbox_player_actions.lua` owns them. The third, `dialogue_dismissed`, is described under [Pausing and held lines](#pausing-and-held-lines).
@@ -534,7 +547,7 @@ What it keeps, and where it comes from:
 
 Params rather than a table in `GG`, because `GG` is cleared by the same reload. They are the cheapest store the engine holds across it, and most of them were already being written for the mission panel.
 
-What it cannot keep is named in the log, as a warning, every time. That is which units are in a group and what a group was ordered to do, which reveals are lit, how long a zone has been held, how many units a team has built or captured, which units have been attacked, what a player has selected or ordered, and which held lines of dialogue are on screen. The units themselves stay on the map. An actor whose unit is gone, or whose id now belongs to a different kind of unit, is reported by name and left dead.
+What it cannot keep is named in the log, as a warning, every time. That is which units are in a group and what a group was ordered to do, which reveals are lit, how long a zone has been held, how many units a team has built or captured, which units have been attacked, what a player has selected or ordered, and which held lines of dialogue are on screen. The units themselves stay on the map. An actor whose unit is gone, or whose id now belongs to a different kind of unit, is reported by name and left dead. An upgraded actor is checked against the def it was upgraded to, which `coilbox_mission_upgraded_<actor>` holds.
 
 Splinter Faction's `game_team_com_ends.lua` kills an ally team with no commander when it starts again past frame 1, so a mission team with `noCommander` set loses its units to the game on a full reload whatever the runtime does. The headless run uses Balanced Annihilation for that reason.
 
@@ -558,6 +571,8 @@ Every `tests/*_test.lua` file, each in its own `luajit`. Adding a suite is addin
 `tests/support.lua` holds the shared scaffolding: a stub of the slice of the engine the runtime touches, which records what the runtime asked for and plays back the callins it reacts to.
 
 `attacked_test.lua` proves what `unit_attacked` counts and for how long, and that a mission without it defines no `UnitDamaged`.
+
+`upgrade_test.lua` proves an actor is followed through an upgrade in one frame and over two, that a reload keeps it, and that a unit beside it, on another team, with a builder, or one of two does not replace it.
 
 `terrain_test.lua` proves a base's ground is set before its buildings, at the start and from `spawn_base`, against the stub's heightmap and against the `stronghold` fixture.
 
@@ -599,6 +614,7 @@ What it has settled:
 - A base's terrain changes. The `stronghold` mission's wall ring stands 48 above the map's own ground from frame 5, and its outpost's hill is not there until its trigger fires a minute in, then rises by 32 with the turret on it.
 
 - A unit being attacked. The `attacked` mission, written by hand in `tests/headless/missions/`, puts an enemy turret in range of one of the player's units and of a group, and its triggers fire from the engine's own `UnitDamaged`, narrowed by the attacker's team and type. Damage dealt with no attacker fires nothing. The `sentries` run, whose mission asks no such condition, checks that the runtime gadget has no `UnitDamaged` in the engine's gadget handler.
+- An actor upgraded. The `upgrade` mission, written by hand in `tests/headless/missions/`, has the probe replace three actors with the engine's own `Spring.CreateUnit` and `Spring.DestroyUnit`: one in one frame, one over two frames and a building half a build square off. Each is its new unit afterwards, `unit_dead` stays false, `unit_health_below` reads the new unit, and the new unit's death still counts. This run caught that Balanced Annihilation's gadget handler passes `UnitDestroyed` no weapon id.
 - A full `/luarules reload` in the middle of a mission. The `reload` mission is written by hand in `tests/headless/missions/` rather than compiled, because no scenario is it: an invulnerable actor, an ordinary one, a var, two objectives and a trigger that fires once. The probe records what the engine holds, sends `luarules reload`, and the probe the reload loads checks the same things with real damage and real units: the actors are still the units they were, the invulnerable actor and the anchor still survive a hit, the var, the objective and the spent trigger are where they were. Before the fix 8 of those 17 checks failed.
 
 What it has caught:

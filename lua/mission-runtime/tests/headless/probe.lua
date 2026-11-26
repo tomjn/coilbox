@@ -1679,6 +1679,79 @@ plans.attacked = {
 	},
 }
 
+-- An actor followed through an upgrade (issue #5297). The probe replaces each
+-- actor's unit the way Beyond All Reason and Splinter Faction do, with the
+-- engine's own Spring.CreateUnit and Spring.DestroyUnit, so what the runtime
+-- reads is what the engine hands every gadget: the new unit's place as it is
+-- created, and no attacker and weapon -21 for the old one.
+local upgraded = {}
+
+local function successor(old, defName, dx)
+	local x, y, z = Spring.GetUnitBasePosition(old)
+	return Spring.CreateUnit(defName, x + (dx or 0), y, z - (dx or 0), 0, Spring.GetUnitTeam(old))
+end
+
+local DEATHS = { "heroDead", "scoutDead", "postDead" }
+
+plans.upgrade = {
+	deadline = 160,
+	steps = {
+		{ frame = 5, run = function()
+			local units = state().units
+			check("the actors are on the map", units.hero and units.scout and units.post)
+			upgraded.hero = { old = units.hero }
+			upgraded.scout = { old = units.scout }
+			upgraded.post = { old = units.post }
+		end },
+		{ frame = 30, run = function()
+			-- In one frame, as Beyond All Reason does.
+			upgraded.hero.new = successor(upgraded.hero.old, "armrock")
+			Spring.DestroyUnit(upgraded.hero.old, false, true)
+			-- Made now and destroyed on the next frame, as Splinter Faction does.
+			upgraded.scout.new = successor(upgraded.scout.old, "armpw")
+			-- A building half a build square off, as a grid snap leaves it.
+			upgraded.post.new = successor(upgraded.post.old, "armsolar", 8)
+			Spring.DestroyUnit(upgraded.post.old, false, true)
+			check("while its old unit stands, the actor is still it",
+				state().units.scout == upgraded.scout.old)
+		end },
+		{ frame = 31, run = function()
+			Spring.DestroyUnit(upgraded.scout.old, false, true)
+		end },
+		{ frame = 32, run = function()
+			for _, id in ipairs({ "hero", "scout", "post" }) do
+				local new = upgraded[id].new
+				check("an upgraded actor is its new unit: " .. id,
+					new and state().units[id] == new and rules("coilbox_mission_actor_" .. id) == new,
+					tostring(state().units[id]) .. "/" .. tostring(rules("coilbox_mission_actor_" .. id))
+						.. " wanted " .. tostring(new))
+			end
+			check("and the hero's new def is recorded", rules("coilbox_mission_upgraded_hero") == "armrock",
+				tostring(rules("coilbox_mission_upgraded_hero")))
+		end },
+		{ frame = 60, run = function()
+			for _, id in ipairs(DEATHS) do
+				check("unit_dead stays false through the upgrade: " .. id, objectiveIs(id) == ACTIVE,
+					objectiveIs(id))
+			end
+			check("unit_health_below has not fired", objectiveIs("wounded") == ACTIVE)
+			local new = upgraded.hero.new
+			local _, maxHealth = Spring.GetUnitHealth(new)
+			Spring.AddUnitDamage(new, maxHealth * 0.7, 0, nil, FALL)
+		end },
+		{ frame = 100, run = function()
+			check("unit_health_below reads the new unit", objectiveIs("wounded") == COMPLETE,
+				objectiveIs("wounded"))
+			Spring.DestroyUnit(upgraded.hero.new, false, true)
+		end },
+		{ frame = 130, run = function()
+			check("an upgraded actor that dies with nothing in its place is dead",
+				objectiveIs("heroDead") == COMPLETE and state().units.hero == nil, objectiveIs("heroDead"))
+			check("and the others are not", objectiveIs("scoutDead") == ACTIVE and objectiveIs("postDead") == ACTIVE)
+		end },
+	},
+}
+
 -- No mission at all: the modoption gate. The runtime is a file in the game
 -- whatever happens, so what has to be proved is that a normal game never gets a
 -- gadget out of it.

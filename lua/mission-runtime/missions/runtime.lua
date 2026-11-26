@@ -185,8 +185,15 @@
 -- A runtime behind 17 has no implementation for it, so it reports itself once
 -- and never holds. So a scenario using it asks for 17.
 
+-- 18 adds no types and no format features, so nothing asks for it. It follows an
+-- actor through an upgrade (issue #5297). Beyond All Reason's evolving
+-- commanders and Splinter Faction's morphs replace a unit with a new one in its
+-- place, and a runtime behind 18 counts the actor dead from then on. Nothing a
+-- scenario writes says it wants the actor followed, so no scenario can ask, and
+-- the version is how a game that vendored 17 is offered the fix.
+
 return {
-	version = 17,
+	version = 18,
 
 	-- The compiled mission format this runtime reads.
 	schemaVersion = 1,

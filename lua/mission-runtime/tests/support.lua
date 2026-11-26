@@ -362,7 +362,10 @@ function M.newEngine(modOptions, files, options)
 	--- Create a unit the way the engine does, including the callins the runtime
 	-- watches. `builderID` stands for a unit that something is building, which
 	-- is the case that does not finish here.
-	function engine.spawn(def, team, builderID)
+	--
+	-- `at`, when given, is { x, y, z, facing }, and the unit stands there before
+	-- UnitCreated runs, as one Spring.CreateUnit made does.
+	function engine.spawn(def, team, builderID, at)
 		if options.defs and not options.defs[def] then
 			error("bad unitDef name: " .. tostring(def), 0)
 		end
@@ -380,6 +383,9 @@ function M.newEngine(modOptions, files, options)
 			-- What the engine gives a unit whose def asks for nothing else.
 			movestate = 1,
 		}
+		if at then
+			unit.x, unit.y, unit.z, unit.facing = at[1], at[2], at[3], at[4]
+		end
 		engine.units[unitID] = unit
 		engine.order[#engine.order + 1] = unitID
 		engine.cmdDescs[unitID] = commandDescs(unitDef(def))
@@ -539,10 +545,7 @@ function M.newEngine(modOptions, files, options)
 					return nil
 				end
 				table.insert(engine.events, { "unit", def, engine.env.Spring.GetGroundHeight(x, z) })
-				local unitID = engine.spawn(def, team, nil)
-				local unit = engine.units[unitID]
-				unit.x, unit.y, unit.z, unit.facing = x, y, z, facing
-				return unitID
+				return engine.spawn(def, team, nil, { x, y, z, facing })
 			end,
 			DestroyUnit = function(unitID)
 				local unit = engine.units[unitID]
@@ -550,7 +553,8 @@ function M.newEngine(modOptions, files, options)
 					return
 				end
 				unit.alive = false
-				fire("UnitDestroyed", unitID, unit.defID, unit.team)
+				-- No attacker, and the weapon id the engine gives a unit Lua removed.
+				fire("UnitDestroyed", unitID, unit.defID, unit.team, nil, nil, nil, -21)
 			end,
 			GetTeamUnitCount = function(team)
 				local count = 0
@@ -865,7 +869,14 @@ function M.newEngine(modOptions, files, options)
 				table.insert(engine.markers, { x, y, z, text, localOnly })
 			end,
 		},
-		Game = { mapName = "Test Map", gameSpeed = 30, mapSizeX = 4096, mapSizeZ = 4096 },
+		Game = {
+			mapName = "Test Map",
+			gameSpeed = 30,
+			mapSizeX = 4096,
+			mapSizeZ = 4096,
+			squareSize = 8,
+			buildSquareSize = 16,
+		},
 		-- The engine's own command constants, at the numbers it uses.
 		CMD = {
 			OPT_SHIFT = 32,
