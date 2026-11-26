@@ -28,7 +28,7 @@ A mission's skirmish setup is a **snapshot**: when you attach a preset to a miss
 
 Missions carry more than a still panorama:
 
-- **Briefing** — authored as **Markdown**. Embed media inline by relative path with the image syntax: `![](../images/intro.jpg)` shows an image, and a source ending in an audio or video extension renders an `<audio>` / `<video>` player instead (`![](../briefings/vo.mp3)`, `![](../briefings/intro.mp4)`). A link to `https:`, `mailto:` or `tel:` opens in the reader's browser, mail client or dialler. Any other link is refused, because Coilbox has no back button to return from a page drawn over it, so link a bundled file with the image syntax above rather than as a link.
+- **Briefing** — authored as **Markdown**. Embed media inline by relative path with the image syntax: `![](images/intro.jpg)` shows an image, and a source ending in an audio or video extension renders an `<audio>` / `<video>` player instead (`![](briefings/vo.mp3)`, `![](briefings/intro.mp4)`). These paths are for a [bundled campaign](#bundle-a-campaign-in-a-distribution). A [campaign inside a game](#ship-a-campaign-inside-your-game) names its files differently. A link to `https:`, `mailto:` or `tel:` opens in the reader's browser, mail client or dialler. Any other link is refused, because Coilbox has no back button to return from a page drawn over it, so link a bundled file with the image syntax above rather than as a link.
 - **Panorama** and **side graphic**: each can be a still image, a looping muted video, the mission's map as a live 3D preview, or one of the mission's game's units as a spinning 3D model. Pick the source in the mission editor. If the player's install can't draw the chosen unit, the briefing shows that slot's image instead.
 - **Voiceover** (audio) and **cutscene** (video) — optional players shown on the briefing screen.
 
@@ -121,7 +121,7 @@ A [distribution profile](distribution-profile.md) can ship one or more campaigns
 
 Each file in `campaigns/` is an exported campaign, dropped in as-is: export from Campaign builder and save the resulting `.json` as `.coilbox/campaigns/<any-name>.json`. (A bare campaign document — the inner `campaign` object without the export wrapper — is also accepted.) Images are embedded in the export, so a still-image campaign is a single self-contained file.
 
-To ship **audio or video** (which can't be embedded), reference the files by relative path from `.coilbox/` — a `"local"` media reference such as `{ "kind": "local", "path": "briefings/intro.mp4" }` for a panorama, voiceover or cutscene, or `![](../images/art.jpg)` inline in a Markdown briefing — and place the files under `.coilbox/` alongside the campaign. These paths resolve the same way as [distribution-profile](distribution-profile.md) welcome-screen media.
+To ship **audio or video** (which can't be embedded), reference the files by relative path from `.coilbox/` — a `"local"` media reference such as `{ "kind": "local", "path": "briefings/intro.mp4" }` for a panorama, voiceover or cutscene, or `![](images/art.jpg)` inline in a Markdown briefing — and place the files under `.coilbox/` alongside the campaign. These paths resolve the same way as [distribution-profile](distribution-profile.md) welcome-screen media.
 
 Bundled campaigns show up in the Campaigns list marked read-only (no edit/delete in the builder) but otherwise play exactly like local ones, and their progress is tracked the same way.
 
@@ -150,7 +150,9 @@ Put each campaign in its own folder under `campaigns/` at the root of the game:
 
 Media goes beside `campaign.json`. A `"file"` reference in the document, such as `{ "kind": "file", "file": "intro-voice.ogg" }`, names a file in the same folder. This is how a game ships audio and video, which an export cannot carry. Images embedded in the export work too, so a still-image campaign can be the export file on its own.
 
-Put media in the panorama, side graphic, voiceover, cutscene, icon and background slots. Images and media written into a Markdown briefing do not load from the game yet ([issue #5468](https://github.com/tomjn/coilbox/issues/5468)). Neither do [units from the unit builder](#units-from-the-unit-builder) ([issue #5469](https://github.com/tomjn/coilbox/issues/5469)).
+A Markdown briefing can use the same files inline. `![](landing.jpg)` shows `landing.jpg` from the campaign's folder, and an audio or video file name shows a player. Give the bare file name. Coilbox does not read folders inside the campaign folder, so `![](briefings/landing.jpg)` does not load. If a name has a space in it, wrap it in angle brackets, as in `![](<first landing.jpg>)`.
+
+[Units from the unit builder](#units-from-the-unit-builder) do not load from a game yet ([issue #5469](https://github.com/tomjn/coilbox/issues/5469)).
 
 A campaign in a game is read-only. Coilbox never writes into the game, and the campaign has no Edit or Delete in Campaign builder. Players can still Duplicate it to get an editable copy, and Export it.
 
