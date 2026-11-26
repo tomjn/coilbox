@@ -434,11 +434,6 @@ msgstr "（{shownCount} / {totalCount}）"
 msgid "({totalCount})"
 msgstr "（{totalCount}）"
 
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "(auto)"
-msgstr "（自動）"
-
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 #, fuzzy
 msgid "(copies into the library)"
@@ -10077,6 +10072,10 @@ msgstr ""
 msgid "About banking"
 msgstr "バンクについて"
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "About bench mode"
+msgstr ""
+
 #: src/content/pages/StorageSection.tsx
 msgid "About caches"
 msgstr ""
@@ -10162,6 +10161,10 @@ msgstr ""
 msgid "About keys with more than one action"
 msgstr ""
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "About lobby servers"
+msgstr ""
+
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "About logging back in on startup"
 msgstr ""
@@ -10227,6 +10230,10 @@ msgstr "リプレイのトラックについて"
 msgid "About replay unit lists"
 msgstr ""
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "About resetting the database"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "About roles"
@@ -10236,6 +10243,10 @@ msgstr "役割について"
 #, fuzzy
 msgid "About round shapes"
 msgstr "円形の形状について"
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "About run defaults"
+msgstr ""
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 msgid "About saved copies"
@@ -10273,6 +10284,10 @@ msgstr "当たり判定ボリュームについて"
 msgid "About the colour texture"
 msgstr "カラーテクスチャについて"
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "About the duration"
+msgstr ""
+
 #: src/play/pages/EngineLogSection.tsx
 msgid "About the engine log"
 msgstr ""
@@ -10309,6 +10324,14 @@ msgstr ""
 #, fuzzy
 msgid "About the pivot point"
 msgstr "ピボットについて"
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "About the Python path"
+msgstr ""
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "About the ramp"
+msgstr ""
 
 #: src/lego/pages/components/TextureBuilderPanel.tsx
 #, fuzzy
@@ -12862,6 +12885,7 @@ msgid "Autohost vote"
 msgstr "オートホストの投票"
 
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Automatic"
 msgstr "自動"
@@ -13712,9 +13736,8 @@ msgid "bench"
 msgstr "bench"
 
 #: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Bench & database"
-msgstr "ベンチとデータベース"
+msgid "Bench"
+msgstr ""
 
 #: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
@@ -19671,6 +19694,14 @@ msgstr "データが JSON ではありません：{reason}"
 msgid "Data table"
 msgstr "データテーブル"
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "Database"
+msgstr ""
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "Database name"
+msgstr ""
+
 #: src/multiplayer/battles/OaPorts.tsx
 #, fuzzy
 msgid "Datagrams"
@@ -19691,36 +19722,6 @@ msgstr "作成日"
 #, fuzzy
 msgid "Days"
 msgstr "日"
-
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "DB driver"
-msgstr "DB ドライバー"
-
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "DB host"
-msgstr "DB ホスト"
-
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "DB name"
-msgstr "DB 名"
-
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "DB password"
-msgstr "DB パスワード"
-
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "DB port"
-msgstr "DB ポート"
-
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "DB user"
-msgstr "DB ユーザー"
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 #, fuzzy
@@ -19916,11 +19917,6 @@ msgstr "デフォルト：{defaultText}"
 #, fuzzy
 msgid "defaults"
 msgstr "デフォルト"
-
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "defaults to <server-dir>/venv/bin/python3"
-msgstr "デフォルトは <server-dir>/venv/bin/python3"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -21491,6 +21487,10 @@ msgstr "視界の外でも弾を描画します。"
 msgid "Drive a scenario against a lobby server (load) or launch one locally and benchmark it (bench)."
 msgstr "ロビーサーバーに対してシナリオを実行する（load）か、ローカルで起動してベンチマークします（bench）。"
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "Driver"
+msgstr ""
+
 #: src/lego/scriptPlayback.ts
 #, fuzzy
 msgid "Drives along a path while its weapon keeps aiming at a target that keeps moving, from where the unit is and which way it faces."
@@ -21547,9 +21547,8 @@ msgid "Drops a point on a team's map, labelled if you give it text."
 msgstr "チームのマップにポイントを置きます。テキストを指定するとラベルが付きます。"
 
 #: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Drops and recreates the database. Required for register-storm; leave on for clean A/B runs."
-msgstr "データベースを削除して作り直します。register-storm には必須です。クリーンな A/B 比較のためにはオンのままにしてください。"
+msgid "Drops and recreates the database. The register-storm scenario needs this, and it keeps A/B runs comparable."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -21649,7 +21648,6 @@ msgid "e.g. 10m, 2h, 3d"
 msgstr "例：10m、2h、3d"
 
 #: src/uberstress/pages/RunPage.tsx
-#: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
 msgid "e.g. 10s"
 msgstr "例：10s"
@@ -25480,11 +25478,6 @@ msgstr "発光を赤、反射を緑に入れます。青はエンジンが読み
 msgid "glTF Binary"
 msgstr "glTF バイナリ"
 
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Go duration, e.g. 30s"
-msgstr "実行時間（例：30s）"
-
 #: src/multiplayer/pages/ChatPage.tsx
 #: src/multiplayer/RelayIndicator.tsx
 #, fuzzy
@@ -26481,6 +26474,7 @@ msgstr "横"
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #: src/multiplayer/battle/MemberRow.tsx
 #: src/play/pages/SkirmishPage.tsx
+#: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Host"
 msgstr "ホスト"
@@ -26708,6 +26702,14 @@ msgstr "この抽出施設が下のメタルをどれだけ強く採取するか
 #, fuzzy
 msgid "How long a match runs"
 msgstr "試合の長さ"
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "How long it takes to open every connection, such as 10s."
+msgstr ""
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "How long the run lasts. A number and a unit, such as 30s, 2m or 1m30s."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -29346,6 +29348,10 @@ msgstr "計測ツールを終了"
 msgid "Leave the measure tool ({measureKey})"
 msgstr "計測ツールを終了（{measureKey}）"
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "Leave this empty to use venv/bin/python3 in the uberserver folder."
+msgstr ""
+
 #: src/hub/pages/components/AssetUploadControl.tsx
 #, fuzzy
 msgid "Leave this off unless you are happy to publish pictures made from the games and maps you have installed."
@@ -30042,11 +30048,6 @@ msgstr "ロビーサーバー"
 #, fuzzy
 msgid "Local"
 msgstr "ローカル"
-
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Local dev"
-msgstr "ローカル開発"
 
 #: src/multiplayer/admin/ServerAddressSection.tsx
 #, fuzzy
@@ -32424,9 +32425,8 @@ msgid "My server"
 msgstr "自分のサーバー"
 
 #: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "mysql binary"
-msgstr "mysql バイナリ"
+msgid "mysql program"
+msgstr ""
 
 #: src/blueprint/pages/BlueprintsPage.tsx
 #: src/content/pages/components/MapRecords.tsx
@@ -34775,9 +34775,8 @@ msgid "No server would say what your public address is."
 msgstr "パブリックアドレスを教えてくれるサーバーがありませんでした。"
 
 #: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "No servers yet. Add one to target it from the Run page."
-msgstr "まだサーバーはありません。追加すると、実行ページで対象にできます。"
+msgid "No servers."
+msgstr ""
 
 #: src/content/pages/components/ReplaySetPicker.tsx
 #, fuzzy
@@ -36935,6 +36934,10 @@ msgstr "{activeName} のみ"
 msgid "Only another admin, or a direct change to the database, can give it back."
 msgstr "これを戻せるのは、別の管理者かデータベースの直接変更だけです。"
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "Only bench mode uses these. It starts an uberserver checkout on this machine and can reset its database before each run. It needs the checkout, a Python virtual environment and a MySQL server you can reach."
+msgstr ""
+
 #: src/content/pages/components/MissionRuntimeSection.tsx
 #, fuzzy
 msgid "Only coilbox's own files. The game's gadgets, widgets and missions stay where they are. This can't be undone."
@@ -38278,6 +38281,7 @@ msgstr "搭乗ユニットが撃破後も生存"
 #: src/lobby-servers/RegisterForm.tsx
 #: src/uberstress/pages/components/SeedSqlForm.tsx
 #: src/uberstress/pages/RunPage.tsx
+#: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Password"
 msgstr "パスワード"
@@ -39400,6 +39404,7 @@ msgstr "不向きな目標"
 #: src/direct/JoinRoomForm.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Port"
 msgstr "ポート"
@@ -41654,6 +41659,7 @@ msgstr "リミックス元"
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/multiplayer/battle/MemberRow.tsx
 #: src/play/ChobbyPresetsView.tsx
+#: src/uberstress/pages/SettingsSection.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 #, fuzzy
@@ -42520,11 +42526,6 @@ msgstr "反映されなかったものを送るには、もう一度リセット
 msgid "Reset all shortcuts"
 msgstr "すべてのショートカットをリセット"
 
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Reset database before each bench run"
-msgstr "各ベンチ実行の前にデータベースをリセット"
-
 #: src/multiplayer/battles/BattleFilterPopover.tsx
 #, fuzzy
 msgid "Reset filters"
@@ -42558,6 +42559,10 @@ msgstr "セッションをリセット"
 #, fuzzy
 msgid "Reset the armour class to {inherited}, the game's own"
 msgstr "装甲クラスをゲーム自体の {inherited} にリセット"
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "Reset the database before each run"
+msgstr ""
 
 #: src/components/ViewControls.tsx
 #: src/lego/pages/components/AxisCompass.tsx
@@ -45104,11 +45109,6 @@ msgstr "登録時にサーバーが確認を求めました。ログインして
 #, fuzzy
 msgid "Server battles are listed here once you log in. This list is empty because coilbox has no lobby connection, not because nobody is playing."
 msgstr "ログインすると、サーバーの試合がここに表示されます。この一覧が空なのは、coilbox がロビーに接続していないためで、誰もプレイしていないわけではありません。"
-
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Server dir"
-msgstr "サーバーのディレクトリ"
 
 #: src/multiplayer/chat/FriendRow.tsx
 #, fuzzy
@@ -51510,6 +51510,14 @@ msgstr "ルートピースがありません。"
 msgid "The rules are grouped under Coilbox, so you can find and remove them in Windows Defender Firewall whenever you like."
 msgstr "規則は Coilbox の下にまとめられているため、Windows Defender ファイアウォールでいつでも見つけて削除できます。"
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "The Run page offers these as targets. A server needs an address, such as 127.0.0.1:8200."
+msgstr ""
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "The Run page starts with these. You can still change them there for each run."
+msgstr ""
+
 #: src/scenario/pages/components/TriggerSteps.tsx
 #, fuzzy
 msgid "The runtime that would play this scenario does not implement this type, so the mission is refused at launch until the game's runtime catches up or the step goes."
@@ -55305,9 +55313,8 @@ msgid "Type your message..."
 msgstr "メッセージを入力…"
 
 #: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "uberserver checkout path"
-msgstr "uberserver のチェックアウトパス"
+msgid "uberserver folder"
+msgstr ""
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
@@ -56565,17 +56572,13 @@ msgstr "damage に独自のエントリがない装甲クラスに使われま�
 msgid "Used for collisions and for melee impulse. Defaults to the metal cost."
 msgstr "衝突と近接攻撃の衝撃に使われます。デフォルトはメタルコストです。"
 
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Used only by bench mode, which launches an uberserver checkout locally and resets the database before each run. Requires a checkout, a Python venv, and a reachable MySQL on this machine."
-msgstr "ベンチモードでのみ使われます。ベンチモードは uberserver のチェックアウトをローカルで起動し、各実行の前にデータベースをリセットします。チェックアウト、Python の venv、このマシンで接続できる MySQL が必要です。"
-
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Used when the weapon has no model. EmgCannon defaults to a different colour."
 msgstr "武器にモデルがない場合に使われます。EmgCannon はデフォルトで別の色になります。"
 
 #: src/multiplayer/admin/StaffSection.tsx
+#: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
 msgid "User"
 msgstr "ユーザー"
@@ -56635,9 +56638,8 @@ msgid "Username, IP or email to unban"
 msgstr "BAN を解除するユーザー名、IP、メールアドレス"
 
 #: src/uberstress/pages/RunPage.tsx
-#, fuzzy
-msgid "Uses the bench/DB settings on the Servers page. Uncheck to benchmark an external address."
-msgstr "サーバーページのベンチ/DB の設定を使います。外部のアドレスをベンチマークするにはチェックを外してください。"
+msgid "Uses the Bench and Database settings for uberstress. Uncheck to benchmark an external address."
+msgstr ""
 
 #: src/profile/useHealthChecks.ts
 #, fuzzy
