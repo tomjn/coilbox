@@ -1021,6 +1021,11 @@ msgstr "{0, plural, one {Equipped in # place:} other {Equipped in # places:}}"
 msgid "{0, plural, one {Estimated from # earlier recording of this game on this computer.} other {Estimated from # earlier recordings of this game on this computer.}}"
 msgstr "{0, plural, one {Estimated from # earlier recording of this game on this computer.} other {Estimated from # earlier recordings of this game on this computer.}}"
 
+#. placeholder {0}: leftOut.length
+#: src/campaign/pages/CampaignBuilderPage.tsx
+msgid "{0, plural, one {Exported {campaignTitle}, but # media file is not in the export: {files}. An export cannot carry audio, video or a file that cannot be read.} other {Exported {campaignTitle}, but # media files are not in the export: {files}. An export cannot carry audio, video or a file that cannot be read.}}"
+msgstr "{0, plural, one {Exported {campaignTitle}, but # media file is not in the export: {files}. An export cannot carry audio, video or a file that cannot be read.} other {Exported {campaignTitle}, but # media files are not in the export: {files}. An export cannot carry audio, video or a file that cannot be read.}}"
+
 #. placeholder {0}: info.gameVersions.length
 #: src/content/mapImage.ts
 msgid "{0, plural, one {Game and version: {gameVersions}.} other {Game and versions: {gameVersions}.}}"

@@ -240,6 +240,12 @@ export interface Campaign {
    * generated at launch. Absent on a campaign with none.
    */
   units?: CampaignUnit[];
+  /**
+   * Files the mission briefings show or play, under the name the Markdown uses.
+   * Set on a copy or an export of a game's campaign, which has left the folder
+   * those names pointed into (issue #5484).
+   */
+  briefingFiles?: Record<string, ImageRef>;
   createdAt: string;
   updatedAt: string;
 }
@@ -382,6 +388,19 @@ function parseUnitFiles(value: unknown): Record<string, ImageRef> | undefined {
     }
   }
   return Object.keys(files).length > 0 ? files : undefined;
+}
+
+/** Narrow an unknown to the briefings' carried files, by the name used. */
+function parseBriefingFiles(
+  value: unknown,
+): Record<string, ImageRef> | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const files: [string, ImageRef][] = [];
+  for (const [name, raw] of Object.entries(value)) {
+    const ref = parseImageRef(raw);
+    if (ref) files.push([name, ref]);
+  }
+  return files.length > 0 ? Object.fromEntries(files) : undefined;
 }
 
 /**
@@ -553,6 +572,7 @@ export function parseCampaignJson(json: string): Campaign | null {
     backgroundPlayback: parsePlayback(d.backgroundPlayback),
     missions,
     units: parseUnits(d.units),
+    briefingFiles: parseBriefingFiles(d.briefingFiles),
     createdAt: typeof d.createdAt === "string" ? d.createdAt : "",
     updatedAt: typeof d.updatedAt === "string" ? d.updatedAt : "",
   };

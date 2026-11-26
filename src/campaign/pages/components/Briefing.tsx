@@ -5,16 +5,19 @@ import { createContext, useContext, useEffect, useState } from "react";
 import Markdown, { type Components } from "react-markdown";
 import {
   assetUrl,
+  campaignMediaUrl,
   isLocalRef,
   markdownFilePath,
   mediaKind,
 } from "../../../lib/assetUrl";
 import { externalOnlyLink } from "../../../lib/MarkdownLink";
 import { GFM_PLUGINS, GFM_PROSE_CLASSES } from "../../../lib/markdownGfm";
+import { briefingFileName } from "../../briefingFiles";
 import {
   type CampaignGameOrigin,
   gameCampaignFileUrl,
 } from "../../gameCampaigns";
+import type { ImageRef } from "../../model";
 
 /**
  * Renders a mission/campaign briefing as Markdown. Unlike the profile welcome screen
@@ -28,11 +31,36 @@ import {
  * campaign resolves against the portable `.coilbox/` folder through the
  * `coilbox://` protocol (so `![](images/x.jpg)` loads a bundled file). In a
  * campaign shipped inside a game it names a file beside that campaign's
- * `campaign.json`, read out of the game's archive (issue #5468)
+ * `campaign.json`, read out of the game's archive (issue #5468). A file the
+ * campaign carries itself, as a copy of a game's campaign does, comes before both
+ * (issue #5484)
  */
 
-/** The game the briefing's campaign ships inside, if it is a game's campaign */
-const GameOrigin = createContext<CampaignGameOrigin | undefined>(undefined);
+/** Where the briefing's relative file names are looked up */
+interface Source {
+  campaignId?: string;
+  /** Set for a campaign shipped inside a game */
+  gameOrigin?: CampaignGameOrigin;
+  /** The files the campaign carries, by the name the Markdown uses */
+  files?: Record<string, ImageRef>;
+}
+
+const BriefingSource = createContext<Source>({});
+
+/** The URL of a carried file, or `undefined` to look the name up elsewhere */
+function carriedUrl(
+  { campaignId, gameOrigin, files }: Source,
+  name: string,
+): string | undefined {
+  if (!files || !Object.hasOwn(files, name)) return undefined;
+  const ref = files[name];
+  if (ref.kind === "data") return ref.dataUri;
+  if (ref.kind === "local") return assetUrl(ref.path);
+  // A game's document naming a file means one in the game.
+  return campaignId && !gameOrigin
+    ? campaignMediaUrl(campaignId, ref.file)
+    : undefined;
+}
 
 type Kind = ReturnType<typeof mediaKind>;
 
@@ -143,10 +171,20 @@ function BriefingImage({
   alt?: string;
   title?: string;
 }) {
-  const origin = useContext(GameOrigin);
+  const source = useContext(BriefingSource);
+  const origin = source.gameOrigin;
   if (typeof src !== "string" || !src) return null;
+  if (isLocalRef(src)) {
+    const name = briefingFileName(src);
+    const url = carriedUrl(source, name);
+    if (url) {
+      return (
+        <InlineMedia url={url} kind={mediaKind(name)} alt={alt} title={title} />
+      );
+    }
+  }
   if (origin && isLocalRef(src)) {
-    const file = markdownFilePath(src.startsWith("./") ? src.slice(2) : src);
+    const file = briefingFileName(src);
     return (
       <GameMedia
         key={file}
@@ -177,12 +215,12 @@ const MEDIA_COMPONENTS: Components = {
 export function BriefingProse({
   children,
   className,
+  campaignId,
   gameOrigin,
-}: {
+  files,
+}: Source & {
   children: string;
   className?: string;
-  /** Set for a campaign shipped inside a game, whose media stays in the game */
-  gameOrigin?: CampaignGameOrigin;
 }) {
   return (
     <div
@@ -196,11 +234,11 @@ export function BriefingProse({
         className,
       )}
     >
-      <GameOrigin.Provider value={gameOrigin}>
+      <BriefingSource.Provider value={{ campaignId, gameOrigin, files }}>
         <Markdown components={MEDIA_COMPONENTS} remarkPlugins={GFM_PLUGINS}>
           {children}
         </Markdown>
-      </GameOrigin.Provider>
+      </BriefingSource.Provider>
     </div>
   );
 }

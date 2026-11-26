@@ -1,6 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { campaignMediaDelete } from "./bindings";
-import type { Campaign, CampaignMission } from "./model";
+import type { Campaign, CampaignMission, ImageRef } from "./model";
 
 /**
  * Which files a campaign has imported, and which of them nothing names any more
@@ -42,6 +42,26 @@ const CAMPAIGN_SLOTS = [
 ] as const;
 
 /**
+ * Every media slot a campaign has, as the refs currently in them, in an order
+ * that holds from one copy of the document to the next.
+ *
+ * The read-only twin of the field list in `mapCampaignImages` (`images.ts`),
+ * so adding a media field to the model means updating this list too.
+ */
+export function slotRefs(campaign: Campaign): (ImageRef | undefined)[] {
+  return [
+    campaign.icon,
+    campaign.background,
+    ...campaign.missions.flatMap((m) => [
+      m.panorama,
+      m.sideGraphic,
+      m.voiceover,
+      m.cutscene,
+    ]),
+  ];
+}
+
+/**
  * The files this mission imported. Only a `file` ref is one: a `data` ref
  * carries its bytes inline and a `local` ref points at something the
  * distribution shipped, and neither is the campaign's to delete.
@@ -55,10 +75,10 @@ export function missionMedia(mission: CampaignMission): StoredMedia[] {
 
 /** Every imported file the whole document names, missions and campaign alike. */
 export function campaignMediaFiles(campaign: Campaign): Set<string> {
-  const files = CAMPAIGN_SLOTS.flatMap(([slot]) => {
-    const ref = campaign[slot];
-    return ref?.kind === "file" ? [ref.file] : [];
-  });
+  const files = [
+    ...CAMPAIGN_SLOTS.map(([slot]) => campaign[slot]),
+    ...Object.values(campaign.briefingFiles ?? {}),
+  ].flatMap((ref) => (ref?.kind === "file" ? [ref.file] : []));
   for (const mission of campaign.missions) {
     files.push(...missionMedia(mission).map((m) => m.file));
   }
