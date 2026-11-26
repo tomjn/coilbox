@@ -25,6 +25,7 @@ import {
   removeBinding,
   resetKeys,
   resolveKeymap,
+  type SavedKeymap,
 } from "../keymap";
 import { BindingList } from "./components/BindingList";
 import { BrowserToolbar } from "./components/BrowserToolbar";
@@ -92,10 +93,18 @@ export default function KeybindsSection() {
     () => resolveKeymap({ gameText, userText }),
     [gameText, userText],
   );
+  // A keymap from a shared link, kept until it is saved or reverted. The link
+  // usually lands before the file and the game's bindings have loaded, so it
+  // is laid over each keymap they resolve to rather than applied once and
+  // then dropped by the reset below.
+  const [linked, setLinked] = useState<SavedKeymap | null>(null);
   const [keymap, setKeymap] = useState<Keymap>(resolved);
   // Edits are dropped when the target, game or file underneath them changes,
   // because they were edits to a different keymap.
-  useEffect(() => setKeymap(resolved), [resolved]);
+  useEffect(
+    () => setKeymap(linked ? fromSaved(linked, resolved) : resolved),
+    [resolved, linked],
+  );
 
   const [layer, setLayer] = useState<ModifierLayer>("");
   const [selectedKeys, setSelectedKeys] = useState<string | null>(null);
@@ -108,9 +117,7 @@ export default function KeybindsSection() {
   const { code } = useImportParam();
   useEffect(() => {
     if (!code) return;
-    setSaveError(
-      applyContainerText(code, (s) => setKeymap((km) => fromSaved(s, km))),
-    );
+    setSaveError(applyContainerText(code, setLinked));
   }, [code]);
 
   // What is dirty is what would be written, so compare the files rather than
@@ -121,8 +128,15 @@ export default function KeybindsSection() {
 
   async function onSave() {
     setSaving(true);
-    setSaveError(await file.write(text));
+    const error = await file.write(text);
+    setSaveError(error);
+    if (!error) setLinked(null);
     setSaving(false);
+  }
+
+  function onRevert() {
+    setLinked(null);
+    setKeymap(resolved);
   }
 
   if (targets.length === 0 && !loading) {
@@ -287,7 +301,7 @@ export default function KeybindsSection() {
             variant="outline"
             size="sm"
             disabled={!dirty || saving}
-            onClick={() => setKeymap(resolved)}
+            onClick={onRevert}
           >
             <Trans>Revert</Trans>
           </Button>
