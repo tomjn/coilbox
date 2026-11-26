@@ -17,8 +17,10 @@ vi.mock("../GameUpdatesProvider", () => ({
     repo: "example/game",
     release: { tag: "v2", name: "Release 2", body: "", assets: [] },
     checking: false,
-    error: null,
+    checkError: null,
+    installError: null,
     updateAvailable: false,
+    upToDate: true,
     installing: false,
     installed: false,
     profileUpdated: false,
@@ -54,13 +56,13 @@ describe("the game-updates section's text", () => {
       locale: "fr",
       messages: {
         [msg`Update source`.id]: "Source des mises a jour",
-        [msg`Check for updates`.id]: "Verifier les mises a jour",
+        [msg`Check now`.id]: "Verifier maintenant",
       },
     });
     draw();
     expect(screen.getByText("Source des mises a jour")).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: "Verifier les mises a jour" }),
+      screen.getByRole("button", { name: "Verifier maintenant" }),
     ).toBeTruthy();
     expect(screen.queryByText("Update source")).toBeNull();
   });

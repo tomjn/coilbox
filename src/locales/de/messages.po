@@ -15740,6 +15740,7 @@ msgstr "Nach Updates suchen"
 msgid "Check it loads"
 msgstr "Laden prüfen"
 
+#: src/game-updates/pages/GameUpdatesSection.tsx
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Check now"
 msgstr ""
@@ -27704,11 +27705,6 @@ msgstr "installiert"
 msgid "Installed"
 msgstr "Installiert"
 
-#: src/game-updates/pages/GameUpdatesSection.tsx
-#, fuzzy
-msgid "Installed — restart to apply the updated profile."
-msgstr "Installiert — neu starten, um das aktualisierte Profil anzuwenden."
-
 #: src/deeplink/DeepLinkHandler.tsx
 #, fuzzy
 msgid "Installed {fileName}"
@@ -27719,11 +27715,6 @@ msgstr "{fileName} installiert"
 #, fuzzy
 msgid "Installed <0>{0}</0>"
 msgstr "<0>{0}</0> installiert"
-
-#: src/game-updates/pages/GameUpdatesSection.tsx
-#, fuzzy
-msgid "Installed and ready."
-msgstr "Installiert und bereit."
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
 #: src/widgets/pages/CoilboxWidgets.tsx
@@ -27751,6 +27742,14 @@ msgstr "Installiert, und {staleCount} von {fileCount, plural, one {# Datei weich
 #, fuzzy
 msgid "Installed, and its licence notice is missing or out of date"
 msgstr "Installiert, und der Lizenzhinweis fehlt oder ist veraltet"
+
+#: src/game-updates/pages/GameUpdatesSection.tsx
+msgid "Installed."
+msgstr ""
+
+#: src/game-updates/pages/GameUpdatesSection.tsx
+msgid "Installed. Restart to apply the new profile."
+msgstr ""
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Installed. Restart to apply."
@@ -29125,9 +29124,8 @@ msgid "Latest"
 msgstr "Neueste"
 
 #: src/game-updates/pages/GameUpdatesSection.tsx
-#, fuzzy
-msgid "Latest: {releaseName}"
-msgstr "Neueste: {releaseName}"
+msgid "Latest release {releaseName}"
+msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -45147,11 +45145,6 @@ msgstr "Legen Sie zuerst in den <0>Einstellungen für Inhalte-Ordner</0> einen D
 msgid "Set a download folder in <0>Content folders settings</0> to enable downloads."
 msgstr "Legen Sie in den <0>Einstellungen für Inhalte-Ordner</0> einen Download-Ordner fest, um Downloads zu aktivieren."
 
-#: src/game-updates/pages/GameUpdatesSection.tsx
-#, fuzzy
-msgid "Set a download folder in <0>Content folders settings</0> to enable updates."
-msgstr "Legen Sie in den <0>Einstellungen für Inhalte-Ordner</0> einen Download-Ordner fest, um Updates zu aktivieren."
-
 #: src/home/zones/SuggestedMap.tsx
 #, fuzzy
 msgid "Set a download folder in <0>Content folders settings</0> to install it."
@@ -45166,6 +45159,10 @@ msgstr "Legen Sie unter <0>Inhalte-Ordner</0> einen Download-Ordner fest, um Spi
 #, fuzzy
 msgid "Set a download folder in <0>Content folders</0> to install maps."
 msgstr "Legen Sie unter <0>Inhalte-Ordner</0> einen Download-Ordner fest, um Karten zu installieren."
+
+#: src/game-updates/pages/GameUpdatesSection.tsx
+msgid "Set a download folder in <0>Content folders</0> to install updates."
+msgstr ""
 
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #, fuzzy
@@ -56185,6 +56182,10 @@ msgstr "Oben"
 msgid "Up to 30 minutes"
 msgstr "Bis 30 Minuten"
 
+#: src/game-updates/pages/GameUpdatesSection.tsx
+msgid "Up to date with {releaseName}"
+msgstr ""
+
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Up to date. Last checked {lastCheckedText}"
 msgstr ""
@@ -59095,11 +59096,6 @@ msgstr "Sie sind {0} nicht beigetreten."
 #, fuzzy
 msgid "You have not shared a replay with {other}."
 msgstr "Sie haben keine Wiederholung mit {other} gemeinsam."
-
-#: src/game-updates/pages/GameUpdatesSection.tsx
-#, fuzzy
-msgid "You have the latest game version ({releaseTag})."
-msgstr "Sie haben die neueste Spielversion ({releaseTag})."
 
 #: src/challenge/SubstitutedMapNote.tsx
 #, fuzzy

@@ -36,9 +36,17 @@ interface GameUpdatesContextValue {
   /** The latest release, once fetched. */
   release: ReleaseInfo | null;
   checking: boolean;
-  error: string | null;
+  /** Why the last check failed, cleared when the next one starts. */
+  checkError: string | null;
+  /** Why the last install failed, cleared when the next one starts. */
+  installError: string | null;
   /** A newer game archive is available (release archive not yet installed). */
   updateAvailable: boolean;
+  /**
+   * The installed games include the latest release. False until both the
+   * release and the disk listing have been read, as either could say otherwise.
+   */
+  upToDate: boolean;
   /**
    * Everything with a newer version: the profile game, other games and a newer
    * engine. The topbar badge shows this.
@@ -80,7 +88,8 @@ export function GameUpdatesProvider({ children }: { children: ReactNode }) {
 
   const [release, setRelease] = useState<ReleaseInfo | null>(null);
   const [checking, setChecking] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [checkError, setCheckError] = useState<string | null>(null);
+  const [installError, setInstallError] = useState<string | null>(null);
   const [installing, setInstalling] = useState(false);
   const [installed, setInstalled] = useState(false);
   const [profileUpdated, setProfileUpdated] = useState(false);
@@ -107,11 +116,11 @@ export function GameUpdatesProvider({ children }: { children: ReactNode }) {
   const runCheck = useCallback(async () => {
     if (!repo) return;
     setChecking(true);
-    setError(null);
+    setCheckError(null);
     try {
       setRelease(await dlGithubLatestRelease({ repo }));
     } catch (e) {
-      setError(describeError(e));
+      setCheckError(describeError(e));
     } finally {
       setChecking(false);
     }
@@ -131,6 +140,7 @@ export function GameUpdatesProvider({ children }: { children: ReactNode }) {
       installedGames,
     );
   }, [release, filesRead, installedGames]);
+  const upToDate = !!release && filesRead && !updateAvailable;
   const updateCount = libraryUpdates + (updateAvailable ? 1 : 0);
   const updateNames = useMemo(
     () => [
@@ -183,7 +193,7 @@ export function GameUpdatesProvider({ children }: { children: ReactNode }) {
     if (!release || !writePath) return;
     setInstalling(true);
     setInstalled(false);
-    setError(null);
+    setInstallError(null);
     try {
       // Download every game archive we don't already have into <writeRoot>/games.
       const archives = release.assets.filter(
@@ -210,7 +220,7 @@ export function GameUpdatesProvider({ children }: { children: ReactNode }) {
       }
       setInstalled(true);
     } catch (e) {
-      setError(describeError(e));
+      setInstallError(describeError(e));
     } finally {
       setInstalling(false);
       setCurrentFile(null);
@@ -233,8 +243,10 @@ export function GameUpdatesProvider({ children }: { children: ReactNode }) {
         repo,
         release,
         checking,
-        error,
+        checkError,
+        installError,
         updateAvailable,
+        upToDate,
         updateCount,
         updateNames,
         updateTo: updateAvailable

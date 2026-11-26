@@ -68,6 +68,8 @@ describe("the game update check", () => {
     const { result } = renderHook(() => useGameUpdates(), { wrapper });
     await waitFor(() => expect(result.current.release).not.toBeNull());
     expect(result.current.updateAvailable).toBe(false);
+    // Nor that the game is current, which the listing cannot yet say either.
+    expect(result.current.upToDate).toBe(false);
     expect(notify).not.toHaveBeenCalled();
   });
 
@@ -84,5 +86,6 @@ describe("the game update check", () => {
     const { result } = renderHook(() => useGameUpdates(), { wrapper });
     await waitFor(() => expect(result.current.release).not.toBeNull());
     expect(result.current.updateAvailable).toBe(false);
+    expect(result.current.upToDate).toBe(true);
   });
 });
