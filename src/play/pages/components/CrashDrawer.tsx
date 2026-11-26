@@ -3,6 +3,7 @@ import { Button } from "@picoframe/frame";
 import { AlertTriangle, ClipboardCopy, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import { buildCrashReport, describeExit, describeSystem } from "@/play/crash";
 import type { CrashTriage } from "@/play/useCrashTriage";
 import { EngineLogFile } from "./EngineLogFile";
@@ -31,6 +32,7 @@ export function CrashDrawer({
 }) {
   const { t } = useLingui();
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
 
   if (!triage) return null;
   const {
@@ -65,10 +67,11 @@ export function CrashDrawer({
       log,
       output,
     });
+    setCopyError(null);
     navigator.clipboard
       .writeText(text)
       .then(() => setCopied(true))
-      .catch(() => {});
+      .catch((e) => setCopyError(describeError(e)));
   };
 
   return (
@@ -185,6 +188,14 @@ export function CrashDrawer({
                 {copied ? t`Copied` : t`Copy crash report`}
               </Button>
             </div>
+            {copyError && (
+              <p
+                role="alert"
+                className="select-text break-words text-xs text-destructive"
+              >
+                {copyError}
+              </p>
+            )}
           </div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
