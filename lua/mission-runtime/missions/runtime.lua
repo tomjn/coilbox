@@ -159,8 +159,16 @@
 -- the zone or team holds, so "the convoy arrived" holds when anything at all is
 -- in the zone. So a scenario using any of them asks for 14.
 
+-- 15 lets a count leave unit types out (issue #5293). One format feature:
+--
+--   * units_in_zone and unit_count may carry `exceptDefs`, and then never count a
+--     unit of a type it names, whether or not `unitDefs` names it too
+--
+-- A runtime behind 15 reads past the field and counts those units, so "clear the
+-- base" goes on waiting for every wall in it. So a scenario using it asks for 15.
+
 return {
-	version = 14,
+	version = 15,
 
 	-- The compiled mission format this runtime reads.
 	schemaVersion = 1,

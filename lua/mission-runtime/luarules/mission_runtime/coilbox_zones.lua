@@ -83,29 +83,32 @@ local function unitsIn(zone, allegiance)
 end
 
 --- Whether a unit in a zone is one the condition asked about. `defs`, when
--- given, is a set of unit def names to count and nothing else.
-local function counted(unitID, defs)
-	if not defs then
+-- given, is a set of unit def names to count and nothing else. `except`, when
+-- given, is a set of unit def names never to count (issue #5293).
+local function counted(unitID, defs, except)
+	if not defs and not except then
 		return true
 	end
 	local def = UnitDefs[Spring.GetUnitDefID(unitID)]
-	return def ~= nil and defs[def.name] == true
+	if def == nil then
+		return false
+	end
+	return (not defs or defs[def.name] == true) and not (except and except[def.name])
 end
 
 --- How many units are in a zone. `skip` answers for a unit the mission does not
 -- count as being anywhere.
-local function countIn(zone, allegiance, defs, skip)
+local function countIn(zone, allegiance, defs, except, skip)
 	local count = 0
 	for _, unitID in ipairs(unitsIn(zone, allegiance)) do
-		if not skip(unitID) and counted(unitID, defs) then
+		if not skip(unitID) and counted(unitID, defs, except) then
 			count = count + 1
 		end
 	end
 	return count
 end
 
---- A list of unit def names as a set, or nil when the condition names none and
--- every unit counts.
+--- A list of unit def names as a set, or nil when the condition names none.
 local function defSet(list)
 	if not list or #list == 0 then
 		return nil
@@ -165,11 +168,11 @@ function M.register(engine, state)
 	--
 	-- Membership is the same engine query a zone without a group uses, so a unit is
 	-- in a zone here exactly when it would be counted there. `allegiance` narrows
-	-- the group to the units that team owns now, and `defs` to the types named.
+	-- the group to the units that team owns now, and `defs` and `except` by type.
 	-- `all` asks for every one of those to be inside, which is false for a group
-	-- with nothing living: "the convoy arrived" must not hold because the convoy
-	-- was wiped, or has not been spawned.
-	local function groupInZone(zone, params, allegiance, defs, min, max)
+	-- with none: "the convoy arrived" must not hold because the convoy was
+	-- wiped, or has not been spawned.
+	local function groupInZone(zone, params, allegiance, defs, except, min, max)
 		local living = state.groups and state.groups.living(params.group, allegiance)
 		if not living then
 			return false
@@ -182,7 +185,7 @@ function M.register(engine, state)
 
 		local total, count = 0, 0
 		for _, unitID in ipairs(living) do
-			if counted(unitID, defs) then
+			if counted(unitID, defs, except) then
 				total = total + 1
 				if inside[unitID] then
 					count = count + 1
@@ -228,16 +231,16 @@ function M.register(engine, state)
 			if not min and not max then
 				min = 1
 			end
-			local defs = defSet(params.unitDefs)
+			local defs, except = defSet(params.unitDefs), defSet(params.exceptDefs)
 			if params.group ~= nil then
-				return groupInZone(zone, params, allegiance, defs, min, max)
+				return groupInZone(zone, params, allegiance, defs, except, min, max)
 			end
 			if params.all == true then
 				report("zone-all:" .. tostring(params.zone), "warning",
 					"units_in_zone on zone " .. tostring(params.zone)
 						.. " asks for all with no group, ignoring it")
 			end
-			return within(countIn(zone, allegiance, defs, placed), min, max)
+			return within(countIn(zone, allegiance, defs, except, placed), min, max)
 		end,
 	})
 
@@ -321,7 +324,7 @@ function M.register(engine, state)
 	-- enemy walking into an uncontested hold reset it rather than pause it.
 	engine:addTick(function(ctx)
 		for _, entry in ipairs(watched) do
-			local holding = countIn(entry.zone, entry.allegiance, nil, placed) > 0
+			local holding = countIn(entry.zone, entry.allegiance, nil, nil, placed) > 0
 			if holding and entry.uncontested and contested(entry.zone, entry.allegiance) then
 				holding = false
 			end

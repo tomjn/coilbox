@@ -186,6 +186,32 @@ check("and holds once enough of them are there",
 	held == "anyone,mine,theirs,a-crowd,tanks,two-tanks", held)
 
 --------------------------------------------------------------------------------
+-- Unit types left out of the count (issue #5293).
+--------------------------------------------------------------------------------
+
+engine = playing({
+	watching("clear-of-walls", { zone = "yard", exceptDefs = { "armdrag" }, max = 0 }),
+	watching("no-walls", { zone = "yard", exceptDefs = { "armdrag" } }),
+	watching("empty-except", { zone = "yard", exceptDefs = {} }),
+	watching("both", { zone = "yard", unitDefs = { "armpw", "armdrag" }, exceptDefs = { "armdrag" }, min = 2 }),
+	watching("all-excepted", { zone = "yard", unitDefs = { "armdrag" }, exceptDefs = { "armdrag" } }),
+})
+
+standing(engine, "armdrag", 1, 10, 10)
+held = tick(engine, 15)
+check("a zone holding only excepted types is clear", held == "clear-of-walls,empty-except", held)
+
+standing(engine, "armpw", 1, 20, 20)
+standing(engine, "armck", 1, 30, 30)
+held = tick(engine, 30)
+check("a type not excepted is counted", held == "no-walls,empty-except", held)
+
+standing(engine, "armpw", 1, 40, 40)
+held = tick(engine, 45)
+check("with both lists a unit is counted if named by one and not the other",
+	held == "no-walls,empty-except,both", held)
+
+--------------------------------------------------------------------------------
 -- Zones and teams a mission does not have.
 --------------------------------------------------------------------------------
 
