@@ -1696,8 +1696,8 @@ plans.attacked = {
 	},
 }
 
--- An actor followed through an upgrade (issue #5297). The probe replaces each
--- actor's unit the way Beyond All Reason and Splinter Faction do, with the
+-- An actor and a group's unit followed through an upgrade (issues #5297 and
+-- #5475). The probe replaces each one's unit the way Beyond All Reason and Splinter Faction do, with the
 -- engine's own Spring.CreateUnit and Spring.DestroyUnit, so what the runtime
 -- reads is what the engine hands every gadget: the new unit's place as it is
 -- created, and no attacker and weapon -21 for the old one.
@@ -1708,7 +1708,17 @@ local function successor(old, defName, dx)
 	return Spring.CreateUnit(defName, x + (dx or 0), y, z - (dx or 0), 0, Spring.GetUnitTeam(old))
 end
 
-local DEATHS = { "heroDead", "scoutDead", "postDead" }
+local DEATHS = { "heroDead", "scoutDead", "postDead", "squadDead" }
+
+--- The living units of the upgrade mission's group.
+local function squad()
+	return state().groups.living("squad")
+end
+
+local function moveState(unitID)
+	local states = Spring.GetUnitStates(unitID)
+	return states and states.movestate
+end
 
 plans.upgrade = {
 	deadline = 160,
@@ -1719,6 +1729,11 @@ plans.upgrade = {
 			upgraded.hero = { old = units.hero }
 			upgraded.scout = { old = units.scout }
 			upgraded.post = { old = units.post }
+			local members = squad()
+			check("the group is on the map, holding", #members == 2
+				and moveState(members[1]) == CMD.MOVESTATE_HOLDPOS, #members)
+			upgraded.first = { old = members[1] }
+			upgraded.second = { old = members[2] }
 		end },
 		{ frame = 30, run = function()
 			-- In one frame, as Beyond All Reason does.
@@ -1731,9 +1746,14 @@ plans.upgrade = {
 			Spring.DestroyUnit(upgraded.post.old, false, true)
 			check("while its old unit stands, the actor is still it",
 				state().units.scout == upgraded.scout.old)
+			-- The group's two, one each way.
+			upgraded.first.new = successor(upgraded.first.old, "armrock")
+			Spring.DestroyUnit(upgraded.first.old, false, true)
+			upgraded.second.new = successor(upgraded.second.old, "armrock")
 		end },
 		{ frame = 31, run = function()
 			Spring.DestroyUnit(upgraded.scout.old, false, true)
+			Spring.DestroyUnit(upgraded.second.old, false, true)
 		end },
 		{ frame = 32, run = function()
 			for _, id in ipairs({ "hero", "scout", "post" }) do
@@ -1745,6 +1765,15 @@ plans.upgrade = {
 			end
 			check("and the hero's new def is recorded", rules("coilbox_mission_upgraded_hero") == "armrock",
 				tostring(rules("coilbox_mission_upgraded_hero")))
+			local members = squad()
+			check("the group's units are its new ones", #members == 2
+				and members[1] == upgraded.first.new and members[2] == upgraded.second.new,
+				table.concat(members, ",") .. " wanted " .. tostring(upgraded.first.new) .. ","
+					.. tostring(upgraded.second.new))
+			for _, unitID in ipairs(members) do
+				check("and a sleeping group's new unit holds position",
+					moveState(unitID) == CMD.MOVESTATE_HOLDPOS, tostring(moveState(unitID)))
+			end
 		end },
 		{ frame = 60, run = function()
 			for _, id in ipairs(DEATHS) do
@@ -1752,6 +1781,7 @@ plans.upgrade = {
 					objectiveIs(id))
 			end
 			check("unit_health_below has not fired", objectiveIs("wounded") == ACTIVE)
+			state().groups.orders("squad", { { kind = "move", waypoints = { { x = 2400, z = 3000 } } } })
 			local new = upgraded.hero.new
 			local _, maxHealth = Spring.GetUnitHealth(new)
 			Spring.AddUnitDamage(new, maxHealth * 0.7, 0, nil, FALL)
@@ -1759,12 +1789,26 @@ plans.upgrade = {
 		{ frame = 100, run = function()
 			check("unit_health_below reads the new unit", objectiveIs("wounded") == COMPLETE,
 				objectiveIs("wounded"))
+			for _, unitID in ipairs(squad()) do
+				-- Read by where it goes: Balanced Annihilation queues a move as a
+				-- command of its own.
+				local order = (Spring.GetUnitCommands(unitID, 1) or {})[1]
+				check("an order to the group reaches its new unit",
+					order and order.params[1] == 2400 and order.params[3] == 3000,
+					order and table.concat(order.params, ","))
+				check("which has its move state back",
+					moveState(unitID) ~= CMD.MOVESTATE_HOLDPOS, tostring(moveState(unitID)))
+			end
 			Spring.DestroyUnit(upgraded.hero.new, false, true)
+			Spring.DestroyUnit(upgraded.first.new, false, true)
+			Spring.DestroyUnit(upgraded.second.new, false, true)
 		end },
 		{ frame = 130, run = function()
 			check("an upgraded actor that dies with nothing in its place is dead",
 				objectiveIs("heroDead") == COMPLETE and state().units.hero == nil, objectiveIs("heroDead"))
 			check("and the others are not", objectiveIs("scoutDead") == ACTIVE and objectiveIs("postDead") == ACTIVE)
+			check("an upgraded group that dies with nothing in its place is dead",
+				objectiveIs("squadDead") == COMPLETE and #squad() == 0, objectiveIs("squadDead"))
 		end },
 	},
 }
