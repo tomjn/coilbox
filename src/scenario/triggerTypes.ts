@@ -110,7 +110,7 @@ export type TypeSpec = Record<string, ParamSpec>;
  * would drift.
  */
 export function isUnitDefParam(name: string): boolean {
-  return name === "unitDef" || name === "unitDefs";
+  return name === "unitDef" || name === "unitDefs" || name === "exceptDefs";
 }
 
 /** Comparisons a `var` condition can make. */
@@ -161,6 +161,14 @@ export const CONDITION_TYPES: Record<string, TypeSpec> = {
         return t`unit types`;
       },
     },
+    /** Types never counted, even ones `unitDefs` names (issue #5293). */
+    exceptDefs: {
+      kind: "strings",
+      optional: true,
+      get label() {
+        return t`except unit types`;
+      },
+    },
     min: {
       kind: "number",
       optional: true,
@@ -186,6 +194,14 @@ export const CONDITION_TYPES: Record<string, TypeSpec> = {
       optional: true,
       get label() {
         return t`unit types`;
+      },
+    },
+    /** Types never counted, even ones `unitDefs` names (issue #5293). */
+    exceptDefs: {
+      kind: "strings",
+      optional: true,
+      get label() {
+        return t`except unit types`;
       },
     },
     min: {
@@ -782,15 +798,15 @@ export const TYPE_RUNTIME_VERSION: Record<string, number> = {
  * A runtime behind it reads past the parameter and answers the question without
  * it, which is a different question: `units_in_zone` with a `group` counts every
  * unit in the zone. So a scenario that sets one asks for the version. A boolean
- * written `false` is the question every runtime has always answered and asks for
- * nothing.
+ * written `false`, or an emptied list, is the question every runtime has always
+ * answered and asks for nothing.
  *
  * Add a parameter here in the same change that adds it to the type's table and
  * bumps `missions/runtime.lua`.
  */
 export const PARAM_RUNTIME_VERSION: Record<string, Record<string, number>> = {
-  units_in_zone: { group: 14, all: 14 },
-  unit_count: { group: 14 },
+  units_in_zone: { group: 14, all: 14, exceptDefs: 15 },
+  unit_count: { group: 14, exceptDefs: 15 },
 };
 
 /**

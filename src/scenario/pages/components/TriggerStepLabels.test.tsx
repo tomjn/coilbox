@@ -140,6 +140,21 @@ describe("trigger parameter labels", () => {
     expect(screen.getByText("unit to build")).toBeTruthy();
   });
 
+  it("offers unit types to leave out after the ones to count (issue #5293)", () => {
+    renderStep({ type: "units_in_zone", params: { zone: "" } });
+    const pickers = () => screen.getByText("except unit types");
+    expect(pickers()).toBeTruthy();
+    expect(screen.getAllByText("Add a unit type")).toHaveLength(2);
+    cleanup();
+
+    renderStep({
+      type: "unit_count",
+      params: { team: "", exceptDefs: ["armdrag"] },
+    });
+    expect(pickers()).toBeTruthy();
+    expect(screen.getByLabelText("Remove armdrag")).toBeTruthy();
+  });
+
   it("names the point picker's group rather than either of its two parts (issue #2299)", () => {
     const step: TriggerStep = {
       type: "camera_pan",

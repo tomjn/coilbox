@@ -2,10 +2,10 @@
 -- Do not edit: change the scenario and compile again.
 return {
   schemaVersion = 1,
-  runtimeVersion = 14,
+  runtimeVersion = 15,
   id = "convoy",
   name = "Convoy",
-  description = "Triggers that ask about a group: the convoy arriving, thinning out, and the raiders being wiped.",
+  description = "Triggers that count units: the convoy arriving and thinning out, the raiders being wiped, and the depot cleared of everything but walls.",
   game = "Test Game",
   map = "Comet Catcher Redux",
   teams = {
@@ -99,6 +99,40 @@ return {
         {
           type = "wake_group",
           params = { group = "raid" },
+        },
+      },
+    },
+    {
+      id = "depot-cleared",
+      enabled = true,
+      ["repeat"] = false,
+      conditions = {
+        op = "all",
+        conditions = {
+          {
+            type = "units_in_zone",
+            params = {
+              exceptDefs = { "cordrag", "corfort" },
+              max = 0,
+              team = "raiders",
+              zone = "depot",
+            },
+          },
+          {
+            type = "unit_count",
+            params = {
+              exceptDefs = { "corck" },
+              max = 0,
+              team = "raiders",
+              unitDefs = { "corak", "corck" },
+            },
+          },
+        },
+      },
+      actions = {
+        {
+          type = "set_var",
+          params = { name = "arrived", value = 2 },
         },
       },
     },

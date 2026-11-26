@@ -22902,6 +22902,10 @@ msgstr "Dokładne wysokości"
 msgid "Exact numbers. A model stores 32-bit floats where the document stores 64, so positions, rotations and scales come back correct to about the seventh digit."
 msgstr "Dokładne liczby. Model przechowuje liczby 32-bitowe, a dokument 64-bitowe, więc pozycje, obroty i skale wracają poprawne do mniej więcej siódmej cyfry."
 
+#: src/scenario/triggerTypes.ts
+msgid "except unit types"
+msgstr "oprócz typów jednostek"
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Exclusive interception"

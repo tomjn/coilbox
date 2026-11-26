@@ -733,6 +733,14 @@ do
 			watching("convoy-player", "unit_count", { group = "convoy", team = "player", min = 1 }),
 			watching("convoy-enemy-gone", "unit_count", { group = "convoy", team = "enemy", max = 0 }),
 			watching("count-of-nothing", "unit_count", {}),
+			watching("rock-excepted-all-in", "units_in_zone",
+				{ zone = "pad", group = "convoy", all = true, exceptDefs = { "armrock" } }),
+			watching("excepted-both-all-in", "units_in_zone", { zone = "pad", group = "convoy", all = true,
+				unitDefs = { "armrock" }, exceptDefs = { "armrock" } }),
+			watching("convoy-no-rock", "unit_count",
+				{ group = "convoy", exceptDefs = { "armrock" }, min = 2, max = 2 }),
+			watching("convoy-both", "unit_count", { group = "convoy",
+				unitDefs = { "armpw", "armrock" }, exceptDefs = { "armpw" }, min = 1, max = 1 }),
 		},
 	})
 
@@ -781,6 +789,7 @@ do
 		has(read, "convoy-any-in"), read)
 	check("all does not hold while one of the group is outside",
 		not has(read, "convoy-all-in"), read)
+	check("all ignores a member of an excepted type that is outside", has(read, "rock-excepted-all-in"), read)
 	check("a unit that is not the group's is not counted, however many are in the zone",
 		not has(tick(30), "raiders-all-in"))
 
@@ -801,6 +810,9 @@ do
 	read = tick(90)
 	check("unit_count with a group counts that group and no team", has(read, "convoy-two"), read)
 	check("and can be narrowed to a unit type", has(read, "convoy-rock"), read)
+	check("a group's count leaves excepted types out", has(read, "convoy-no-rock"), read)
+	check("a group's count with both lists applies both", has(read, "convoy-both"), read)
+	check("all does not hold when every member's type is excepted", not has(read, "excepted-both-all-in"), read)
 	check("a unit_count naming neither a team nor a group never holds and says so",
 		not has(read, "count-of-nothing")
 		and logged(gc, "warning: unit_count names neither a team nor a group"))

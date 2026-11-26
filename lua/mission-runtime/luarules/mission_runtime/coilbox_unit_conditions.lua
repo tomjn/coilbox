@@ -113,6 +113,15 @@ function M.register(engine, state)
 		return count
 	end
 
+	--- The types `exceptDefs` leaves out of a count, as a set (issue #5293).
+	local function excepted(params)
+		local set = {}
+		for _, name in ipairs(params.exceptDefs or {}) do
+			set[name] = true
+		end
+		return set
+	end
+
 	--- How many of a group's living units match the condition (issue #5292).
 	-- `team`, when given, keeps the units that team owns now, so a group the
 	-- mission handed the player can be counted from either side. Read through
@@ -131,10 +140,11 @@ function M.register(engine, state)
 			end
 		end
 
+		local except = excepted(params)
 		local count = 0
 		for _, unitID in ipairs(living) do
 			local def = UnitDefs[Spring.GetUnitDefID(unitID)]
-			if not wanted or (def and wanted[def.name]) then
+			if (not wanted or (def and wanted[def.name])) and not (def and except[def.name]) then
 				count = count + 1
 			end
 		end
@@ -165,17 +175,29 @@ function M.register(engine, state)
 				return false
 			end
 
+			--- How many units of one type the mission would say the team has.
+			local function ofType(name)
+				local def = UnitDefNames[name]
+				if not def then
+					return 0
+				end
+				return Spring.GetTeamUnitDefCount(team, def.id) - placed(team, def.id)
+			end
+
 			local count = 0
+			local except = excepted(params)
 			local defs = params.unitDefs
 			if defs and #defs > 0 then
 				for _, name in ipairs(defs) do
-					local def = UnitDefNames[name]
-					if def then
-						count = count + Spring.GetTeamUnitDefCount(team, def.id) - placed(team, def.id)
+					if not except[name] then
+						count = count + ofType(name)
 					end
 				end
 			else
 				count = (Spring.GetTeamUnitCount(team) or 0) - placed(team)
+				for name in pairs(except) do
+					count = count - ofType(name)
+				end
 			end
 
 			return within(count, tonumber(params.min), tonumber(params.max))

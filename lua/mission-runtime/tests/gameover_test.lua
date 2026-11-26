@@ -319,6 +319,18 @@ engine = anchored({
 			actions = { { type = "probe", params = { mark = "wiped" } } },
 		},
 		{
+			id = "no-walls-left",
+			enabled = true,
+			["repeat"] = true,
+			conditions = {
+				op = "all",
+				conditions = {
+					{ type = "unit_count", params = { team = "player", exceptDefs = { "wall" }, min = 0, max = 0 } },
+				},
+			},
+			actions = { { type = "probe", params = { mark = "no-walls-left" } } },
+		},
+		{
 			id = "in-corner",
 			enabled = true,
 			["repeat"] = true,
@@ -338,8 +350,9 @@ check("a team with a unit of its own does not read as wiped",
 engine.env.Spring.DestroyUnit(engine.GG.CoilboxMission.units.scout)
 engine.env:GameFrame(30)
 
-check("a team whose last unit died reads as wiped",
-	table.concat(engine.fired, ",") == "wiped", table.concat(engine.fired, ","))
+-- The anchor here is a wall, so excepting walls must not take it off twice.
+check("a team whose last unit died reads as wiped, excepting the anchor's type or not",
+	table.concat(engine.fired, ",") == "wiped,no-walls-left", table.concat(engine.fired, ","))
 check("but the engine still counts a unit for it, which is what stops the game ending",
 	engine.env.Spring.GetTeamUnitCount(0) == 1, engine.env.Spring.GetTeamUnitCount(0))
 check("and an anchor standing in a zone is in no zone as far as the mission is concerned",

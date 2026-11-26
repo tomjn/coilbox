@@ -22902,6 +22902,10 @@ msgstr "精确高度"
 msgid "Exact numbers. A model stores 32-bit floats where the document stores 64, so positions, rotations and scales come back correct to about the seventh digit."
 msgstr "精确数值。模型存储的是 32 位浮点数，而文档存储的是 64 位，因此位置、旋转和缩放会精确到大约第七位有效数字。"
 
+#: src/scenario/triggerTypes.ts
+msgid "except unit types"
+msgstr "排除的单位类型"
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Exclusive interception"
