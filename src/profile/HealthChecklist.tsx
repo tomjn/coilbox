@@ -27,10 +27,10 @@ export default function HealthChecklist() {
   const { checks, loading } = useHealthChecks();
 
   return (
-    <section className="space-y-3">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        <Trans>Health</Trans>
-      </h3>
+    <section className="flex flex-col gap-3">
+      <h2 className="text-sm font-semibold">
+        <Trans>Results</Trans>
+      </h2>
       {loading && checks.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           <Trans>Running checks…</Trans>
@@ -49,11 +49,15 @@ export default function HealthChecklist() {
 function Row({ check }: { check: HealthCheck }) {
   const Icon = ICONS[check.status];
   return (
-    <li className="flex items-start gap-3 px-3 py-2">
+    <li className="flex items-start gap-3 px-4 py-3">
       <Icon size={16} className={`mt-0.5 shrink-0 ${COLOURS[check.status]}`} />
       <div className="min-w-0">
         <p className="font-medium">{check.label}</p>
-        {check.hint && <p className="text-muted-foreground">{check.hint}</p>}
+        {check.hint && (
+          <p className="mt-0.5 select-text text-xs text-muted-foreground">
+            {check.hint}
+          </p>
+        )}
         {check.detail && (
           <pre className="mt-2 overflow-x-auto rounded-md border border-border bg-muted/50 p-2 font-mono text-xs leading-relaxed text-foreground">
             {check.detail}

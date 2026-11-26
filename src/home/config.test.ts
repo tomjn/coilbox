@@ -350,12 +350,12 @@ describe("describeHome", () => {
           zones: [{ zone: "greeting" }, { zone: "cards" }],
         }),
       ),
-    ).toBe('Layout "stacked", 2 zone(s), pinned');
+    ).toBe('Layout "stacked", 2 zones, pinned');
   });
 
   it("says what an unconfigured page tracks", () => {
     expect(describeHome(resolveHome(undefined))).toBe(
-      `Default layout, ${DEFAULT_ZONES.length} zone(s), tracking the default`,
+      `Default layout, ${DEFAULT_ZONES.length} zones, tracking the default`,
     );
   });
 
@@ -363,7 +363,7 @@ describe("describeHome", () => {
     const home = resolveHome({
       zones: [{ zone: "greeting" }, { zone: "nope" }, { zone: "cards" }],
     });
-    expect(describeHome(home)).toContain("2 zone(s)");
+    expect(describeHome(home)).toContain("2 zones");
   });
 });
 

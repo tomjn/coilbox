@@ -224,7 +224,7 @@ describe("deriveHealthChecks", () => {
       "scenarios",
     );
     expect(c.status).toBe("warn");
-    expect(c.label).toContain("1 scenario(s)");
+    expect(c.label).toContain("1 scenario failed");
     expect(c.hint).toContain(".coilbox/scenarios/");
     expect(c.detail).toContain("Ambush [bundled]");
     expect(c.detail).toContain("newer version of coilbox");
@@ -522,9 +522,7 @@ describe("deriveHealthChecks", () => {
     it("confirms a bundle with nothing wrong, naming what it carries", () => {
       const c = byId({ ...base(), bundle: bundle() }, "bundle");
       expect(c.status).toBe("ok");
-      expect(c.label).toBe(
-        "Bundled content: 1 game(s), 1 map(s), engine 2025.06.12",
-      );
+      expect(c.label).toBe("Bundled content: 1 game, 1 map, engine 2025.06.12");
     });
 
     it("lists each authoring mistake on a line of its own", () => {
@@ -541,7 +539,7 @@ describe("deriveHealthChecks", () => {
         "bundle",
       );
       expect(c.status).toBe("warn");
-      expect(c.label).toBe("2 problem(s) in the bundled content");
+      expect(c.label).toBe("2 problems in the bundled content");
       const lines = c.detail?.split("\n") ?? [];
       expect(lines).toHaveLength(2);
       expect(lines[0]).toContain("duck.sd7 sits at the top");

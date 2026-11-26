@@ -26,7 +26,7 @@
  * the same way this module does.
  */
 
-import { t } from "@lingui/core/macro";
+import { plural, t } from "@lingui/core/macro";
 import {
   DEFAULT_LAYOUT,
   isLayoutName,
@@ -357,8 +357,11 @@ export function describeHome(home: ResolvedHome): string {
   const layoutName = home.layout;
   const layout = layoutName ? t`Layout "${layoutName}"` : t`Default layout`;
   const tracking = home.pinned ? t`pinned` : t`tracking the default`;
-  const zoneCount = home.entries.length;
-  return t`${layout}, ${zoneCount} zone(s), ${tracking}`;
+  const zones = plural(home.entries.length, {
+    one: "# zone",
+    other: "# zones",
+  });
+  return t`${layout}, ${zones}, ${tracking}`;
 }
 
 /**
