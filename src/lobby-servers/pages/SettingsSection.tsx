@@ -6,19 +6,18 @@ import {
   ExternalLink,
   KeyRound,
   Plus,
-  RefreshCw,
-  Server,
-  ServerCog,
   Terminal,
   Trash2,
   TriangleAlert,
   UserPlus,
-  Users,
 } from "lucide-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { CheckField, Field } from "@/components/Field";
+import { HelpPopover } from "@/components/HelpPopover";
 import { OptionSelect } from "@/components/OptionSelect";
+import { SettingList, SettingRow } from "@/components/SettingRow";
 import { SlideDrawer } from "@/components/SlideDrawer";
+import { Switch } from "@/components/ui/switch";
 import { describeError } from "@/i18n/uiError";
 import { identifierFieldProps } from "@/lib/identifierField";
 import { updateStoredSetting } from "@/lib/storedSetting";
@@ -72,10 +71,6 @@ import { PasswordRecoveryForm } from "../PasswordRecoveryForm";
 import { RegisterForm } from "../RegisterForm";
 import { AutojoinChannels } from "./components/AutojoinChannels";
 
-const H2_CLASS =
-  "flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground";
-const EMPTY_CLASS =
-  "rounded-md border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground";
 /**
  * uberserver: the lobby server behind lobby.recoilengine.org. This fork rather than
  * `spring/uberserver` upstream, because its readme is a start-to-finish deployment
@@ -167,10 +162,6 @@ export default function LobbyServersSettings() {
   const [autoAway, setAutoAway] = useSetting<boolean>(
     AUTO_AWAY_ENABLED_KEY,
     true,
-  );
-  const [awayMinutes, setAwayMinutes] = useSetting<number>(
-    AUTO_AWAY_MINUTES_KEY,
-    DEFAULT_AUTO_AWAY_MINUTES,
   );
   const moveServerKeyData = useMoveServerKeyData();
 
@@ -348,64 +339,113 @@ export default function LobbyServersSettings() {
   return (
     // `pb-8` so the last section clears the bottom of the scroll area rather than
     // ending flush against it.
-    <div className="space-y-8 pb-8">
-      <section className="space-y-3">
-        <h2 className={H2_CLASS}>
-          <RefreshCw size={15} /> <Trans>Connection</Trans>
+    <div className="flex flex-col gap-10 pb-8">
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold">
+          <Trans>Connection</Trans>
         </h2>
-        <div className="space-y-3 rounded-md border border-border p-3">
-          <CheckField
-            label={t`Connect automatically on startup`}
-            hint={t`When Coilbox starts, log back in to every account that was connected when it last closed. To connect one account every time, tick Connect on startup on that login.`}
-            checked={autoConnect}
-            onChange={setAutoConnect}
-          />
-          <CheckField
+        <SettingList>
+          <SettingRow
+            id="lobby-auto-connect"
+            label={t`Log back in on startup`}
+            helpLabel={t`About logging back in on startup`}
+            help={
+              <p>
+                <Trans>
+                  When Coilbox starts, it logs back in to every account that was
+                  connected when it last closed. To connect one account every
+                  time, open that login and turn on Connect on startup there.
+                </Trans>
+              </p>
+            }
+          >
+            <Switch
+              id="lobby-auto-connect"
+              checked={autoConnect}
+              onCheckedChange={(v) => setAutoConnect(v === true)}
+            />
+          </SettingRow>
+          <SettingRow
+            id="lobby-auto-rejoin"
             label={t`Reconnect automatically`}
-            hint={t`If the server drops the connection, rejoin your channels and last battle automatically.`}
-            checked={autoRejoin}
-            onChange={setAutoRejoin}
-          />
-          <CheckField
+            helpLabel={t`About reconnecting`}
+            help={
+              <p>
+                <Trans>
+                  If the server drops the connection, Coilbox logs back in and
+                  rejoins your channels and last battle.
+                </Trans>
+              </p>
+            }
+          >
+            <Switch
+              id="lobby-auto-rejoin"
+              checked={autoRejoin}
+              onCheckedChange={(v) => setAutoRejoin(v === true)}
+            />
+          </SettingRow>
+          <SettingRow
+            id="lobby-auto-away"
             label={t`Set me away when idle`}
-            hint={t`Show as away to everyone else after a spell without input. Using Coilbox again clears it. Away you set by hand stays until you clear it.`}
-            checked={autoAway}
-            onChange={setAutoAway}
-          />
-          {autoAway && (
-            <Field
-              label={t`Minutes before away`}
-              // The cap belongs on the input, not the field: on the field it also
-              // caps the label and hint, which wraps them at 10rem.
-              className="pl-6"
-              hint={t`${MIN_AUTO_AWAY_MINUTES} to ${MAX_AUTO_AWAY_MINUTES}.`}
-            >
-              <Input
-                className="max-w-40"
-                type="number"
-                min={MIN_AUTO_AWAY_MINUTES}
-                max={MAX_AUTO_AWAY_MINUTES}
-                value={awayMinutes}
-                onChange={(e) => setAwayMinutes(Number(e.target.value))}
-                // Half-typed values are usable while typing and corrected on the
-                // way out, so the field can never be left showing what it isn't.
-                onBlur={() => setAwayMinutes(clampAwayMinutes(awayMinutes))}
-              />
-            </Field>
-          )}
-        </div>
+            helpLabel={t`About going away when idle`}
+            help={
+              <p>
+                <Trans>
+                  Everyone else sees you as away once you stop using Coilbox for
+                  the time below. Using Coilbox again clears it. Away you set by
+                  hand stays until you clear it.
+                </Trans>
+              </p>
+            }
+          >
+            <Switch
+              id="lobby-auto-away"
+              checked={autoAway}
+              onCheckedChange={(v) => setAutoAway(v === true)}
+            />
+          </SettingRow>
+          {autoAway && <AwayMinutesRow />}
+        </SettingList>
       </section>
 
-      <section className="space-y-3">
-        <h2 className={H2_CLASS}>
-          <Users size={15} /> <Trans>Accounts</Trans>
-        </h2>
+      <section className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold">
+            <Trans>Accounts</Trans>
+          </h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRecoveryOpen((o) => !o)}
+              disabled={servers.length === 0}
+            >
+              <KeyRound /> <Trans>Forgot password</Trans>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRegisterOpen((o) => !o)}
+              disabled={servers.length === 0}
+            >
+              <UserPlus /> <Trans>Register</Trans>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={addAccount}
+              disabled={servers.length === 0}
+            >
+              <Plus /> <Trans>Add login</Trans>
+            </Button>
+          </div>
+        </div>
         {accountsCfg.accounts.length === 0 ? (
-          <p className={EMPTY_CLASS}>
+          <p className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
             <Trans>No logins yet. Add one to connect to a lobby.</Trans>
           </p>
         ) : (
-          <ul className="space-y-2">
+          <ul className="divide-y divide-border overflow-hidden rounded-md border border-border">
             {accountsCfg.accounts.map((a) => (
               <AccountListRow
                 key={a.id}
@@ -416,39 +456,33 @@ export default function LobbyServersSettings() {
             ))}
           </ul>
         )}
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setRegisterOpen((o) => !o)}
-            disabled={servers.length === 0}
-          >
-            <UserPlus /> <Trans>Register</Trans>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={addAccount}
-            disabled={servers.length === 0}
-          >
-            <Plus /> <Trans>Add login</Trans>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setRecoveryOpen((o) => !o)}
-            disabled={servers.length === 0}
-          >
-            <KeyRound /> <Trans>Forgot password</Trans>
-          </Button>
-        </div>
       </section>
 
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className={H2_CLASS}>
-            <Server size={15} /> <Trans>Servers</Trans>
-          </h2>
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1">
+            <h2 className="text-sm font-semibold">
+              <Trans>Servers</Trans>
+            </h2>
+            <HelpPopover label={t`About hosting your own server`}>
+              <p>
+                <Trans>
+                  Coilbox connects to any TASServer-compatible lobby, including
+                  one you run yourself. lobby.recoilengine.org runs uberserver,
+                  which has a full deployment guide using Docker and MariaDB.
+                  Add yours as a custom server once it is running.
+                </Trans>
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="self-start"
+                onClick={() => openUrl(UBERSERVER_URL).catch(() => {})}
+              >
+                <ExternalLink /> <Trans>Uberserver guide</Trans>
+              </Button>
+            </HelpPopover>
+          </div>
           <Button variant="outline" size="sm" onClick={addCustomServer}>
             <Plus /> <Trans>Add custom server</Trans>
           </Button>
@@ -456,7 +490,7 @@ export default function LobbyServersSettings() {
         {/* One list: `allServers` already returns the built-ins first, then the
             user's own, so custom entries need no separate section. Only they get
             an `onOpen`, which is what makes their row a button. */}
-        <ul className="space-y-2">
+        <ul className="divide-y divide-border overflow-hidden rounded-md border border-border">
           {servers.map((s) => (
             <ServerListRow
               key={s.id}
@@ -469,29 +503,6 @@ export default function LobbyServersSettings() {
             />
           ))}
         </ul>
-      </section>
-
-      <section className="space-y-3">
-        <h2 className={H2_CLASS}>
-          <ServerCog size={15} /> <Trans>Host your own server</Trans>
-        </h2>
-        <div className="space-y-3 rounded-md border border-dashed border-border p-3">
-          <p className="text-xs leading-snug text-muted-foreground">
-            <Trans>
-              Coilbox connects to any TASServer-compatible lobby, including one
-              you run yourself. lobby.recoilengine.org runs uberserver, which
-              ships a start-to-finish deployment guide using Docker and MariaDB.
-              Add yours as a custom server above once it is running.
-            </Trans>
-          </p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => openUrl(UBERSERVER_URL).catch(() => {})}
-          >
-            <ExternalLink /> <Trans>Uberserver</Trans>
-          </Button>
-        </div>
       </section>
 
       <RegisterDrawer
@@ -532,6 +543,53 @@ export default function LobbyServersSettings() {
         onClose={() => setConsoleOpen(false)}
       />
     </div>
+  );
+}
+
+/**
+ * How many idle minutes before the player shows as away. The field holds what
+ * is typed until it loses focus or Enter is pressed, and only then saves the
+ * clamped number, so clearing the field to retype it never saves a zero.
+ */
+function AwayMinutesRow() {
+  const { t } = useLingui();
+  const [minutes, setMinutes] = useSetting<number>(
+    AUTO_AWAY_MINUTES_KEY,
+    DEFAULT_AUTO_AWAY_MINUTES,
+  );
+  const [draft, setDraft] = useState<string | null>(null);
+
+  const commit = () => {
+    if (draft === null) return;
+    setDraft(null);
+    const typed = draft.trim() === "" ? Number.NaN : Number(draft);
+    // An empty or unreadable entry keeps the saved value.
+    if (Number.isFinite(typed)) setMinutes(clampAwayMinutes(typed));
+  };
+
+  return (
+    <SettingRow
+      id="lobby-away-minutes"
+      label={t`Minutes before away`}
+      description={t`${MIN_AUTO_AWAY_MINUTES} to ${MAX_AUTO_AWAY_MINUTES}`}
+    >
+      <Input
+        id="lobby-away-minutes"
+        aria-describedby="lobby-away-minutes-description"
+        className="w-24"
+        type="number"
+        inputMode="numeric"
+        min={MIN_AUTO_AWAY_MINUTES}
+        max={MAX_AUTO_AWAY_MINUTES}
+        step={1}
+        value={draft ?? String(clampAwayMinutes(minutes))}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commit();
+        }}
+      />
+    </SettingRow>
   );
 }
 
@@ -579,7 +637,7 @@ function AccountListRow({
       <button
         type="button"
         onClick={onOpen}
-        className="flex w-full items-center gap-2 rounded-md border border-border px-3 py-2 text-left hover:bg-accent"
+        className="flex w-full items-center gap-2 px-4 py-2.5 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >
         <span className="flex min-w-0 flex-col">
           <span className="truncate text-sm font-semibold leading-tight">
@@ -955,17 +1013,17 @@ function AccountForm({
             </Button>
           </div>
         )}
-        <Field label="Server">
+        <Field label={t`Server`}>
           <OptionSelect
             value={a.serverId}
             onValueChange={(v) =>
               void rename({ serverId: v, username: a.username })
             }
             options={serverOptions(servers)}
-            placeholder="Select a server"
+            placeholder={t`Select a server`}
           />
         </Field>
-        <Field label="Username">
+        <Field label={t`Username`}>
           <Input
             value={usernameInput}
             onChange={(e) => setUsernameInput(e.target.value)}
@@ -996,13 +1054,13 @@ function AccountForm({
           />
         ) : (
           <Field
-            label="Password"
+            label={t`Password`}
             hint={
               saved == null
                 ? undefined
                 : saved
-                  ? "Saved in keychain"
-                  : "Not set"
+                  ? t`Saved in keychain`
+                  : t`Not set`
             }
           >
             <Input
@@ -1012,7 +1070,7 @@ function AccountForm({
               onChange={(e) => setPassword(e.target.value)}
               onBlur={savePassword}
               onKeyDown={blurOnEnter}
-              placeholder={saved ? "•••••••• (saved)" : ""}
+              placeholder={saved ? t`•••••••• (saved)` : ""}
               {...identifierFieldProps}
             />
           </Field>
@@ -1196,9 +1254,12 @@ function ServerListRow({
             <Trans>Official</Trans>
           </span>
         ) : (
-          <span className={cn(tag, "ml-auto")}>
-            {s.builtin ? t`Built-in` : t`Custom`}
-          </span>
+          // Most servers ship with Coilbox, so only the player's own are marked.
+          !s.builtin && (
+            <span className={cn(tag, "ml-auto")}>
+              <Trans>Custom</Trans>
+            </span>
+          )
         )}
       </div>
       <div className="truncate font-mono text-xs text-muted-foreground">
@@ -1213,14 +1274,17 @@ function ServerListRow({
     </>
   );
 
-  const shell = "rounded-md border border-border px-3 py-2 text-sm";
+  const shell = "px-4 py-2.5 text-sm";
   return (
     <li>
       {onOpen ? (
         <button
           type="button"
           onClick={onOpen}
-          className={cn(shell, "block w-full text-left hover:bg-accent")}
+          className={cn(
+            shell,
+            "block w-full text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+          )}
         >
           {body}
         </button>

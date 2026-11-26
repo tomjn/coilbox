@@ -4682,9 +4682,8 @@ msgid "{metricLabel} per minute, by team, over match time"
 msgstr "{metricLabel} al minuto, per squadra, nel tempo della partita"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
-#, fuzzy
-msgid "{MIN_AUTO_AWAY_MINUTES} to {MAX_AUTO_AWAY_MINUTES}."
-msgstr "Da {MIN_AUTO_AWAY_MINUTES} a {MAX_AUTO_AWAY_MINUTES}."
+msgid "{MIN_AUTO_AWAY_MINUTES} to {MAX_AUTO_AWAY_MINUTES}"
+msgstr ""
 
 #: src/content/pages/GameUnitPage.tsx
 #, fuzzy
@@ -8243,6 +8242,10 @@ msgstr "#{channel} non è più registrato."
 msgid "#{channel} is registered to {founder}."
 msgstr "#{channel} è registrato a nome di {founder}."
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "•••••••• (saved)"
+msgstr ""
+
 #: src/profile/health.ts
 #, fuzzy
 msgid "`defaultLocale` names a language coilbox does not have"
@@ -10128,12 +10131,24 @@ msgstr "Informazioni sulla correzione di UV e normali"
 msgid "About fullscreen"
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "About going away when idle"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "About hosting your own server"
+msgstr ""
+
 #: src/general/pages/SettingsSection.tsx
 msgid "About interface size"
 msgstr ""
 
 #: src/content/pages/components/KeyBindingEditor.tsx
 msgid "About keys with more than one action"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "About logging back in on startup"
 msgstr ""
 
 #: src/content/pages/FoldersSection.tsx
@@ -10170,6 +10185,10 @@ msgstr "Informazioni sulle proporzioni"
 
 #: src/downloads/pages/SettingsSection.tsx
 msgid "About rapid repositories"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "About reconnecting"
 msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
@@ -14644,11 +14663,6 @@ msgstr "Creata nell’editor di unità come {builtByName} ed esportata in {gameL
 msgid "Built in the unit builder as {projectName} and exported into this game"
 msgstr "Creata nell’editor di unità come {projectName} ed esportata in questo gioco"
 
-#: src/lobby-servers/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Built-in"
-msgstr "Integrato"
-
 #: src/multiplayer/chat/ChatPane.tsx
 #, fuzzy
 msgid "Bullet list"
@@ -16704,9 +16718,8 @@ msgid "Coilbox challenge"
 msgstr "Sfida coilbox"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Coilbox connects to any TASServer-compatible lobby, including one you run yourself. lobby.recoilengine.org runs uberserver, which ships a start-to-finish deployment guide using Docker and MariaDB. Add yours as a custom server above once it is running."
-msgstr "Coilbox si connette a qualsiasi lobby compatibile con TASServer, anche una gestita da te. lobby.recoilengine.org usa uberserver, che include una guida completa al deployment con Docker e MariaDB. Aggiungi il tuo come server personalizzato qui sopra una volta avviato."
+msgid "Coilbox connects to any TASServer-compatible lobby, including one you run yourself. lobby.recoilengine.org runs uberserver, which has a full deployment guide using Docker and MariaDB. Add yours as a custom server once it is running."
+msgstr ""
 
 #: src/multiplayer/battle/compatBattle.ts
 #, fuzzy
@@ -17826,11 +17839,6 @@ msgstr "Connettiti come {username}"
 #, fuzzy
 msgid "Connect as {username} and join"
 msgstr "Connettiti come {username} ed entra"
-
-#: src/lobby-servers/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Connect automatically on startup"
-msgstr "Connetti automaticamente all’avvio"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -22726,6 +22734,10 @@ msgstr "Chiunque entri deve avere esattamente questa versione."
 msgid "Everyone"
 msgstr "Tutti"
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Everyone else sees you as away once you stop using Coilbox for the time below. Using Coilbox again clears it. Away you set by hand stays until you clear it."
+msgstr ""
+
 #: src/multiplayer/battles/zerokBattle.ts
 #, fuzzy
 msgid "Everyone for themselves."
@@ -26495,11 +26507,6 @@ msgstr "Ospita di nuovo la battaglia per aprire un nuovo inoltro. Motivo: {reaso
 msgid "Host vs computer"
 msgstr "Host contro computer"
 
-#: src/lobby-servers/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Host your own server"
-msgstr "Ospita il tuo server"
-
 #: src/direct/room.ts
 #, fuzzy
 msgid "Hosting on port {port} as {host}"
@@ -26964,9 +26971,8 @@ msgid "If nothing arrives, start again and ask for a new code."
 msgstr "Se non arriva nulla, ricomincia e chiedi un nuovo codice."
 
 #: src/lobby-servers/pages/SettingsSection.tsx
-#, fuzzy
-msgid "If the server drops the connection, rejoin your channels and last battle automatically."
-msgstr "Se il server interrompe la connessione, rientra automaticamente nei tuoi canali e nell’ultima battaglia."
+msgid "If the server drops the connection, Coilbox logs back in and rejoins your channels and last battle."
+msgstr ""
 
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #: src/multiplayer/pages/IgnoreSettings.tsx
@@ -30095,6 +30101,10 @@ msgstr "Blocca ogni equipaggiamento che lo contiene"
 #, fuzzy
 msgid "Log"
 msgstr "Log"
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Log back in on startup"
+msgstr ""
 
 #: src/home/zones/ResumeRail.tsx
 #: src/multiplayer/pages/BattlesPage.tsx
@@ -35645,6 +35655,7 @@ msgid "not set"
 msgstr "non impostato"
 
 #: src/lego/pages/components/MovementSection.tsx
+#: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Not set"
 msgstr "Non impostato"
@@ -38194,6 +38205,7 @@ msgid "Passengers survive its death"
 msgstr "I passeggeri sopravvivono alla sua distruzione"
 
 #: src/lobby-servers/AddAccountForm.tsx
+#: src/lobby-servers/pages/SettingsSection.tsx
 #: src/lobby-servers/RegisterForm.tsx
 #: src/uberstress/pages/components/SeedSqlForm.tsx
 #: src/uberstress/pages/RunPage.tsx
@@ -43649,6 +43661,10 @@ msgstr "Salvato nel gioco con il widget di coilbox, sul motore {engine}."
 msgid "Saved in game with the coilbox widget."
 msgstr "Salvato nel gioco con il widget di coilbox."
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Saved in keychain"
+msgstr ""
+
 #: src/lobby-servers/AddAccountForm.tsx
 #, fuzzy
 msgid "Saved in your keychain when you add the login."
@@ -44625,6 +44641,7 @@ msgid "Select a run…"
 msgstr "Seleziona un’esecuzione…"
 
 #: src/lobby-servers/AddAccountForm.tsx
+#: src/lobby-servers/pages/SettingsSection.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/lobby-servers/RegisterForm.tsx
 #, fuzzy
@@ -45017,6 +45034,7 @@ msgstr "server"
 
 #: src/content/replayEventList.ts
 #: src/lobby-servers/AddAccountForm.tsx
+#: src/lobby-servers/pages/SettingsSection.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/tools.tsx
@@ -45897,11 +45915,6 @@ msgstr "Mostra tutti gli scenari"
 #, fuzzy
 msgid "Show and sort the figures for {primary} alone instead of the whole match"
 msgstr "Mostra e ordina i dati solo di {primary} invece che dell’intera partita"
-
-#: src/lobby-servers/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Show as away to everyone else after a spell without input. Using Coilbox again clears it. Away you set by hand stays until you clear it."
-msgstr "Mostra agli altri lo stato assente dopo un po’ senza input. Usare di nuovo Coilbox lo toglie. Lo stato assente impostato a mano resta finché non lo togli."
 
 #: src/multiplayer/admin/ChannelsSection.tsx
 #, fuzzy
@@ -55278,11 +55291,6 @@ msgstr "Mappa dei tipi (-z)"
 msgid "Type your message..."
 msgstr "Scrivi il tuo messaggio…"
 
-#: src/lobby-servers/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Uberserver"
-msgstr "Uberserver"
-
 #: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
 msgid "uberserver checkout path"
@@ -55302,6 +55310,10 @@ msgstr "uberserver genera una nuova password che sostituisce quella attuale di {
 #, fuzzy
 msgid "uberserver gives the new account the same password as the account named below. Coilbox never sees that password, and there is nothing to type for it here."
 msgstr "uberserver dà al nuovo account la stessa password dell’account indicato qui sotto. Coilbox non vede mai quella password, e qui non c’è nulla da scrivere."
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Uberserver guide"
+msgstr ""
 
 #: src/multiplayer/admin/AnnouncementsSection.tsx
 #, fuzzy
@@ -56572,6 +56584,7 @@ msgstr "nome utente"
 
 #: src/account/pages/SettingsSection.tsx
 #: src/lobby-servers/AddAccountForm.tsx
+#: src/lobby-servers/pages/SettingsSection.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/BansSection.tsx
@@ -57727,14 +57740,13 @@ msgstr "Quando è armato"
 msgid "When ChangeHeading is sent"
 msgstr "Quando viene inviato ChangeHeading"
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "When Coilbox starts, it logs back in to every account that was connected when it last closed. To connect one account every time, open that login and turn on Connect on startup there."
+msgstr ""
+
 #: src/content/pages/FoldersSection.tsx
 msgid "When coilbox starts, it looks for content folders if it has none yet, then reads the games and maps so the library opens quickly."
 msgstr ""
-
-#: src/lobby-servers/pages/SettingsSection.tsx
-#, fuzzy
-msgid "When Coilbox starts, log back in to every account that was connected when it last closed. To connect one account every time, tick Connect on startup on that login."
-msgstr "All’avvio di Coilbox, accedi di nuovo a ogni account che era connesso all’ultima chiusura. Per connettere un account ogni volta, seleziona Connetti all’avvio su quelle credenziali."
 
 #: src/i18n/frameStrings.ts
 #, fuzzy

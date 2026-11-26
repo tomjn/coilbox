@@ -4681,9 +4681,8 @@ msgid "{metricLabel} per minute, by team, over match time"
 msgstr "每分钟 {metricLabel}，按队伍，随对局时间"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
-#, fuzzy
-msgid "{MIN_AUTO_AWAY_MINUTES} to {MAX_AUTO_AWAY_MINUTES}."
-msgstr "{MIN_AUTO_AWAY_MINUTES} 到 {MAX_AUTO_AWAY_MINUTES}。"
+msgid "{MIN_AUTO_AWAY_MINUTES} to {MAX_AUTO_AWAY_MINUTES}"
+msgstr ""
 
 #: src/content/pages/GameUnitPage.tsx
 #, fuzzy
@@ -8242,6 +8241,10 @@ msgstr "#{channel} 已不再注册。"
 msgid "#{channel} is registered to {founder}."
 msgstr "#{channel} 已注册给 {founder}。"
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "•••••••• (saved)"
+msgstr ""
+
 #: src/profile/health.ts
 #, fuzzy
 msgid "`defaultLocale` names a language coilbox does not have"
@@ -10127,12 +10130,24 @@ msgstr "关于修复 UV 和法线"
 msgid "About fullscreen"
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "About going away when idle"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "About hosting your own server"
+msgstr ""
+
 #: src/general/pages/SettingsSection.tsx
 msgid "About interface size"
 msgstr ""
 
 #: src/content/pages/components/KeyBindingEditor.tsx
 msgid "About keys with more than one action"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "About logging back in on startup"
 msgstr ""
 
 #: src/content/pages/FoldersSection.tsx
@@ -10169,6 +10184,10 @@ msgstr "关于比例"
 
 #: src/downloads/pages/SettingsSection.tsx
 msgid "About rapid repositories"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "About reconnecting"
 msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
@@ -14643,11 +14662,6 @@ msgstr "在单位构建器中以 {builtByName} 构建，并导出到 {gameLabel}
 msgid "Built in the unit builder as {projectName} and exported into this game"
 msgstr "在单位构建器中以 {projectName} 构建，并导出到此游戏"
 
-#: src/lobby-servers/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Built-in"
-msgstr "内置"
-
 #: src/multiplayer/chat/ChatPane.tsx
 #, fuzzy
 msgid "Bullet list"
@@ -16701,9 +16715,8 @@ msgid "Coilbox challenge"
 msgstr "Coilbox 挑战"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Coilbox connects to any TASServer-compatible lobby, including one you run yourself. lobby.recoilengine.org runs uberserver, which ships a start-to-finish deployment guide using Docker and MariaDB. Add yours as a custom server above once it is running."
-msgstr "Coilbox 可以连接任何兼容 TASServer 的大厅，包括你自己运行的大厅。lobby.recoilengine.org 运行的是 uberserver，它附带使用 Docker 和 MariaDB 的完整部署指南。运行后，请在上方将其添加为自定义服务器。"
+msgid "Coilbox connects to any TASServer-compatible lobby, including one you run yourself. lobby.recoilengine.org runs uberserver, which has a full deployment guide using Docker and MariaDB. Add yours as a custom server once it is running."
+msgstr ""
 
 #: src/multiplayer/battle/compatBattle.ts
 #, fuzzy
@@ -17822,11 +17835,6 @@ msgstr "以 {username} 身份连接"
 #, fuzzy
 msgid "Connect as {username} and join"
 msgstr "以 {username} 身份连接并加入"
-
-#: src/lobby-servers/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Connect automatically on startup"
-msgstr "启动时自动连接"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -22720,6 +22728,10 @@ msgstr "所有加入的人都必须使用完全相同的版本。"
 msgid "Everyone"
 msgstr "所有人"
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Everyone else sees you as away once you stop using Coilbox for the time below. Using Coilbox again clears it. Away you set by hand stays until you clear it."
+msgstr ""
+
 #: src/multiplayer/battles/zerokBattle.ts
 #, fuzzy
 msgid "Everyone for themselves."
@@ -26487,11 +26499,6 @@ msgstr "请重新开设战斗以打开新的中继。原因：{reason}"
 msgid "Host vs computer"
 msgstr "创建人机对战"
 
-#: src/lobby-servers/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Host your own server"
-msgstr "自建服务器"
-
 #: src/direct/room.ts
 #, fuzzy
 msgid "Hosting on port {port} as {host}"
@@ -26956,9 +26963,8 @@ msgid "If nothing arrives, start again and ask for a new code."
 msgstr "如果没有收到，请重新开始并申请新的验证码。"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
-#, fuzzy
-msgid "If the server drops the connection, rejoin your channels and last battle automatically."
-msgstr "服务器断开连接时，自动重新加入你的频道和上一个房间。"
+msgid "If the server drops the connection, Coilbox logs back in and rejoins your channels and last battle."
+msgstr ""
 
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #: src/multiplayer/pages/IgnoreSettings.tsx
@@ -30085,6 +30091,10 @@ msgstr "锁定包含它的所有配装"
 #, fuzzy
 msgid "Log"
 msgstr "日志"
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Log back in on startup"
+msgstr ""
 
 #: src/home/zones/ResumeRail.tsx
 #: src/multiplayer/pages/BattlesPage.tsx
@@ -35633,6 +35643,7 @@ msgid "not set"
 msgstr "未设置"
 
 #: src/lego/pages/components/MovementSection.tsx
+#: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Not set"
 msgstr "未设置"
@@ -38178,6 +38189,7 @@ msgid "Passengers survive its death"
 msgstr "乘员在其被摧毁后存活"
 
 #: src/lobby-servers/AddAccountForm.tsx
+#: src/lobby-servers/pages/SettingsSection.tsx
 #: src/lobby-servers/RegisterForm.tsx
 #: src/uberstress/pages/components/SeedSqlForm.tsx
 #: src/uberstress/pages/RunPage.tsx
@@ -43628,6 +43640,10 @@ msgstr "使用 coilbox widget 在游戏中保存，引擎为 {engine}。"
 msgid "Saved in game with the coilbox widget."
 msgstr "使用 coilbox widget 在游戏中保存。"
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Saved in keychain"
+msgstr ""
+
 #: src/lobby-servers/AddAccountForm.tsx
 msgid "Saved in your keychain when you add the login."
 msgstr "添加登录信息时保存到你的钥匙串。"
@@ -44603,6 +44619,7 @@ msgid "Select a run…"
 msgstr "选择一次运行…"
 
 #: src/lobby-servers/AddAccountForm.tsx
+#: src/lobby-servers/pages/SettingsSection.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/lobby-servers/RegisterForm.tsx
 #, fuzzy
@@ -44995,6 +45012,7 @@ msgstr "服务器"
 
 #: src/content/replayEventList.ts
 #: src/lobby-servers/AddAccountForm.tsx
+#: src/lobby-servers/pages/SettingsSection.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/tools.tsx
@@ -45874,11 +45892,6 @@ msgstr "显示所有场景"
 #, fuzzy
 msgid "Show and sort the figures for {primary} alone instead of the whole match"
 msgstr "单独显示并排序 {primary} 的数据，而不是整场对局的数据"
-
-#: src/lobby-servers/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Show as away to everyone else after a spell without input. Using Coilbox again clears it. Away you set by hand stays until you clear it."
-msgstr "一段时间没有操作后，对其他人显示为离开。再次使用 Coilbox 即可清除。你手动设置的离开状态会一直保留，直到你清除它。"
 
 #: src/multiplayer/admin/ChannelsSection.tsx
 #, fuzzy
@@ -55247,11 +55260,6 @@ msgstr "类型图 (-z)"
 msgid "Type your message..."
 msgstr "输入消息…"
 
-#: src/lobby-servers/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Uberserver"
-msgstr "Uberserver"
-
 #: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
 msgid "uberserver checkout path"
@@ -55271,6 +55279,10 @@ msgstr "uberserver 会生成新密码并替换 {username} 的当前密码，然�
 #, fuzzy
 msgid "uberserver gives the new account the same password as the account named below. Coilbox never sees that password, and there is nothing to type for it here."
 msgstr "uberserver 会为新账号设置与下方指定账号相同的密码。Coilbox 永远看不到该密码，这里也无需输入。"
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Uberserver guide"
+msgstr ""
 
 #: src/multiplayer/admin/AnnouncementsSection.tsx
 #, fuzzy
@@ -56541,6 +56553,7 @@ msgstr "用户名"
 
 #: src/account/pages/SettingsSection.tsx
 #: src/lobby-servers/AddAccountForm.tsx
+#: src/lobby-servers/pages/SettingsSection.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/BansSection.tsx
@@ -57696,14 +57709,13 @@ msgstr "启用时"
 msgid "When ChangeHeading is sent"
 msgstr "发送 ChangeHeading 时"
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "When Coilbox starts, it logs back in to every account that was connected when it last closed. To connect one account every time, open that login and turn on Connect on startup there."
+msgstr ""
+
 #: src/content/pages/FoldersSection.tsx
 msgid "When coilbox starts, it looks for content folders if it has none yet, then reads the games and maps so the library opens quickly."
 msgstr ""
-
-#: src/lobby-servers/pages/SettingsSection.tsx
-#, fuzzy
-msgid "When Coilbox starts, log back in to every account that was connected when it last closed. To connect one account every time, tick Connect on startup on that login."
-msgstr "Coilbox 启动时，重新登录上次关闭时已连接的所有账号。要每次都连接某个账号，请在该登录信息上勾选“启动时连接”。"
 
 #: src/i18n/frameStrings.ts
 #, fuzzy
