@@ -6317,13 +6317,13 @@ msgstr "{scenarioName} als mission.lua"
 
 #: src/campaign/units.ts
 #, fuzzy
-msgid "{scope, select, campaign {This campaign's copy of {unitLabel} is missing. Attach it again from the unit builder.} conquest {This conquest's copy of {unitLabel} is missing. Attach it again from the unit builder.} warpath {This warpath's copy of {unitLabel} is missing. Attach it again from the unit builder.} other {This run's copy of {unitLabel} is missing. Attach it again from the unit builder.}}"
-msgstr "{scope, select, campaign {De kopie van {unitLabel} in deze campagne ontbreekt. Koppel hem opnieuw vanuit de eenhedenbouwer.} conquest {De kopie van {unitLabel} in deze Verovering ontbreekt. Koppel hem opnieuw vanuit de eenhedenbouwer.} warpath {De kopie van {unitLabel} in dit Oorlogspad ontbreekt. Koppel hem opnieuw vanuit de eenhedenbouwer.} other {De kopie van {unitLabel} in deze tocht ontbreekt. Koppel hem opnieuw vanuit de eenhedenbouwer.}}"
+msgid "{scope, select, campaign {This campaign's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} conquest {This conquest's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} warpath {This warpath's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} other {This run's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.}}"
+msgstr "{scope, select, campaign {De id van deze campagne, {ownerId}, kan geen spelmap benoemen, dus de eenheden kunnen niet worden geladen.} conquest {De id van deze Verovering, {ownerId}, kan geen spelmap benoemen, dus de eenheden kunnen niet worden geladen.} warpath {De id van dit Oorlogspad, {ownerId}, kan geen spelmap benoemen, dus de eenheden kunnen niet worden geladen.} other {De id van deze tocht, {ownerId}, kan geen spelmap benoemen, dus de eenheden kunnen niet worden geladen.}}"
 
 #: src/campaign/units.ts
 #, fuzzy
-msgid "{scope, select, campaign {This campaign's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} conquest {This conquest's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} warpath {This warpath's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} other {This run's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.}}"
-msgstr "{scope, select, campaign {De id van deze campagne, {ownerId}, kan geen spelmap benoemen, dus de eenheden kunnen niet worden geladen.} conquest {De id van deze Verovering, {ownerId}, kan geen spelmap benoemen, dus de eenheden kunnen niet worden geladen.} warpath {De id van dit Oorlogspad, {ownerId}, kan geen spelmap benoemen, dus de eenheden kunnen niet worden geladen.} other {De id van deze tocht, {ownerId}, kan geen spelmap benoemen, dus de eenheden kunnen niet worden geladen.}}"
+msgid "{scope, select, conquest {This conquest's copy of {unitLabel} is missing. Attach it again from the unit builder.} warpath {This warpath's copy of {unitLabel} is missing. Attach it again from the unit builder.} other {This run's copy of {unitLabel} is missing. Attach it again from the unit builder.}}"
+msgstr "{scope, select, conquest {De kopie van {unitLabel} in deze Verovering ontbreekt. Koppel hem opnieuw vanuit de eenhedenbouwer.} warpath {De kopie van {unitLabel} in dit Oorlogspad ontbreekt. Koppel hem opnieuw vanuit de eenhedenbouwer.} other {De kopie van {unitLabel} in deze tocht ontbreekt. Koppel hem opnieuw vanuit de eenhedenbouwer.}}"
 
 #: src/direct/roomSeed.ts
 #, fuzzy
@@ -49435,6 +49435,10 @@ msgstr "De bytes die geschreven zijn, zestien per regel."
 msgid "The caches are already empty."
 msgstr ""
 
+#: src/campaign/units.ts
+msgid "The campaign's copy of {name} could not be stored: {reason}"
+msgstr ""
+
 #: src/conquest/pages/GalaxyPage.tsx
 #, fuzzy
 msgid "The challenge code sets this conquest up: fog of war is off and the threat level is {level}. Pick a faction and start."
@@ -52828,6 +52832,10 @@ msgstr "Deze build levert geen muziek mee."
 #, fuzzy
 msgid "This builder has nothing on its menu. Add a unit to give it one."
 msgstr "Deze bouwer heeft niets in zijn menu. Voeg een eenheid toe om hem er een te geven."
+
+#: src/campaign/units.ts
+msgid "This campaign has no copy of {unitNames}. Attach it again from the unit builder. A campaign that came with a game has to be exported again by its author."
+msgstr ""
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #, fuzzy

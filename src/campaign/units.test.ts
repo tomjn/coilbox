@@ -4,6 +4,7 @@ vi.mock("./bindings", () => ({
   campaignUnitSave: vi.fn(),
   campaignUnitList: vi.fn(),
   campaignUnitDelete: vi.fn(),
+  campaignUnitFileWrite: vi.fn(),
 }));
 vi.mock("../lego/mutator", () => ({
   prepareUnit: vi.fn(),
@@ -31,6 +32,7 @@ import type { PlayTarget } from "../play/config";
 import { loadUnitDefs } from "../workshop/config";
 import {
   campaignUnitDelete,
+  campaignUnitFileWrite,
   campaignUnitList,
   campaignUnitSave,
 } from "./bindings";
@@ -45,6 +47,7 @@ import {
   updateUnit,
   withoutUnit,
   withUnit,
+  writeCarriedCopies,
 } from "./units";
 
 const target = {
@@ -594,9 +597,132 @@ describe("composing a mission's mutator", () => {
         played,
       ),
     ).rejects.toThrow(
-      "This campaign's copy of The tank is missing. Attach it again from the unit builder.",
+      "This campaign has no copy of The tank. Attach it again from the unit builder. A campaign that came with a game has to be exported again by its author.",
     );
     expect(writePreparedMutator).not.toHaveBeenCalled();
+  });
+
+  it("names every unit with no copy", async () => {
+    vi.mocked(campaignUnitList).mockResolvedValue({
+      units: [stored("tank", false)],
+    });
+    await expect(
+      composeUnits(
+        campaign([entry("tank"), entry("jeep"), entry("boat")]),
+        target,
+        { name: "BA", archive: "ba.sdz" },
+        played,
+      ),
+    ).rejects.toThrow("This campaign has no copy of The jeep, The boat.");
+  });
+
+  // Issue #5469. A game's campaign, or a bundled one, is never imported, so its
+  // copies are still in the document.
+  describe("with the copies carried in the document", () => {
+    const dataUri = (text: string) =>
+      `data:application/octet-stream;base64,${btoa(text)}`;
+
+    function carried(unitName: string) {
+      const copy = stored(unitName, true, packAtlas, ["camo.png"]);
+      return {
+        copy,
+        entry: entry(unitName, {
+          files: {
+            "unit.json": { kind: "data", dataUri: dataUri(copy.json) },
+            "camo.png": { kind: "data", dataUri: dataUri("png") },
+          },
+        }),
+      };
+    }
+
+    /** A units folder that holds what has been written to it. */
+    function disk(initial: ReturnType<typeof stored>[] = []) {
+      const copies = new Map(initial.map((c) => [c.unitName, c]));
+      const textures = new Map<string, string[]>();
+      vi.mocked(campaignUnitDelete).mockImplementation(async (args) => {
+        textures.delete(args.unitName);
+        return { deleted: copies.delete(args.unitName) };
+      });
+      vi.mocked(campaignUnitFileWrite).mockImplementation(async (args) => {
+        const { unitName, file } = args;
+        if (file !== "unit.json") {
+          textures.set(unitName, [...(textures.get(unitName) ?? []), file]);
+        } else {
+          copies.set(unitName, {
+            unitName,
+            json: atob(args.dataUri.split(",")[1]),
+            dir: `/app/campaign/units/c1/${unitName}`,
+            files: textures.get(unitName) ?? [],
+          });
+        }
+        return { file };
+      });
+      vi.mocked(campaignUnitList).mockImplementation(async () => ({
+        units: [...copies.values()],
+      }));
+    }
+
+    const launch = (units: CampaignUnit[]) =>
+      composeUnits(
+        campaign(units),
+        target,
+        { name: "BA", archive: "ba.sdz" },
+        played,
+      );
+
+    it("writes them to the units folder and launches with them", async () => {
+      disk();
+      await launch([carried("tank").entry]);
+
+      const writes = vi.mocked(campaignUnitFileWrite).mock.calls;
+      // `unit.json` last, so a write that stops part way leaves no copy.
+      expect(writes.map(([a]) => [a.campaignId, a.unitName, a.file])).toEqual([
+        ["c1", "tank", "camo.png"],
+        ["c1", "tank", "unit.json"],
+      ]);
+      const [unit] = vi.mocked(writePreparedMutator).mock.calls[0][0].prepared;
+      expect(unit.payload.textures?.sourceDir).toBe(
+        "/app/campaign/units/c1/tank",
+      );
+    });
+
+    it("leaves a copy that already matches alone", async () => {
+      disk([carried("tank").copy]);
+      await launch([carried("tank").entry]);
+
+      expect(campaignUnitDelete).not.toHaveBeenCalled();
+      expect(campaignUnitFileWrite).not.toHaveBeenCalled();
+    });
+
+    it("replaces a copy the game has since changed", async () => {
+      disk([{ ...carried("tank").copy, json: "{}" }]);
+      await launch([carried("tank").entry]);
+
+      expect(campaignUnitDelete).toHaveBeenCalledWith({
+        campaignId: "c1",
+        unitName: "tank",
+      });
+      expect(campaignUnitFileWrite).toHaveBeenCalledTimes(2);
+    });
+
+    it("writes once when two callers ask at the same time", async () => {
+      disk();
+      const owner = campaign([carried("tank").entry]);
+      await Promise.all([writeCarriedCopies(owner), writeCarriedCopies(owner)]);
+
+      expect(campaignUnitFileWrite).toHaveBeenCalledTimes(2);
+    });
+
+    it("names the unit when its copy cannot be written", async () => {
+      disk();
+      vi.mocked(campaignUnitFileWrite).mockRejectedValue(
+        new Error("disk full"),
+      );
+      await expect(launch([carried("tank").entry])).rejects.toThrow(
+        "The campaign's copy of The tank could not be stored: disk full",
+      );
+      expect(writePreparedMutator).not.toHaveBeenCalled();
+    });
   });
 
   it("refuses a unit holding another game's pieces", async () => {

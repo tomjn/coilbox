@@ -83,7 +83,7 @@ The mission editor's **Restricted Units** lists the campaign's units with the ga
 
 This is singleplayer only. A game coilbox writes on one machine cannot be synced to a lobby.
 
-Export and import carry the copies. The bundled atlas is never put in the file, because it ships with coilbox. A copy built on an atlas pack carries its atlas, and if a copy arrives without it, the install gate asks for that pack.
+Export and import carry the copies. The bundled atlas is never put in the file, because it ships with coilbox. A copy built on an atlas pack carries its atlas, and if a copy arrives without it, the install gate asks for that pack. A [bundled campaign](#bundle-a-campaign-in-a-distribution) and a [campaign inside a game](#ship-a-campaign-inside-your-game) play the copies their file holds, with no import.
 
 ## Export and import
 
@@ -152,7 +152,13 @@ Media goes beside `campaign.json`. A `"file"` reference in the document, such as
 
 A Markdown briefing can use the same files inline. `![](landing.jpg)` shows `landing.jpg` from the campaign's folder, and an audio or video file name shows a player. Give the bare file name. Coilbox does not read folders inside the campaign folder, so `![](briefings/landing.jpg)` does not load. If a name has a space in it, wrap it in angle brackets, as in `![](<first landing.jpg>)`.
 
-[Units from the unit builder](#units-from-the-unit-builder) do not load from a game yet ([issue #5469](https://github.com/tomjn/coilbox/issues/5469)).
+### Units from the unit builder in a game
+
+A game's campaign can bring [units from the unit builder](#units-from-the-unit-builder). There is nothing extra to ship. Attach the units in Campaign builder, export the campaign and save the file as `campaign.json`. The export holds each unit's `unit.json` and textures inside it, so the game needs no unit folders, and coilbox does not read loose unit files from the campaign's folder.
+
+To change a unit in your game's campaign, edit a local copy of the campaign, press **Update from library** on the unit, and export the file again.
+
+Coilbox stores the copies under `campaign/units/<campaign id>/` in its data folder when the player opens a mission, and replaces one when your game ships a different `unit.json` for it. If the file names a unit and holds no copy of it, the mission does not start and the message names the unit.
 
 A campaign in a game is read-only. Coilbox never writes into the game, and the campaign has no Edit or Delete in Campaign builder. Players can still Duplicate it to get an editable copy, and Export it.
 
