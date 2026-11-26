@@ -23,6 +23,7 @@ import { ErrorBanner } from "../content/pages/components/states";
  * (setup packs, today) don't gain a button with nothing behind it.
  */
 export function ChallengeCodeInput({
+  id,
   helpText,
   placeholder,
   submitLabel,
@@ -33,7 +34,10 @@ export function ChallengeCodeInput({
   onPickFile,
   preview,
 }: {
-  helpText: string;
+  /** The text box's id, for a label outside the form. */
+  id?: string;
+  /** A line above the box. Left out where the caller explains elsewhere. */
+  helpText?: string;
   /** Something to show under the box about what is pasted in it so far. */
   preview?: (code: string) => ReactNode;
   placeholder?: string;
@@ -94,8 +98,9 @@ export function ChallengeCodeInput({
 
   return (
     <div className="flex flex-col gap-3 p-4">
-      <p className="text-sm text-muted-foreground">{helpText}</p>
+      {helpText && <p className="text-sm text-muted-foreground">{helpText}</p>}
       <Textarea
+        id={id}
         value={code}
         onChange={(e) => setCode(e.target.value)}
         placeholder={placeholder ?? t`Paste a challenge code…`}

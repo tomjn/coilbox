@@ -10158,6 +10158,10 @@ msgstr ""
 msgid "About hosting your own server"
 msgstr ""
 
+#: src/deeplink/pages/ImportSection.tsx
+msgid "About importing"
+msgstr ""
+
 #: src/general/pages/SettingsSection.tsx
 msgid "About interface size"
 msgstr ""
@@ -12231,11 +12235,6 @@ msgstr "これを「ユニット調整 → インポート」に貼り付けた�
 #, fuzzy
 msgid "Anything already installed is still on disk. unitsync said: {reason}"
 msgstr "インストール済みのものはディスクに残っています。unitsync の報告：{reason}"
-
-#: src/deeplink/pages/ImportSection.tsx
-#, fuzzy
-msgid "Anything coilbox shares goes here: {kindsSentence}."
-msgstr "coilbox で共有されたものはすべてここに入ります：{kindsSentence}。"
 
 #: src/lego/pages/components/PieceCollisionFields.tsx
 #, fuzzy
@@ -16656,6 +16655,10 @@ msgstr "COB ツール"
 #, fuzzy
 msgid "Code"
 msgstr "コード"
+
+#: src/deeplink/pages/ImportSection.tsx
+msgid "Code, link or file"
+msgstr ""
 
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/main.tsx
@@ -28197,6 +28200,10 @@ msgstr "ミッション形式 {installedFormat} を読み込みます。"
 msgid "It shows the last saved scan, which may be out of date. Playing is off until a scan succeeds."
 msgstr "最後に保存したスキャン結果を表示しています。古い可能性があります。スキャンが成功するまでプレイできません。"
 
+#: src/deeplink/pages/ImportSection.tsx
+msgid "It takes {kindsSentence}."
+msgstr ""
+
 #: src/content/replayAnalysis.ts
 #, fuzzy
 msgid "It used {usedGame}, and the replay was recorded on {recordedGame}."
@@ -38337,6 +38344,10 @@ msgstr "coilbox のリンク、コード、またはエクスポートしたフ�
 msgid "Paste a coilbox link, a share code, or the contents of a coilbox .json file."
 msgstr "coilbox のリンク、共有コード、または coilbox の .json ファイルの内容を貼り付けてください。"
 
+#: src/deeplink/pages/ImportSection.tsx
+msgid "Paste a coilbox link, a share code, the address of a share on the web, or the contents of an exported file. Coilbox works out what it is and asks before importing anything."
+msgstr ""
+
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 #, fuzzy
 msgid "Paste a payload a lobby showed you, a whole !bset line, or several lines copied out of a battle's mod options. Coilbox shows the Lua and, where the shape allows, turns it into an editable project."
@@ -38366,11 +38377,6 @@ msgstr "セットアップパックのコードを貼り付け…"
 #, fuzzy
 msgid "Paste a share code or link somebody sent you."
 msgstr "送られてきた共有コードかリンクを貼り付けてください。"
-
-#: src/deeplink/pages/ImportSection.tsx
-#, fuzzy
-msgid "Paste anything coilbox made and it will work out what it is. A coilbox link, a share code, the address of a share on the web, the contents of an exported file, or the file itself. Nothing is imported until you have seen what it is and said yes."
-msgstr "coilbox が作ったものなら何でも貼り付ければ、それが何かを判別します。coilbox のリンク、共有コード、ウェブ上の共有のアドレス、エクスポートしたファイルの内容、またはファイルそのものです。内容を確認して承認するまで、何もインポートされません。"
 
 #: src/deeplink/copyLink.ts
 #, fuzzy

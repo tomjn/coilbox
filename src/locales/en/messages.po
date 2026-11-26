@@ -8231,6 +8231,10 @@ msgstr "About going away when idle"
 msgid "About hosting your own server"
 msgstr "About hosting your own server"
 
+#: src/deeplink/pages/ImportSection.tsx
+msgid "About importing"
+msgstr "About importing"
+
 #: src/general/pages/SettingsSection.tsx
 msgid "About interface size"
 msgstr "About interface size"
@@ -9930,10 +9934,6 @@ msgstr "Anyone who pastes this into Unit tweaks → Import gets this project, op
 #: src/content/pages/components/states.tsx
 msgid "Anything already installed is still on disk. unitsync said: {reason}"
 msgstr "Anything already installed is still on disk. unitsync said: {reason}"
-
-#: src/deeplink/pages/ImportSection.tsx
-msgid "Anything coilbox shares goes here: {kindsSentence}."
-msgstr "Anything coilbox shares goes here: {kindsSentence}."
 
 #: src/lego/pages/components/PieceCollisionFields.tsx
 msgid "Anything hits {pieceName}"
@@ -13552,6 +13552,10 @@ msgstr "COB tools"
 #: src/multiplayer/chat/ChatPane.tsx
 msgid "Code"
 msgstr "Code"
+
+#: src/deeplink/pages/ImportSection.tsx
+msgid "Code, link or file"
+msgstr "Code, link or file"
 
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/main.tsx
@@ -22952,6 +22956,10 @@ msgstr "It reads mission format {installedFormat}."
 msgid "It shows the last saved scan, which may be out of date. Playing is off until a scan succeeds."
 msgstr "It shows the last saved scan, which may be out of date. Playing is off until a scan succeeds."
 
+#: src/deeplink/pages/ImportSection.tsx
+msgid "It takes {kindsSentence}."
+msgstr "It takes {kindsSentence}."
+
 #: src/content/replayAnalysis.ts
 msgid "It used {usedGame}, and the replay was recorded on {recordedGame}."
 msgstr "It used {usedGame}, and the replay was recorded on {recordedGame}."
@@ -31185,6 +31193,10 @@ msgstr "Paste a coilbox link, a code, or an exported file's contents…"
 msgid "Paste a coilbox link, a share code, or the contents of a coilbox .json file."
 msgstr "Paste a coilbox link, a share code, or the contents of a coilbox .json file."
 
+#: src/deeplink/pages/ImportSection.tsx
+msgid "Paste a coilbox link, a share code, the address of a share on the web, or the contents of an exported file. Coilbox works out what it is and asks before importing anything."
+msgstr "Paste a coilbox link, a share code, the address of a share on the web, or the contents of an exported file. Coilbox works out what it is and asks before importing anything."
+
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 msgid "Paste a payload a lobby showed you, a whole !bset line, or several lines copied out of a battle's mod options. Coilbox shows the Lua and, where the shape allows, turns it into an editable project."
 msgstr "Paste a payload a lobby showed you, a whole !bset line, or several lines copied out of a battle's mod options. Coilbox shows the Lua and, where the shape allows, turns it into an editable project."
@@ -31208,10 +31220,6 @@ msgstr "Paste a setup pack code…"
 #: src/deeplink/index.ts
 msgid "Paste a share code or link somebody sent you."
 msgstr "Paste a share code or link somebody sent you."
-
-#: src/deeplink/pages/ImportSection.tsx
-msgid "Paste anything coilbox made and it will work out what it is. A coilbox link, a share code, the address of a share on the web, the contents of an exported file, or the file itself. Nothing is imported until you have seen what it is and said yes."
-msgstr "Paste anything coilbox made and it will work out what it is. A coilbox link, a share code, the address of a share on the web, the contents of an exported file, or the file itself. Nothing is imported until you have seen what it is and said yes."
 
 #: src/deeplink/copyLink.ts
 msgid "Paste it into chat or Discord."
