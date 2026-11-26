@@ -159,12 +159,14 @@ const materialised = new Set<string>();
 export async function ensureCampaignScenarioMedia(
   campaignId: string,
 ): Promise<void> {
-  if (materialised.has(campaignId)) return;
-  materialised.add(campaignId);
+  // A game's campaign (issue #2161) carries its clips the same way, in the
+  // document the game ships. It is held apart from a stored one with the same id,
+  // so that deleting the stored one still leaves the game's clips to be written.
+  const gameJson = gameCampaignJson(campaignId);
+  const key = `${gameJson === undefined ? "stored" : "game"}:${campaignId}`;
+  if (materialised.has(key)) return;
+  materialised.add(key);
   try {
-    // A game's campaign (issue #2161) carries its clips the same way, in the
-    // document the game ships.
-    const gameJson = gameCampaignJson(campaignId);
     if (gameJson !== undefined) {
       const parsed = parseCampaignExport(gameJson);
       if (parsed?.media) await restoreCampaignScenarioMedia(parsed.media);
@@ -183,7 +185,7 @@ export async function ensureCampaignScenarioMedia(
   } catch (e) {
     // Retry on the next launch: a clip that did not land only costs a line its
     // picture, so this must never be the reason a mission does not start.
-    materialised.delete(campaignId);
+    materialised.delete(key);
     console.warn("could not materialise bundled dialogue clips", e);
   }
 }
