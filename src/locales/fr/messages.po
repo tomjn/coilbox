@@ -451,7 +451,6 @@ msgid "(no username)"
 msgstr "(pas de nom d’utilisateur)"
 
 #: src/mapconv/pages/components/PathField.tsx
-#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 #, fuzzy
 msgid "(none)"
 msgstr "(aucun)"
@@ -10351,6 +10350,10 @@ msgstr ""
 msgid "About the notification sound"
 msgstr ""
 
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "About the Open Annihilation program"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "About the pivot point"
@@ -15931,6 +15934,7 @@ msgstr "Vérification de votre connexion"
 #: src/game-updates/pages/GameUpdatesSection.tsx
 #: src/mapconv/pages/SettingsSection.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 #: src/notify/NotificationsSettings.tsx
 #: src/packs/pages/components/ImportPackForm.tsx
 #: src/scenario/pages/components/ImportScenarioForm.tsx
@@ -17304,6 +17308,10 @@ msgstr "Coilbox rejoindra la partie {heldBattle} une fois connecté à <0>{heldA
 #, fuzzy
 msgid "Coilbox keymap"
 msgstr "Configuration de touches coilbox"
+
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "Coilbox looks for Open Annihilation where its installer puts it. If yours is somewhere else, choose the open-annihilation file."
+msgstr ""
 
 #: src/lego/moduleFileIo.ts
 #, fuzzy
@@ -30105,6 +30113,7 @@ msgid "Local tweak-slot mod option"
 msgstr "Option de mod d’emplacement d’ajustement local"
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 #, fuzzy
 msgid "Location"
 msgstr "Localisation"
@@ -35772,6 +35781,7 @@ msgstr "non défini"
 
 #: src/lego/pages/components/MovementSection.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 #, fuzzy
 msgid "Not set"
 msgstr "Non défini"
@@ -37283,6 +37293,10 @@ msgstr "Open Annihilation a refusé d’ouvrir ce combat."
 #, fuzzy
 msgid "Open Annihilation takes a password of up to {OA_PASSWORD_MAX} characters."
 msgstr "Open Annihilation accepte un mot de passe de {OA_PASSWORD_MAX} caractères au plus."
+
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "Open Annihilation updates itself, so Coilbox reads its version again each time you open this page."
+msgstr ""
 
 #: src/blueprint/pages/components/ImportPackForm.tsx
 #, fuzzy

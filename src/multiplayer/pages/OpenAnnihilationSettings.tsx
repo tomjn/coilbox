@@ -1,11 +1,10 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Button, Input } from "@picoframe/frame";
+import { Button } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
-import { AlertCircle, FolderOpen, Search } from "lucide-react";
+import { FolderOpen, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Field } from "@/components/Field";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Label } from "@/components/ui/label";
+import { HelpPopover } from "@/components/HelpPopover";
+import { SettingList, SettingRow } from "@/components/SettingRow";
 import { describeError } from "@/i18n/uiError";
 import { playOaCheck, playOaFind } from "../../play/bindings";
 import { useOpenAnnihilation } from "../openAnnihilation";
@@ -22,6 +21,8 @@ export default function OpenAnnihilationSettings() {
   const [program, setProgram] = useOpenAnnihilation();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // True until the check on open has read the stored program's version again.
+  const [checking, setChecking] = useState(true);
   const started = useRef(false);
 
   // Once, when the section opens: fill an empty setting from the usual install
@@ -45,6 +46,7 @@ export default function OpenAnnihilationSettings() {
         setError(describeError(e));
       } finally {
         setBusy(false);
+        setChecking(false);
       }
     })();
   }, []);
@@ -69,16 +71,16 @@ export default function OpenAnnihilationSettings() {
   };
 
   const choose = async () => {
-    const picked = await open({
-      directory: false,
-      multiple: false,
-      title: t`Select the Open Annihilation program`,
-      defaultPath: program?.path,
-    });
-    if (typeof picked !== "string") return;
-    setBusy(true);
     setError(null);
     try {
+      const picked = await open({
+        directory: false,
+        multiple: false,
+        title: t`Select the Open Annihilation program`,
+        defaultPath: program?.path,
+      });
+      if (typeof picked !== "string") return;
+      setBusy(true);
       setProgram(await playOaCheck({ path: picked }));
     } catch (e) {
       setError(describeError(e));
@@ -88,56 +90,70 @@ export default function OpenAnnihilationSettings() {
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Not a Field: its label would wrap the buttons, and a click on a
-          button inside a label is also a click on the label. */}
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="oa-program" className="font-medium leading-none">
+    <section className="flex flex-col gap-3">
+      <div className="flex items-center gap-1">
+        <h2 className="text-sm font-semibold">
           <Trans>Program</Trans>
-        </Label>
-        <div className="flex gap-2">
-          <Input
-            id="oa-program"
-            value={program?.path ?? ""}
-            readOnly
-            placeholder={t`(none)`}
-            className="font-mono text-xs"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            onClick={choose}
-            disabled={busy}
-            className="shrink-0"
-          >
-            <FolderOpen /> <Trans>Choose</Trans>
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={find}
-            disabled={busy}
-            className="shrink-0"
-          >
-            <Search /> <Trans>Find</Trans>
-          </Button>
-        </div>
+        </h2>
+        <HelpPopover label={t`About the Open Annihilation program`}>
+          <p>
+            <Trans>
+              Coilbox looks for Open Annihilation where its installer puts it.
+              If yours is somewhere else, choose the open-annihilation file.
+            </Trans>
+          </p>
+          <p>
+            <Trans>
+              Open Annihilation updates itself, so Coilbox reads its version
+              again each time you open this page.
+            </Trans>
+          </p>
+        </HelpPopover>
       </div>
-      {program && (
-        <Field label={t`Version`}>
-          <Input
-            value={program.version}
-            readOnly
-            className="font-mono text-xs"
-          />
-        </Field>
-      )}
-      {error && (
-        <Alert variant="destructive">
-          <AlertCircle />
-          <AlertDescription className="break-words">{error}</AlertDescription>
-        </Alert>
-      )}
-    </div>
+      <SettingList>
+        <SettingRow
+          label={t`Location`}
+          description={
+            <span
+              id="oa-program-path"
+              className={
+                program ? "select-text break-words font-mono" : undefined
+              }
+            >
+              {program?.path ?? t`Not set`}
+            </span>
+          }
+          error={error}
+        >
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={find}
+              disabled={busy}
+            >
+              <Search /> <Trans>Find</Trans>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={choose}
+              disabled={busy}
+            >
+              <FolderOpen /> <Trans>Choose</Trans>
+            </Button>
+          </div>
+        </SettingRow>
+        {program && (
+          <SettingRow label={t`Version`}>
+            <span className="select-text text-sm">
+              {checking ? t`Checking…` : program.version}
+            </span>
+          </SettingRow>
+        )}
+      </SettingList>
+    </section>
   );
 }

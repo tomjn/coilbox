@@ -364,7 +364,6 @@ msgid "(no username)"
 msgstr ""
 
 #: src/mapconv/pages/components/PathField.tsx
-#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 msgid "(none)"
 msgstr ""
 
@@ -8417,6 +8416,10 @@ msgstr ""
 msgid "About the notification sound"
 msgstr ""
 
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "About the Open Annihilation program"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 msgid "About the pivot point"
 msgstr ""
@@ -12971,6 +12974,7 @@ msgstr ""
 #: src/game-updates/pages/GameUpdatesSection.tsx
 #: src/mapconv/pages/SettingsSection.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 #: src/notify/NotificationsSettings.tsx
 #: src/packs/pages/components/ImportPackForm.tsx
 #: src/scenario/pages/components/ImportScenarioForm.tsx
@@ -14099,6 +14103,10 @@ msgstr ""
 
 #: src/content/pages/components/KeymapsPanel.tsx
 msgid "Coilbox keymap"
+msgstr ""
+
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "Coilbox looks for Open Annihilation where its installer puts it. If yours is somewhere else, choose the open-annihilation file."
 msgstr ""
 
 #: src/lego/moduleFileIo.ts
@@ -24534,6 +24542,7 @@ msgid "Local tweak-slot mod option"
 msgstr ""
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 msgid "Location"
 msgstr ""
 
@@ -29150,6 +29159,7 @@ msgstr ""
 
 #: src/lego/pages/components/MovementSection.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 msgid "Not set"
 msgstr ""
 
@@ -30371,6 +30381,10 @@ msgstr ""
 
 #: src/multiplayer/battles/HostBattleForm.tsx
 msgid "Open Annihilation takes a password of up to {OA_PASSWORD_MAX} characters."
+msgstr ""
+
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "Open Annihilation updates itself, so Coilbox reads its version again each time you open this page."
 msgstr ""
 
 #: src/blueprint/pages/components/ImportPackForm.tsx
