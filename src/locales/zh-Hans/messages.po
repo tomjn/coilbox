@@ -8572,6 +8572,10 @@ msgstr "0 到 1。"
 msgid "0 to 1. At 0, the unit misjudges target speed by up to double or half. At 1, it predicts speed perfectly. leadLimit can still cap how far it leads."
 msgstr "0 到 1。为 0 时，单位对目标速度的判断最多会偏差一倍或一半。为 1 时，它能完美预测速度。leadLimit 仍可限制其提前量。"
 
+#: src/content/engineSettingText.ts
+msgid "0 uses your desktop resolution."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "0.5 in each channel means no change; 1.0 is twice as bright."
@@ -8598,6 +8602,10 @@ msgstr "1 瞄准碰撞体积的近边缘，-1 瞄准远边缘，0 瞄准中心�
 msgid "1 to 2 hours"
 msgstr "1 到 2 小时"
 
+#: src/content/engineSettingText.ts
+msgid "16 samples"
+msgstr ""
+
 #: src/content/libraryMaps.ts
 #: src/content/mapAggregate.ts
 #, fuzzy
@@ -8618,6 +8626,10 @@ msgstr "2 — 快速"
 #, fuzzy
 msgid "2 — Fast (compare last N tiles)"
 msgstr "2 — 快速（比较最近 N 个图块）"
+
+#: src/content/engineSettingText.ts
+msgid "2 samples"
+msgstr ""
 
 #: src/mapconv/pages/SettingsSection.tsx
 #, fuzzy
@@ -8665,6 +8677,10 @@ msgstr "4（高质量快速）是不错的默认值"
 msgid "4 corners"
 msgstr "四角"
 
+#: src/content/engineSettingText.ts
+msgid "4 samples"
+msgstr ""
+
 #: src/startbox/presets.ts
 #, fuzzy
 msgid "4 sides"
@@ -8689,6 +8705,10 @@ msgstr "65536 个 COB 角度单位为一整圈。"
 #, fuzzy
 msgid "65536 COB angle units is a full turn. Only used when turret is off."
 msgstr "65536 个 COB 角度单位为一整圈。仅在 turret 关闭时使用。"
+
+#: src/content/engineSettingText.ts
+msgid "8 samples"
+msgstr ""
 
 #: src/lego/pages/components/ImportResult.tsx
 #, fuzzy
@@ -9969,6 +9989,11 @@ msgstr "放弃征途"
 msgid "Abandoning…"
 msgstr "正在放弃…"
 
+#. placeholder {0}: s.label
+#: src/content/pages/components/EngineSettingField.tsx
+msgid "About {0}"
+msgstr ""
+
 #: src/multiplayer/relayPing.ts
 #, fuzzy
 msgid "About {ms} ms to the relay."
@@ -10419,6 +10444,10 @@ msgstr "参与者或建筑"
 #, fuzzy
 msgid "Actors"
 msgstr "参与者"
+
+#: src/content/engineSettingText.ts
+msgid "Adaptive"
+msgstr ""
 
 #: src/content/pages/components/KeyBindingEditor.tsx
 #: src/lego/pages/components/BuildMenuSection.tsx
@@ -10892,6 +10921,10 @@ msgstr "管理员"
 #, fuzzy
 msgid "Advanced"
 msgstr "高级"
+
+#: src/content/engineSettingText.ts
+msgid "Advanced map shading"
+msgstr ""
 
 #: src/mapconv/pages/CompilePage.tsx
 #: src/uberstress/pages/RunPage.tsx
@@ -11863,6 +11896,10 @@ msgstr "已回答 {spot} 处的问题。"
 #, fuzzy
 msgid "Anti-air"
 msgstr "防空"
+
+#: src/content/engineSettingText.ts
+msgid "Anti-aliasing"
+msgstr ""
 
 #: src/multiplayer/admin/ChannelsSection.tsx
 #, fuzzy
@@ -13164,6 +13201,10 @@ msgstr ".smf/.smt 的基本名称（不含扩展名）"
 msgid "Bases"
 msgstr "基地"
 
+#: src/content/engineSettingText.ts
+msgid "Basic"
+msgstr ""
+
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #, fuzzy
 msgid "battle"
@@ -13262,6 +13303,10 @@ msgstr "对局密码"
 #, fuzzy
 msgid "Battle room"
 msgstr "房间"
+
+#: src/content/engineSettingText.ts
+msgid "Battle volume"
+msgstr ""
 
 #: src/conquest/pages/components/BattleOverlay.tsx
 #: src/conquest/pages/GalaxyPage.tsx
@@ -13725,6 +13770,10 @@ msgstr "加成"
 #, fuzzy
 msgid "Bonus for every AI"
 msgstr "为每个 AI 加成"
+
+#: src/content/engineSettingText.ts
+msgid "Borderless window"
+msgstr ""
 
 #: src/animation/index.ts
 #: src/animation/pages/Bos2LuaPage.tsx
@@ -14490,6 +14539,10 @@ msgstr "项目符号列表"
 msgid "Bumped from {bumpedFrom} automatically. Two players on different builds of the same name is a sync error, so the number always moves on rather than being typed in."
 msgstr "已自动从 {bumpedFrom} 递增。同名但版本不同会导致两名玩家不同步，因此版本号总是自动递增，而不是手动输入。"
 
+#: src/content/engineSettingText.ts
+msgid "Bumpmapped"
+msgstr ""
+
 #: src/profile/health.ts
 #, fuzzy
 msgid "Bundle or download the game archive (.sdz/.sd7). {scanned}"
@@ -14627,6 +14680,10 @@ msgstr "相机"
 msgid "Camera angle"
 msgstr "相机角度"
 
+#: src/content/engineSettingText.ts
+msgid "Camera mode"
+msgstr ""
+
 #: src/content/index.ts
 #, fuzzy
 msgid "Camera mode, edge scrolling and the mouse."
@@ -14704,6 +14761,10 @@ msgstr "已完成的战役"
 #, fuzzy
 msgid "Campaigns guide"
 msgstr "战役指南"
+
+#: src/content/engineSettingText.ts
+msgid "Can also be changed during a game."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -20719,6 +20780,10 @@ msgstr "门"
 msgid "Double click to fill the view"
 msgstr "双击以填满视图"
 
+#: src/content/engineSettingText.ts
+msgid "Double-click time"
+msgstr ""
+
 #: src/challenge/SubstitutedMapNote.tsx
 #: src/content/pages/components/FilePreview.tsx
 #: src/content/pages/components/MapNotInstalled.tsx
@@ -21233,6 +21298,10 @@ msgstr "单位移动时在其后方地面上绘制痕迹。"
 msgid "Draws the bones of the selected units in game."
 msgstr "在游戏中绘制所选单位的骨骼。"
 
+#: src/content/engineSettingText.ts
+msgid "Draws the cursor outside the game, so it stays responsive at a low frame rate. Some drivers do not support it in fullscreen."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Draws the projectile even outside sight."
@@ -21380,6 +21449,14 @@ msgstr "时长"
 #, fuzzy
 msgid "Duration: {duration}"
 msgstr "时长：{duration}"
+
+#: src/content/engineSettingText.ts
+msgid "Dynamic"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Dynamic edge scroll"
+msgstr ""
 
 #: src/conquest/galaxy3d/GalaxyView.tsx
 #, fuzzy
@@ -21572,6 +21649,10 @@ msgstr "经济与耐久"
 #, fuzzy
 msgid "Edge"
 msgstr "边缘"
+
+#: src/content/engineSettingText.ts
+msgid "Edge scroll width"
+msgstr ""
 
 #: src/campaign/index.ts
 #: src/campaign/pages/CampaignEditPage.tsx
@@ -23104,6 +23185,10 @@ msgstr "未设置时回退到碰撞体积的尺寸。"
 msgid "Falls under gravity"
 msgstr "受重力下落"
 
+#: src/content/engineSettingText.ts
+msgid "Fast, skipping terrain"
+msgstr ""
+
 #: src/content/replayMapView/timelineKeys.ts
 #, fuzzy
 msgid "Faster"
@@ -24060,6 +24145,10 @@ msgstr "对于能原地转向的单位，全速时能做出的最急转弯。更
 msgid "For Blender"
 msgstr "用于 Blender"
 
+#: src/content/engineSettingText.ts
+msgid "For borderless fullscreen, turn this off and Borderless window on."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "For most weapons, base impulse equals the damage dealt. For melee weapons it's the attacker's mass instead."
@@ -24199,6 +24288,14 @@ msgstr "四条腿"
 msgid "Four views ({key})"
 msgstr "四视图 ({key})"
 
+#: src/content/engineSettingText.ts
+msgid "FPS"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "FPS camera FOV"
+msgstr ""
+
 #: src/placement/PlacementSurface.tsx
 #, fuzzy
 msgid "Frame"
@@ -24265,6 +24362,7 @@ msgstr "适应地图"
 msgid "Frame the selection"
 msgstr "让所选内容适应视图"
 
+#: src/content/engineSettingText.ts
 #: src/lego/pages/components/JoinedTo.tsx
 #, fuzzy
 msgid "Free"
@@ -24516,6 +24614,7 @@ msgstr "前轮转向"
 msgid "Fuchsia"
 msgstr "紫红"
 
+#: src/content/engineSettingText.ts
 #: src/lego/pages/components/ScanSkeletons.tsx
 #: src/multiplayer/battles/BattleFilterPopover.tsx
 #, fuzzy
@@ -24532,6 +24631,7 @@ msgstr "整条前线（默认）"
 msgid "Full motion"
 msgstr "完整动态效果"
 
+#: src/content/engineSettingText.ts
 #: src/general/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Fullscreen"
@@ -24966,6 +25066,10 @@ msgstr "正在收集场景及其对白片段…"
 msgid "General"
 msgstr "通用"
 
+#: src/content/engineSettingText.ts
+msgid "General volume"
+msgstr ""
+
 #: src/lego/pages/components/GenerateDrawer.tsx
 #: src/lego/pages/components/RosterDrawer.tsx
 #: src/lego/pages/ProjectsPage.tsx
@@ -25327,6 +25431,10 @@ msgstr "地面"
 msgid "Ground ambient"
 msgstr "地面环境光"
 
+#: src/content/engineSettingText.ts
+msgid "Ground detail"
+msgstr ""
+
 #: src/mapconv/pages/components/MapinfoOptions.tsx
 #, fuzzy
 msgid "Ground diffuse"
@@ -25479,6 +25587,10 @@ msgstr "挂接于"
 #, fuzzy
 msgid "Hard"
 msgstr "困难"
+
+#: src/content/engineSettingText.ts
+msgid "Hardware cursor"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -25864,6 +25976,10 @@ msgstr "隐藏单位详情"
 msgid "hideSettings id ''{id}'' matches nothing"
 msgstr "hideSettings id \"{id}\" 没有匹配任何内容"
 
+#: src/content/engineSettingText.ts
+msgid "High (4096)"
+msgstr ""
+
 #: src/lego/pages/components/ShapeFields.tsx
 #, fuzzy
 msgid "High at back"
@@ -25883,6 +25999,10 @@ msgstr "高端"
 #, fuzzy
 msgid "Higher is less accurate. 0 is perfect. Improves with the firing unit's experience."
 msgstr "数值越高越不准。0 为完全精准。随开火单位的经验提升而改善。"
+
+#: src/content/engineSettingText.ts
+msgid "Higher is sharper and slower."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -26497,6 +26617,10 @@ msgstr "单位下方地面变化时保留多少原有倾斜，从 0（立即贴�
 #, fuzzy
 msgid "How much of the protected direction's ability to move builds up each frame, in the modes that let it move."
 msgstr "在允许移动的模式下，受保护方向每帧积累的移动能力。"
+
+#: src/content/engineSettingText.ts
+msgid "How much of the screen edge scrolls the camera, as a share of the screen."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -27133,6 +27257,10 @@ msgstr "游戏中"
 #, fuzzy
 msgid "In game widget"
 msgstr "游戏内小部件"
+
+#: src/content/engineSettingText.ts
+msgid "In milliseconds."
+msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -29726,6 +29854,10 @@ msgstr "配装"
 msgid "Loadouts"
 msgstr "配装"
 
+#: src/content/engineSettingText.ts
+msgid "Lobbies replace this with your lobby name, so it shows up in replays and when the engine is started on its own."
+msgstr ""
+
 #: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Lobby port"
@@ -30081,6 +30213,10 @@ msgstr "失败，{category} {change}"
 msgid "Lost, and it counted toward no rating"
 msgstr "失败，且不计入任何评分"
 
+#: src/content/engineSettingText.ts
+msgid "Low (1024)"
+msgstr ""
+
 #: src/lego/pages/components/ShapeFields.tsx
 #: src/placement/TerrainControls.tsx
 #, fuzzy
@@ -30091,6 +30227,10 @@ msgstr "低端"
 #, fuzzy
 msgid "Low end must be between 0 and the height."
 msgstr "低端必须在 0 到高度之间。"
+
+#: src/content/engineSettingText.ts
+msgid "Low values make cliffs look jagged."
+msgstr ""
 
 #: src/workshop/pages/components/EquipWeaponPopover.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
@@ -30675,6 +30815,7 @@ msgstr "质量"
 msgid "Master URL"
 msgstr "主索引 URL"
 
+#: src/content/engineSettingText.ts
 #: src/sound/SoundSettings.tsx
 #, fuzzy
 msgid "Master volume"
@@ -30833,6 +30974,14 @@ msgstr "最大升降舵"
 msgid "Max height (-maxh)"
 msgstr "最大高度 (-maxh)"
 
+#: src/content/engineSettingText.ts
+msgid "Max nano particles"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Max particles"
+msgstr ""
+
 #: src/lego/banking.ts
 #, fuzzy
 msgid "Max pitch"
@@ -30849,6 +30998,10 @@ msgstr "最大玩家数"
 #, fuzzy
 msgid "Max rudder"
 msgstr "最大方向舵"
+
+#: src/content/engineSettingText.ts
+msgid "Max simultaneous sounds"
+msgstr ""
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
@@ -30926,6 +31079,10 @@ msgstr "中位数 {median}"
 #, fuzzy
 msgid "Medium"
 msgstr "中"
+
+#: src/content/engineSettingText.ts
+msgid "Medium (2048)"
+msgstr ""
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -31132,6 +31289,10 @@ msgstr "中间"
 #, fuzzy
 msgid "Middle drag"
 msgstr "中键拖动"
+
+#: src/content/engineSettingText.ts
+msgid "Middle-click scroll speed"
+msgstr ""
 
 #: src/content/pages/components/AchievementsSection.tsx
 #, fuzzy
@@ -31967,6 +32128,10 @@ msgstr "音乐"
 msgid "Music source"
 msgstr "音乐来源"
 
+#: src/content/engineSettingText.ts
+msgid "Music volume"
+msgstr ""
+
 #: src/sound/SoundSettings.tsx
 #, fuzzy
 msgid "Music was turned off because the last attempt to play it stopped Coilbox responding."
@@ -32456,6 +32621,10 @@ msgstr "需要地图的图片和高度数据。"
 #, fuzzy
 msgid "Negative values mean no limit."
 msgstr "负值表示无限制。"
+
+#: src/content/engineSettingText.ts
+msgid "Negative values scroll the other way."
+msgstr ""
 
 #: src/lego/pages/components/ExportDrawer.tsx
 #, fuzzy
@@ -33307,7 +33476,6 @@ msgid "No engines found in your content folders."
 msgstr "在你的内容文件夹中未找到引擎。"
 
 #: src/content/pages/components/BrowserToolbar.tsx
-#: src/content/pages/EngineConfigPage.tsx
 #: src/content/pages/KeybindsSection.tsx
 #, fuzzy
 msgid "No engines found in your content folders. Add a folder in <0>Content folders</0> or install one from <1>Engines</1>."
@@ -36123,6 +36291,8 @@ msgstr "共完成 {conquestsFinished} 个"
 msgid "off"
 msgstr "关"
 
+#: src/content/engineSettingText.ts
+#: src/content/pages/components/EngineSettingField.tsx
 #: src/play/modOptions.ts
 #: src/profile/SettingsSection.tsx
 #, fuzzy
@@ -36143,6 +36313,10 @@ msgstr "除非你开启，否则保持关闭。开启后，Coilbox 会读取这�
 #, fuzzy
 msgid "Off, a unit can fire out of the transport carrying it (its firebase) without exploding early. Useful for marines shooting from inside a bunker."
 msgstr "关：单位可以从搭载它的运输单位（其火力平台）中开火，而不会提前爆炸。适用于在掩体内射击的陆战队。"
+
+#: src/content/engineSettingText.ts
+msgid "Off, and not loaded"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -36294,6 +36468,8 @@ msgstr "将移除较旧的录制轨道，以保持在 {limit} 的上限内。"
 msgid "Oldest"
 msgstr "最早优先"
 
+#: src/content/engineSettingText.ts
+#: src/content/pages/components/EngineSettingField.tsx
 #: src/play/modOptions.ts
 #: src/profile/SettingsSection.tsx
 #: src/widgets/pages/WidgetsPage.tsx
@@ -37557,6 +37733,10 @@ msgstr "总体"
 msgid "Overclocked Reactor"
 msgstr "超频反应堆"
 
+#: src/content/engineSettingText.ts
+msgid "Overhead"
+msgstr ""
+
 #: src/lego/generateChecked.ts
 #: src/lego/problems.ts
 #, fuzzy
@@ -37579,6 +37759,7 @@ msgid "Overrides the map's gravity for ballistic weapons and missiles; missiles 
 msgstr "为弹道武器和导弹覆盖地图重力，导弹只有在 flightTime 耗尽后才受影响。0 表示关闭覆盖并使用地图重力。"
 
 #: src/career/pages/CareerPage.tsx
+#: src/content/engineSettingText.ts
 #: src/content/pages/GameDetailPage.tsx
 #: src/content/pages/MapDetailPage.tsx
 #, fuzzy
@@ -38825,6 +39006,7 @@ msgstr "玩家 {slot}"
 msgid "Player lookup"
 msgstr "玩家查询"
 
+#: src/content/engineSettingText.ts
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
 msgid "Player name"
@@ -40958,6 +41140,14 @@ msgstr "以此设置重新挑战"
 msgid "Refight: {mapName}"
 msgstr "重新挑战：{mapName}"
 
+#: src/content/engineSettingText.ts
+msgid "Reflective"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Reflective and refractive"
+msgstr ""
+
 #: src/lego/pages/components/TextureBuilderPanel.tsx
 #, fuzzy
 msgid "Reflectivity (greyscale, optional)"
@@ -42077,7 +42267,6 @@ msgstr "重新扫描中…"
 msgid "Resend verification email"
 msgstr "重新发送验证邮件"
 
-#: src/content/pages/components/EngineSettingField.tsx
 #: src/content/pages/components/KeyBindingEditor.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
@@ -42247,6 +42436,14 @@ msgstr "调整工作区大小"
 #, fuzzy
 msgid "Resize this panel"
 msgstr "调整此面板大小"
+
+#: src/content/engineSettingText.ts
+msgid "Resolution height"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Resolution width"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -42727,6 +42924,10 @@ msgstr "编队名称"
 #, fuzzy
 msgid "Rosters"
 msgstr "编队"
+
+#: src/content/engineSettingText.ts
+msgid "Rotatable overhead"
+msgstr ""
 
 #: src/lego/pages/components/ModelViewport.tsx
 #, fuzzy
@@ -43758,6 +43959,10 @@ msgstr "已导入脚本"
 msgid "Scroll"
 msgstr "滚动"
 
+#: src/content/engineSettingText.ts
+msgid "Scroll faster the closer the pointer is to the edge."
+msgstr ""
+
 #: src/components/ui/message-scroller.tsx
 #, fuzzy
 msgid "Scroll to end"
@@ -43767,6 +43972,10 @@ msgstr "滚动到末尾"
 #, fuzzy
 msgid "Scroll to start"
 msgstr "滚动到开头"
+
+#: src/content/engineSettingText.ts
+msgid "Scroll wheel speed"
+msgstr ""
 
 #: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
@@ -45113,6 +45322,14 @@ msgstr "着色器已编译"
 msgid "Shading map"
 msgstr "着色贴图"
 
+#: src/content/engineSettingText.ts
+msgid "Shadow detail"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Shadows"
+msgstr ""
+
 #: src/content/index.ts
 #, fuzzy
 msgid "Shadows, water, particles and anti-aliasing."
@@ -46436,6 +46653,10 @@ msgstr "平滑纹理 (-smooth)"
 msgid "Smoothing angle"
 msgstr "平滑角度"
 
+#: src/content/engineSettingText.ts
+msgid "Smooths jagged edges. Costly at high sample counts."
+msgstr ""
+
 #: src/lego/pages/components/ModelViewport.tsx
 #, fuzzy
 msgid "Snapped to \"{snappedTo}\". Hold Alt to place freely"
@@ -46850,6 +47071,10 @@ msgstr "点位，最大间隙"
 #, fuzzy
 msgid "Spread of individual projectiles within one burst, using the same angle transform as accuracy."
 msgstr "一轮连发中各弹体的散布，使用与 accuracy 相同的角度变换。"
+
+#: src/content/engineSettingText.ts
+msgid "Spring"
+msgstr ""
 
 #: src/mapconv/pages/DecompilePage.tsx
 #, fuzzy
@@ -47982,6 +48207,10 @@ msgstr "对称：新部件会获得一个镜像副本或一圈副本，它们会
 msgid "Synced"
 msgstr "已同步"
 
+#: src/content/engineSettingText.ts
+msgid "Syncs frames to your monitor. Adaptive drops the sync when the frame rate falls below it."
+msgstr ""
+
 #: src/content/pages/components/ReplayTimelineDock.tsx
 #: src/general/pages/SettingsSection.tsx
 #: src/i18n/frameStrings.ts
@@ -48272,6 +48501,10 @@ msgstr "队伍 1 是对局中编号较小的队伍，所以队伍战绩不能说
 #, fuzzy
 msgid "Team count"
 msgstr "队伍数量"
+
+#: src/content/engineSettingText.ts
+msgid "Team highlight"
+msgstr ""
 
 #: src/multiplayer/battle/GameTypePresetsControls.tsx
 #, fuzzy
@@ -54963,6 +55196,10 @@ msgstr "uberstress"
 msgid "Uberstress"
 msgstr "Uberstress"
 
+#: src/content/engineSettingText.ts
+msgid "UI volume"
+msgstr ""
+
 #: src/content/pages/components/ReplayRoster.tsx
 #, fuzzy
 msgid "Unassigned"
@@ -55304,6 +55541,10 @@ msgstr "单位放置"
 #, fuzzy
 msgid "Unit reference"
 msgstr "单位参考"
+
+#: src/content/engineSettingText.ts
+msgid "Unit reply volume"
+msgstr ""
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #: src/multiplayer/battle/BattleOptionsDrawer.tsx
@@ -56372,6 +56613,10 @@ msgstr "垂直"
 msgid "Vertices"
 msgstr "顶点"
 
+#: src/content/engineSettingText.ts
+msgid "Very high (8192)"
+msgstr ""
+
 #: src/runlite/pages/components/RunHud.tsx
 #, fuzzy
 msgid "Veteran"
@@ -56523,6 +56768,10 @@ msgstr "已发起投票"
 #, fuzzy
 msgid "Vote to start"
 msgstr "投票开始"
+
+#: src/content/engineSettingText.ts
+msgid "VSync"
+msgstr ""
 
 #: src/lego/scriptMarks.ts
 #, fuzzy
@@ -56832,6 +57081,10 @@ msgstr "水深"
 #, fuzzy
 msgid "Water opacity"
 msgstr "水的不透明度"
+
+#: src/content/engineSettingText.ts
+msgid "Water rendering"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -57911,6 +58164,14 @@ msgstr "无法读取时间段 {window}：{message}"
 #, fuzzy
 msgid "Window of match time"
 msgstr "对局时间段"
+
+#: src/content/engineSettingText.ts
+msgid "Windowed height"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Windowed width"
+msgstr ""
 
 #: src/multiplayer/battles/WindowsFirewall.tsx
 #, fuzzy

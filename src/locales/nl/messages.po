@@ -8573,6 +8573,10 @@ msgstr "0 tot 1."
 msgid "0 to 1. At 0, the unit misjudges target speed by up to double or half. At 1, it predicts speed perfectly. leadLimit can still cap how far it leads."
 msgstr "0 tot 1. Bij 0 schat de eenheid de snelheid van het doel tot het dubbele of de helft verkeerd in. Bij 1 voorspelt ze de snelheid perfect. leadLimit kan nog begrenzen hoe ver ze voorhoudt."
 
+#: src/content/engineSettingText.ts
+msgid "0 uses your desktop resolution."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "0.5 in each channel means no change; 1.0 is twice as bright."
@@ -8599,6 +8603,10 @@ msgstr "1 richt op de dichtstbijzijnde rand van het botsingsvolume, -1 op de ver
 msgid "1 to 2 hours"
 msgstr "1 tot 2 uur"
 
+#: src/content/engineSettingText.ts
+msgid "16 samples"
+msgstr ""
+
 #: src/content/libraryMaps.ts
 #: src/content/mapAggregate.ts
 #, fuzzy
@@ -8619,6 +8627,10 @@ msgstr "2 — Snel"
 #, fuzzy
 msgid "2 — Fast (compare last N tiles)"
 msgstr "2 — Snel (vergelijk de laatste N tegels)"
+
+#: src/content/engineSettingText.ts
+msgid "2 samples"
+msgstr ""
 
 #: src/mapconv/pages/SettingsSection.tsx
 #, fuzzy
@@ -8666,6 +8678,10 @@ msgstr "4 (hoge kwaliteit, snel) is een goede standaard"
 msgid "4 corners"
 msgstr "4 hoeken"
 
+#: src/content/engineSettingText.ts
+msgid "4 samples"
+msgstr ""
+
 #: src/startbox/presets.ts
 #, fuzzy
 msgid "4 sides"
@@ -8690,6 +8706,10 @@ msgstr "65536 COB-hoekeenheden is een volle draai."
 #, fuzzy
 msgid "65536 COB angle units is a full turn. Only used when turret is off."
 msgstr "65536 COB-hoekeenheden is een volle draai. Alleen gebruikt als turret uit staat."
+
+#: src/content/engineSettingText.ts
+msgid "8 samples"
+msgstr ""
 
 #: src/lego/pages/components/ImportResult.tsx
 #, fuzzy
@@ -9970,6 +9990,11 @@ msgstr "Oorlogspad opgeven"
 msgid "Abandoning…"
 msgstr "Opgeven…"
 
+#. placeholder {0}: s.label
+#: src/content/pages/components/EngineSettingField.tsx
+msgid "About {0}"
+msgstr ""
+
 #: src/multiplayer/relayPing.ts
 #, fuzzy
 msgid "About {ms} ms to the relay."
@@ -10420,6 +10445,10 @@ msgstr "actor of gebouw"
 #, fuzzy
 msgid "Actors"
 msgstr "Actors"
+
+#: src/content/engineSettingText.ts
+msgid "Adaptive"
+msgstr ""
 
 #: src/content/pages/components/KeyBindingEditor.tsx
 #: src/lego/pages/components/BuildMenuSection.tsx
@@ -10893,6 +10922,10 @@ msgstr "Beheerders"
 #, fuzzy
 msgid "Advanced"
 msgstr "Geavanceerd"
+
+#: src/content/engineSettingText.ts
+msgid "Advanced map shading"
+msgstr ""
 
 #: src/mapconv/pages/CompilePage.tsx
 #: src/uberstress/pages/RunPage.tsx
@@ -11864,6 +11897,10 @@ msgstr "De vraag bij {spot} beantwoord."
 #, fuzzy
 msgid "Anti-air"
 msgstr "Luchtafweer"
+
+#: src/content/engineSettingText.ts
+msgid "Anti-aliasing"
+msgstr ""
 
 #: src/multiplayer/admin/ChannelsSection.tsx
 #, fuzzy
@@ -13165,6 +13202,10 @@ msgstr "basisnaam voor de .smf/.smt (zonder extensie)"
 msgid "Bases"
 msgstr "Bases"
 
+#: src/content/engineSettingText.ts
+msgid "Basic"
+msgstr ""
+
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #, fuzzy
 msgid "battle"
@@ -13263,6 +13304,10 @@ msgstr "Wachtwoord van gevecht"
 #, fuzzy
 msgid "Battle room"
 msgstr "Gevechtsruimte"
+
+#: src/content/engineSettingText.ts
+msgid "Battle volume"
+msgstr ""
 
 #: src/conquest/pages/components/BattleOverlay.tsx
 #: src/conquest/pages/GalaxyPage.tsx
@@ -13726,6 +13771,10 @@ msgstr "Bonus"
 #, fuzzy
 msgid "Bonus for every AI"
 msgstr "Bonus voor elke AI"
+
+#: src/content/engineSettingText.ts
+msgid "Borderless window"
+msgstr ""
 
 #: src/animation/index.ts
 #: src/animation/pages/Bos2LuaPage.tsx
@@ -14491,6 +14540,10 @@ msgstr "Opsommingslijst"
 msgid "Bumped from {bumpedFrom} automatically. Two players on different builds of the same name is a sync error, so the number always moves on rather than being typed in."
 msgstr "Automatisch verhoogd vanaf {bumpedFrom}. Twee spelers met verschillende builds onder dezelfde naam geeft een syncfout, dus het nummer gaat altijd omhoog in plaats van dat je het intypt."
 
+#: src/content/engineSettingText.ts
+msgid "Bumpmapped"
+msgstr ""
+
 #: src/profile/health.ts
 #, fuzzy
 msgid "Bundle or download the game archive (.sdz/.sd7). {scanned}"
@@ -14628,6 +14681,10 @@ msgstr "Camera"
 msgid "Camera angle"
 msgstr "Camerahoek"
 
+#: src/content/engineSettingText.ts
+msgid "Camera mode"
+msgstr ""
+
 #: src/content/index.ts
 #, fuzzy
 msgid "Camera mode, edge scrolling and the mouse."
@@ -14705,6 +14762,10 @@ msgstr "Voltooide campagnes"
 #, fuzzy
 msgid "Campaigns guide"
 msgstr "Gids voor campagnes"
+
+#: src/content/engineSettingText.ts
+msgid "Can also be changed during a game."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -20723,6 +20784,10 @@ msgstr "Deuren"
 msgid "Double click to fill the view"
 msgstr "Dubbelklik om de weergave te vullen"
 
+#: src/content/engineSettingText.ts
+msgid "Double-click time"
+msgstr ""
+
 #: src/challenge/SubstitutedMapNote.tsx
 #: src/content/pages/components/FilePreview.tsx
 #: src/content/pages/components/MapNotInstalled.tsx
@@ -21238,6 +21303,10 @@ msgstr "Tekent een spoor op de grond achter de eenheid terwijl hij beweegt."
 msgid "Draws the bones of the selected units in game."
 msgstr "Tekent de botten van de geselecteerde eenheden in het spel."
 
+#: src/content/engineSettingText.ts
+msgid "Draws the cursor outside the game, so it stays responsive at a low frame rate. Some drivers do not support it in fullscreen."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Draws the projectile even outside sight."
@@ -21385,6 +21454,14 @@ msgstr "Duur"
 #, fuzzy
 msgid "Duration: {duration}"
 msgstr "Duur: {duration}"
+
+#: src/content/engineSettingText.ts
+msgid "Dynamic"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Dynamic edge scroll"
+msgstr ""
 
 #: src/conquest/galaxy3d/GalaxyView.tsx
 #, fuzzy
@@ -21577,6 +21654,10 @@ msgstr "Economie en duurzaamheid"
 #, fuzzy
 msgid "Edge"
 msgstr "Rand"
+
+#: src/content/engineSettingText.ts
+msgid "Edge scroll width"
+msgstr ""
 
 #: src/campaign/index.ts
 #: src/campaign/pages/CampaignEditPage.tsx
@@ -23110,6 +23191,10 @@ msgstr "Valt terug op de grootte van het botsingsvolume."
 msgid "Falls under gravity"
 msgstr "Valt door de zwaartekracht"
 
+#: src/content/engineSettingText.ts
+msgid "Fast, skipping terrain"
+msgstr ""
+
 #: src/content/replayMapView/timelineKeys.ts
 #, fuzzy
 msgid "Faster"
@@ -24067,6 +24152,10 @@ msgstr "Voor een eenheid die ter plekke draait, de scherpste bocht die hij op vo
 msgid "For Blender"
 msgstr "Voor Blender"
 
+#: src/content/engineSettingText.ts
+msgid "For borderless fullscreen, turn this off and Borderless window on."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "For most weapons, base impulse equals the damage dealt. For melee weapons it's the attacker's mass instead."
@@ -24206,6 +24295,14 @@ msgstr "Vier poten"
 msgid "Four views ({key})"
 msgstr "Vier weergaven ({key})"
 
+#: src/content/engineSettingText.ts
+msgid "FPS"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "FPS camera FOV"
+msgstr ""
+
 #: src/placement/PlacementSurface.tsx
 #, fuzzy
 msgid "Frame"
@@ -24272,6 +24369,7 @@ msgstr "Kaart in beeld brengen"
 msgid "Frame the selection"
 msgstr "De selectie in beeld brengen"
 
+#: src/content/engineSettingText.ts
 #: src/lego/pages/components/JoinedTo.tsx
 #, fuzzy
 msgid "Free"
@@ -24523,6 +24621,7 @@ msgstr "Voorwielen sturen"
 msgid "Fuchsia"
 msgstr "Fuchsia"
 
+#: src/content/engineSettingText.ts
 #: src/lego/pages/components/ScanSkeletons.tsx
 #: src/multiplayer/battles/BattleFilterPopover.tsx
 #, fuzzy
@@ -24539,6 +24638,7 @@ msgstr "Volledige grens (standaard)"
 msgid "Full motion"
 msgstr "Volledige beweging"
 
+#: src/content/engineSettingText.ts
 #: src/general/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Fullscreen"
@@ -24974,6 +25074,10 @@ msgstr "Het scenario en de dialoogclips worden verzameld…"
 msgid "General"
 msgstr "Algemeen"
 
+#: src/content/engineSettingText.ts
+msgid "General volume"
+msgstr ""
+
 #: src/lego/pages/components/GenerateDrawer.tsx
 #: src/lego/pages/components/RosterDrawer.tsx
 #: src/lego/pages/ProjectsPage.tsx
@@ -25335,6 +25439,10 @@ msgstr "Grond"
 msgid "Ground ambient"
 msgstr "Grondomgevingslicht"
 
+#: src/content/engineSettingText.ts
+msgid "Ground detail"
+msgstr ""
+
 #: src/mapconv/pages/components/MapinfoOptions.tsx
 #, fuzzy
 msgid "Ground diffuse"
@@ -25487,6 +25595,10 @@ msgstr "Hangt aan"
 #, fuzzy
 msgid "Hard"
 msgstr "Moeilijk"
+
+#: src/content/engineSettingText.ts
+msgid "Hardware cursor"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -25872,6 +25984,10 @@ msgstr "Eenheidsdetails verbergen"
 msgid "hideSettings id ''{id}'' matches nothing"
 msgstr "hideSettings-id ''{id}'' komt nergens mee overeen"
 
+#: src/content/engineSettingText.ts
+msgid "High (4096)"
+msgstr ""
+
 #: src/lego/pages/components/ShapeFields.tsx
 #, fuzzy
 msgid "High at back"
@@ -25891,6 +26007,10 @@ msgstr "Hoog uiteinde"
 #, fuzzy
 msgid "Higher is less accurate. 0 is perfect. Improves with the firing unit's experience."
 msgstr "Hoger is minder nauwkeurig. 0 is perfect. Wordt beter met de ervaring van de vurende eenheid."
+
+#: src/content/engineSettingText.ts
+msgid "Higher is sharper and slower."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -26505,6 +26625,10 @@ msgstr "Hoeveel van de oude helling behouden blijft als de grond onder de eenhei
 #, fuzzy
 msgid "How much of the protected direction's ability to move builds up each frame, in the modes that let it move."
 msgstr "Hoeveel van het vermogen van de beschermde richting om te bewegen elk frame wordt opgebouwd, in de modi die beweging toestaan."
+
+#: src/content/engineSettingText.ts
+msgid "How much of the screen edge scrolls the camera, as a share of the screen."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -27142,6 +27266,10 @@ msgstr "In het spel"
 #, fuzzy
 msgid "In game widget"
 msgstr "Widget in het spel"
+
+#: src/content/engineSettingText.ts
+msgid "In milliseconds."
+msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -29736,6 +29864,10 @@ msgstr "Uitrusting"
 msgid "Loadouts"
 msgstr "Uitrustingen"
 
+#: src/content/engineSettingText.ts
+msgid "Lobbies replace this with your lobby name, so it shows up in replays and when the engine is started on its own."
+msgstr ""
+
 #: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Lobby port"
@@ -30092,6 +30224,10 @@ msgstr "Verloren, {change} {category}"
 msgid "Lost, and it counted toward no rating"
 msgstr "Verloren, telde voor geen enkele score mee"
 
+#: src/content/engineSettingText.ts
+msgid "Low (1024)"
+msgstr ""
+
 #: src/lego/pages/components/ShapeFields.tsx
 #: src/placement/TerrainControls.tsx
 #, fuzzy
@@ -30102,6 +30238,10 @@ msgstr "Onderkant"
 #, fuzzy
 msgid "Low end must be between 0 and the height."
 msgstr "De onderkant moet tussen 0 en de hoogte liggen."
+
+#: src/content/engineSettingText.ts
+msgid "Low values make cliffs look jagged."
+msgstr ""
 
 #: src/workshop/pages/components/EquipWeaponPopover.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
@@ -30686,6 +30826,7 @@ msgstr "Massa"
 msgid "Master URL"
 msgstr "Master-URL"
 
+#: src/content/engineSettingText.ts
 #: src/sound/SoundSettings.tsx
 #, fuzzy
 msgid "Master volume"
@@ -30845,6 +30986,14 @@ msgstr "Max. hoogteroer"
 msgid "Max height (-maxh)"
 msgstr "Max. hoogte (-maxh)"
 
+#: src/content/engineSettingText.ts
+msgid "Max nano particles"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Max particles"
+msgstr ""
+
 #: src/lego/banking.ts
 #, fuzzy
 msgid "Max pitch"
@@ -30861,6 +31010,10 @@ msgstr "Max. spelers"
 #, fuzzy
 msgid "Max rudder"
 msgstr "Max. richtingsroer"
+
+#: src/content/engineSettingText.ts
+msgid "Max simultaneous sounds"
+msgstr ""
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
@@ -30938,6 +31091,10 @@ msgstr "mediaan {median}"
 #, fuzzy
 msgid "Medium"
 msgstr "Middel"
+
+#: src/content/engineSettingText.ts
+msgid "Medium (2048)"
+msgstr ""
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -31144,6 +31301,10 @@ msgstr "Midden"
 #, fuzzy
 msgid "Middle drag"
 msgstr "Slepen met midden"
+
+#: src/content/engineSettingText.ts
+msgid "Middle-click scroll speed"
+msgstr ""
 
 #: src/content/pages/components/AchievementsSection.tsx
 #, fuzzy
@@ -31979,6 +32140,10 @@ msgstr "Muziek"
 msgid "Music source"
 msgstr "Muziekbron"
 
+#: src/content/engineSettingText.ts
+msgid "Music volume"
+msgstr ""
+
 #: src/sound/SoundSettings.tsx
 #, fuzzy
 msgid "Music was turned off because the last attempt to play it stopped Coilbox responding."
@@ -32468,6 +32633,10 @@ msgstr "Heeft de afbeelding en hoogtegegevens van de kaart nodig."
 #, fuzzy
 msgid "Negative values mean no limit."
 msgstr "Negatieve waarden betekenen geen limiet."
+
+#: src/content/engineSettingText.ts
+msgid "Negative values scroll the other way."
+msgstr ""
 
 #: src/lego/pages/components/ExportDrawer.tsx
 #, fuzzy
@@ -33319,7 +33488,6 @@ msgid "No engines found in your content folders."
 msgstr "Geen engines gevonden in je inhoudsmappen."
 
 #: src/content/pages/components/BrowserToolbar.tsx
-#: src/content/pages/EngineConfigPage.tsx
 #: src/content/pages/KeybindsSection.tsx
 #, fuzzy
 msgid "No engines found in your content folders. Add a folder in <0>Content folders</0> or install one from <1>Engines</1>."
@@ -36137,6 +36305,8 @@ msgstr "van {conquestsFinished} voltooid"
 msgid "off"
 msgstr "uit"
 
+#: src/content/engineSettingText.ts
+#: src/content/pages/components/EngineSettingField.tsx
 #: src/play/modOptions.ts
 #: src/profile/SettingsSection.tsx
 #, fuzzy
@@ -36157,6 +36327,10 @@ msgstr "Uit, tenzij je het aanzet. Als het aan staat, leest Coilbox de spel- en 
 #, fuzzy
 msgid "Off, a unit can fire out of the transport carrying it (its firebase) without exploding early. Useful for marines shooting from inside a bunker."
 msgstr "Uit: een eenheid kan vanuit het transport dat hem draagt (zijn vuurbasis) schieten zonder vroegtijdig te ontploffen. Handig voor mariniers die vanuit een bunker schieten."
+
+#: src/content/engineSettingText.ts
+msgid "Off, and not loaded"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -36308,6 +36482,8 @@ msgstr "Oudere tracks worden verwijderd om binnen de limiet van {limit} te blijv
 msgid "Oldest"
 msgstr "Oudste"
 
+#: src/content/engineSettingText.ts
+#: src/content/pages/components/EngineSettingField.tsx
 #: src/play/modOptions.ts
 #: src/profile/SettingsSection.tsx
 #: src/widgets/pages/WidgetsPage.tsx
@@ -37573,6 +37749,10 @@ msgstr "Totaal"
 msgid "Overclocked Reactor"
 msgstr "Overgeklokte reactor"
 
+#: src/content/engineSettingText.ts
+msgid "Overhead"
+msgstr ""
+
 #: src/lego/generateChecked.ts
 #: src/lego/problems.ts
 #, fuzzy
@@ -37595,6 +37775,7 @@ msgid "Overrides the map's gravity for ballistic weapons and missiles; missiles 
 msgstr "Vervangt de zwaartekracht van de kaart voor ballistische wapens en raketten. Raketten worden pas beïnvloed als flightTime op is. 0 schakelt de vervanging uit en gebruikt de zwaartekracht van de kaart."
 
 #: src/career/pages/CareerPage.tsx
+#: src/content/engineSettingText.ts
 #: src/content/pages/GameDetailPage.tsx
 #: src/content/pages/MapDetailPage.tsx
 #, fuzzy
@@ -38841,6 +39022,7 @@ msgstr "Speler {slot}"
 msgid "Player lookup"
 msgstr "Speler opzoeken"
 
+#: src/content/engineSettingText.ts
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
 msgid "Player name"
@@ -40976,6 +41158,14 @@ msgstr "Deze opzet opnieuw bevechten"
 msgid "Refight: {mapName}"
 msgstr "Opnieuw vechten: {mapName}"
 
+#: src/content/engineSettingText.ts
+msgid "Reflective"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Reflective and refractive"
+msgstr ""
+
 #: src/lego/pages/components/TextureBuilderPanel.tsx
 #, fuzzy
 msgid "Reflectivity (greyscale, optional)"
@@ -42096,7 +42286,6 @@ msgstr "Opnieuw scannen…"
 msgid "Resend verification email"
 msgstr "Verificatiemail opnieuw versturen"
 
-#: src/content/pages/components/EngineSettingField.tsx
 #: src/content/pages/components/KeyBindingEditor.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
@@ -42266,6 +42455,14 @@ msgstr "Het werkgebied van grootte veranderen"
 #, fuzzy
 msgid "Resize this panel"
 msgstr "Dit paneel van grootte veranderen"
+
+#: src/content/engineSettingText.ts
+msgid "Resolution height"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Resolution width"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -42747,6 +42944,10 @@ msgstr "Naam van het roster"
 #, fuzzy
 msgid "Rosters"
 msgstr "Rosters"
+
+#: src/content/engineSettingText.ts
+msgid "Rotatable overhead"
+msgstr ""
 
 #: src/lego/pages/components/ModelViewport.tsx
 #, fuzzy
@@ -43780,6 +43981,10 @@ msgstr "Script geïmporteerd"
 msgid "Scroll"
 msgstr "Scrollen"
 
+#: src/content/engineSettingText.ts
+msgid "Scroll faster the closer the pointer is to the edge."
+msgstr ""
+
 #: src/components/ui/message-scroller.tsx
 #, fuzzy
 msgid "Scroll to end"
@@ -43789,6 +43994,10 @@ msgstr "Naar het einde scrollen"
 #, fuzzy
 msgid "Scroll to start"
 msgstr "Naar het begin scrollen"
+
+#: src/content/engineSettingText.ts
+msgid "Scroll wheel speed"
+msgstr ""
 
 #: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
@@ -45136,6 +45345,14 @@ msgstr "Shaders gecompileerd"
 msgid "Shading map"
 msgstr "Schaduwkaart"
 
+#: src/content/engineSettingText.ts
+msgid "Shadow detail"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Shadows"
+msgstr ""
+
 #: src/content/index.ts
 #, fuzzy
 msgid "Shadows, water, particles and anti-aliasing."
@@ -46464,6 +46681,10 @@ msgstr "Gladde textuur (-smooth)"
 msgid "Smoothing angle"
 msgstr "Afvlakhoek"
 
+#: src/content/engineSettingText.ts
+msgid "Smooths jagged edges. Costly at high sample counts."
+msgstr ""
+
 #: src/lego/pages/components/ModelViewport.tsx
 #, fuzzy
 msgid "Snapped to \"{snappedTo}\". Hold Alt to place freely"
@@ -46879,6 +47100,10 @@ msgstr "Plekken, grootste kloof"
 #, fuzzy
 msgid "Spread of individual projectiles within one burst, using the same angle transform as accuracy."
 msgstr "Spreiding van afzonderlijke projectielen binnen één salvo, met dezelfde hoektransformatie als accuracy."
+
+#: src/content/engineSettingText.ts
+msgid "Spring"
+msgstr ""
 
 #: src/mapconv/pages/DecompilePage.tsx
 #, fuzzy
@@ -48012,6 +48237,10 @@ msgstr "Symmetrie: een nieuw deel krijgt een tweeling of een ring van kopieën d
 msgid "Synced"
 msgstr "Gesynchroniseerd"
 
+#: src/content/engineSettingText.ts
+msgid "Syncs frames to your monitor. Adaptive drops the sync when the frame rate falls below it."
+msgstr ""
+
 #: src/content/pages/components/ReplayTimelineDock.tsx
 #: src/general/pages/SettingsSection.tsx
 #: src/i18n/frameStrings.ts
@@ -48302,6 +48531,10 @@ msgstr "Team 1 is het team met het laagste nummer in de wedstrijd, dus de teamre
 #, fuzzy
 msgid "Team count"
 msgstr "Aantal teams"
+
+#: src/content/engineSettingText.ts
+msgid "Team highlight"
+msgstr ""
 
 #: src/multiplayer/battle/GameTypePresetsControls.tsx
 #, fuzzy
@@ -54994,6 +55227,10 @@ msgstr "uberstress"
 msgid "Uberstress"
 msgstr "Uberstress"
 
+#: src/content/engineSettingText.ts
+msgid "UI volume"
+msgstr ""
+
 #: src/content/pages/components/ReplayRoster.tsx
 #, fuzzy
 msgid "Unassigned"
@@ -55335,6 +55572,10 @@ msgstr "plaatsing van eenheden"
 #, fuzzy
 msgid "Unit reference"
 msgstr "Eenhedenoverzicht"
+
+#: src/content/engineSettingText.ts
+msgid "Unit reply volume"
+msgstr ""
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #: src/multiplayer/battle/BattleOptionsDrawer.tsx
@@ -56403,6 +56644,10 @@ msgstr "Verticaal"
 msgid "Vertices"
 msgstr "Hoekpunten"
 
+#: src/content/engineSettingText.ts
+msgid "Very high (8192)"
+msgstr ""
+
 #: src/runlite/pages/components/RunHud.tsx
 #, fuzzy
 msgid "Veteran"
@@ -56554,6 +56799,10 @@ msgstr "Stemming gestart"
 #, fuzzy
 msgid "Vote to start"
 msgstr "Stemmen om te starten"
+
+#: src/content/engineSettingText.ts
+msgid "VSync"
+msgstr ""
 
 #: src/lego/scriptMarks.ts
 #, fuzzy
@@ -56863,6 +57112,10 @@ msgstr "Waterdiepte"
 #, fuzzy
 msgid "Water opacity"
 msgstr "Wateropaciteit"
+
+#: src/content/engineSettingText.ts
+msgid "Water rendering"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -57942,6 +58195,14 @@ msgstr "tijdvak {window} kan niet gelezen worden: {message}"
 #, fuzzy
 msgid "Window of match time"
 msgstr "Tijdvak van de wedstrijdtijd"
+
+#: src/content/engineSettingText.ts
+msgid "Windowed height"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Windowed width"
+msgstr ""
 
 #: src/multiplayer/battles/WindowsFirewall.tsx
 #, fuzzy

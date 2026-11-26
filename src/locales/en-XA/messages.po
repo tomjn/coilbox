@@ -6912,6 +6912,10 @@ msgstr ""
 msgid "0 to 1. At 0, the unit misjudges target speed by up to double or half. At 1, it predicts speed perfectly. leadLimit can still cap how far it leads."
 msgstr ""
 
+#: src/content/engineSettingText.ts
+msgid "0 uses your desktop resolution."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 msgid "0.5 in each channel means no change; 1.0 is twice as bright."
 msgstr ""
@@ -6933,6 +6937,10 @@ msgstr ""
 msgid "1 to 2 hours"
 msgstr ""
 
+#: src/content/engineSettingText.ts
+msgid "16 samples"
+msgstr ""
+
 #: src/content/libraryMaps.ts
 #: src/content/mapAggregate.ts
 msgid "1v1"
@@ -6948,6 +6956,10 @@ msgstr ""
 
 #: src/mapconv/pages/CompilePage.tsx
 msgid "2 — Fast (compare last N tiles)"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "2 samples"
 msgstr ""
 
 #: src/mapconv/pages/SettingsSection.tsx
@@ -6987,6 +6999,10 @@ msgstr ""
 msgid "4 corners"
 msgstr ""
 
+#: src/content/engineSettingText.ts
+msgid "4 samples"
+msgstr ""
+
 #: src/startbox/presets.ts
 msgid "4 sides"
 msgstr ""
@@ -7005,6 +7021,10 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "65536 COB angle units is a full turn. Only used when turret is off."
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "8 samples"
 msgstr ""
 
 #: src/lego/pages/components/ImportResult.tsx
@@ -8033,6 +8053,11 @@ msgstr ""
 msgid "Abandoning…"
 msgstr ""
 
+#. placeholder {0}: s.label
+#: src/content/pages/components/EngineSettingField.tsx
+msgid "About {0}"
+msgstr ""
+
 #: src/multiplayer/relayPing.ts
 msgid "About {ms} ms to the relay."
 msgstr ""
@@ -8402,6 +8427,10 @@ msgstr ""
 #: src/hub/preview.ts
 #: src/scenario/pages/components/modes.tsx
 msgid "Actors"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Adaptive"
 msgstr ""
 
 #: src/content/pages/components/KeyBindingEditor.tsx
@@ -8784,6 +8813,10 @@ msgstr ""
 
 #: src/general/index.ts
 msgid "Advanced"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Advanced map shading"
 msgstr ""
 
 #: src/mapconv/pages/CompilePage.tsx
@@ -9569,6 +9602,10 @@ msgstr ""
 
 #: src/lego/generatorJobs.ts
 msgid "Anti-air"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Anti-aliasing"
 msgstr ""
 
 #: src/multiplayer/admin/ChannelsSection.tsx
@@ -10622,6 +10659,10 @@ msgstr ""
 msgid "Bases"
 msgstr ""
 
+#: src/content/engineSettingText.ts
+msgid "Basic"
+msgstr ""
+
 #: src/runlite/pages/components/EncounterOverlay.tsx
 msgid "battle"
 msgstr ""
@@ -10702,6 +10743,10 @@ msgstr ""
 #: src/multiplayer/index.tsx
 #: src/multiplayer/navPredicates.ts
 msgid "Battle room"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Battle volume"
 msgstr ""
 
 #: src/conquest/pages/components/BattleOverlay.tsx
@@ -11075,6 +11120,10 @@ msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
 msgid "Bonus for every AI"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Borderless window"
 msgstr ""
 
 #: src/animation/index.ts
@@ -11696,6 +11745,10 @@ msgstr ""
 msgid "Bumped from {bumpedFrom} automatically. Two players on different builds of the same name is a sync error, so the number always moves on rather than being typed in."
 msgstr ""
 
+#: src/content/engineSettingText.ts
+msgid "Bumpmapped"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "Bundle or download the game archive (.sdz/.sd7). {scanned}"
 msgstr ""
@@ -11807,6 +11860,10 @@ msgstr ""
 msgid "Camera angle"
 msgstr ""
 
+#: src/content/engineSettingText.ts
+msgid "Camera mode"
+msgstr ""
+
 #: src/content/index.ts
 msgid "Camera mode, edge scrolling and the mouse."
 msgstr ""
@@ -11869,6 +11926,10 @@ msgstr ""
 
 #: src/campaign/index.ts
 msgid "Campaigns guide"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Can also be changed during a game."
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -16773,6 +16834,10 @@ msgstr ""
 msgid "Double click to fill the view"
 msgstr ""
 
+#: src/content/engineSettingText.ts
+msgid "Double-click time"
+msgstr ""
+
 #: src/challenge/SubstitutedMapNote.tsx
 #: src/content/pages/components/FilePreview.tsx
 #: src/content/pages/components/MapNotInstalled.tsx
@@ -17194,6 +17259,10 @@ msgstr ""
 msgid "Draws the bones of the selected units in game."
 msgstr ""
 
+#: src/content/engineSettingText.ts
+msgid "Draws the cursor outside the game, so it stays responsive at a low frame rate. Some drivers do not support it in fullscreen."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 msgid "Draws the projectile even outside sight."
 msgstr ""
@@ -17313,6 +17382,14 @@ msgstr ""
 
 #: src/play/pages/components/DebriefDrawer.tsx
 msgid "Duration: {duration}"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Dynamic"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Dynamic edge scroll"
 msgstr ""
 
 #: src/conquest/galaxy3d/GalaxyView.tsx
@@ -17469,6 +17546,10 @@ msgstr ""
 
 #: src/conquest/pages/components/StartPositionSelect.tsx
 msgid "Edge"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Edge scroll width"
 msgstr ""
 
 #: src/campaign/index.ts
@@ -18717,6 +18798,10 @@ msgstr ""
 msgid "Falls under gravity"
 msgstr ""
 
+#: src/content/engineSettingText.ts
+msgid "Fast, skipping terrain"
+msgstr ""
+
 #: src/content/replayMapView/timelineKeys.ts
 msgid "Faster"
 msgstr ""
@@ -19487,6 +19572,10 @@ msgstr ""
 msgid "For Blender"
 msgstr ""
 
+#: src/content/engineSettingText.ts
+msgid "For borderless fullscreen, turn this off and Borderless window on."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 msgid "For most weapons, base impulse equals the damage dealt. For melee weapons it's the attacker's mass instead."
 msgstr ""
@@ -19599,6 +19688,14 @@ msgstr ""
 msgid "Four views ({key})"
 msgstr ""
 
+#: src/content/engineSettingText.ts
+msgid "FPS"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "FPS camera FOV"
+msgstr ""
+
 #: src/placement/PlacementSurface.tsx
 msgid "Frame"
 msgstr ""
@@ -19652,6 +19749,7 @@ msgstr ""
 msgid "Frame the selection"
 msgstr ""
 
+#: src/content/engineSettingText.ts
 #: src/lego/pages/components/JoinedTo.tsx
 msgid "Free"
 msgstr ""
@@ -19854,6 +19952,7 @@ msgstr ""
 msgid "Fuchsia"
 msgstr ""
 
+#: src/content/engineSettingText.ts
 #: src/lego/pages/components/ScanSkeletons.tsx
 #: src/multiplayer/battles/BattleFilterPopover.tsx
 msgid "Full"
@@ -19867,6 +19966,7 @@ msgstr ""
 msgid "Full motion"
 msgstr ""
 
+#: src/content/engineSettingText.ts
 #: src/general/pages/SettingsSection.tsx
 msgid "Fullscreen"
 msgstr ""
@@ -20227,6 +20327,10 @@ msgstr ""
 msgid "General"
 msgstr ""
 
+#: src/content/engineSettingText.ts
+msgid "General volume"
+msgstr ""
+
 #: src/lego/pages/components/GenerateDrawer.tsx
 #: src/lego/pages/components/RosterDrawer.tsx
 #: src/lego/pages/ProjectsPage.tsx
@@ -20518,6 +20622,10 @@ msgstr ""
 msgid "Ground ambient"
 msgstr ""
 
+#: src/content/engineSettingText.ts
+msgid "Ground detail"
+msgstr ""
+
 #: src/mapconv/pages/components/MapinfoOptions.tsx
 msgid "Ground diffuse"
 msgstr ""
@@ -20640,6 +20748,10 @@ msgstr ""
 #: src/scenario/pages/components/DifficultyRangeFields.tsx
 #: src/scenario/pages/components/ScenarioTestDrawer.tsx
 msgid "Hard"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Hardware cursor"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -20952,6 +21064,10 @@ msgstr ""
 msgid "hideSettings id ''{id}'' matches nothing"
 msgstr ""
 
+#: src/content/engineSettingText.ts
+msgid "High (4096)"
+msgstr ""
+
 #: src/lego/pages/components/ShapeFields.tsx
 msgid "High at back"
 msgstr ""
@@ -20966,6 +21082,10 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "Higher is less accurate. 0 is perfect. Improves with the firing unit's experience."
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Higher is sharper and slower."
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -21459,6 +21579,10 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "How much of the protected direction's ability to move builds up each frame, in the modes that let it move."
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "How much of the screen edge scrolls the camera, as a share of the screen."
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -21977,6 +22101,10 @@ msgstr ""
 
 #: src/blueprint/pages/components/BlueprintWidgetButton.tsx
 msgid "In game widget"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "In milliseconds."
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
@@ -24075,6 +24203,10 @@ msgstr ""
 msgid "Loadouts"
 msgstr ""
 
+#: src/content/engineSettingText.ts
+msgid "Lobbies replace this with your lobby name, so it shows up in replays and when the engine is started on its own."
+msgstr ""
+
 #: src/uberstress/pages/SettingsSection.tsx
 msgid "Lobby port"
 msgstr ""
@@ -24363,6 +24495,10 @@ msgstr ""
 msgid "Lost, and it counted toward no rating"
 msgstr ""
 
+#: src/content/engineSettingText.ts
+msgid "Low (1024)"
+msgstr ""
+
 #: src/lego/pages/components/ShapeFields.tsx
 #: src/placement/TerrainControls.tsx
 msgid "Low end"
@@ -24370,6 +24506,10 @@ msgstr ""
 
 #: src/lego/wedgeShape.ts
 msgid "Low end must be between 0 and the height."
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Low values make cliffs look jagged."
 msgstr ""
 
 #: src/workshop/pages/components/EquipWeaponPopover.tsx
@@ -24849,6 +24989,7 @@ msgstr ""
 msgid "Master URL"
 msgstr ""
 
+#: src/content/engineSettingText.ts
 #: src/sound/SoundSettings.tsx
 msgid "Master volume"
 msgstr ""
@@ -24977,6 +25118,14 @@ msgstr ""
 msgid "Max height (-maxh)"
 msgstr ""
 
+#: src/content/engineSettingText.ts
+msgid "Max nano particles"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Max particles"
+msgstr ""
+
 #: src/lego/banking.ts
 msgid "Max pitch"
 msgstr ""
@@ -24989,6 +25138,10 @@ msgstr ""
 
 #: src/lego/banking.ts
 msgid "Max rudder"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Max simultaneous sounds"
 msgstr ""
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
@@ -25051,6 +25204,10 @@ msgstr ""
 
 #: src/lego/generate.ts
 msgid "Medium"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Medium (2048)"
 msgstr ""
 
 #: src/lego/animPresets.ts
@@ -25218,6 +25375,10 @@ msgstr ""
 
 #: src/lego/pages/components/ShortcutSheet.tsx
 msgid "Middle drag"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Middle-click scroll speed"
 msgstr ""
 
 #: src/content/pages/components/AchievementsSection.tsx
@@ -25896,6 +26057,10 @@ msgstr ""
 msgid "Music source"
 msgstr ""
 
+#: src/content/engineSettingText.ts
+msgid "Music volume"
+msgstr ""
+
 #: src/sound/SoundSettings.tsx
 msgid "Music was turned off because the last attempt to play it stopped Coilbox responding."
 msgstr ""
@@ -26292,6 +26457,10 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "Negative values mean no limit."
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Negative values scroll the other way."
 msgstr ""
 
 #: src/lego/pages/components/ExportDrawer.tsx
@@ -26980,7 +27149,6 @@ msgid "No engines found in your content folders."
 msgstr ""
 
 #: src/content/pages/components/BrowserToolbar.tsx
-#: src/content/pages/EngineConfigPage.tsx
 #: src/content/pages/KeybindsSection.tsx
 msgid "No engines found in your content folders. Add a folder in <0>Content folders</0> or install one from <1>Engines</1>."
 msgstr ""
@@ -29251,6 +29419,8 @@ msgstr ""
 msgid "off"
 msgstr ""
 
+#: src/content/engineSettingText.ts
+#: src/content/pages/components/EngineSettingField.tsx
 #: src/play/modOptions.ts
 #: src/profile/SettingsSection.tsx
 msgid "Off"
@@ -29266,6 +29436,10 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "Off, a unit can fire out of the transport carrying it (its firebase) without exploding early. Useful for marines shooting from inside a bunker."
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Off, and not loaded"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -29389,6 +29563,8 @@ msgstr ""
 msgid "Oldest"
 msgstr ""
 
+#: src/content/engineSettingText.ts
+#: src/content/pages/components/EngineSettingField.tsx
 #: src/play/modOptions.ts
 #: src/profile/SettingsSection.tsx
 #: src/widgets/pages/WidgetsPage.tsx
@@ -30411,6 +30587,10 @@ msgstr ""
 msgid "Overclocked Reactor"
 msgstr ""
 
+#: src/content/engineSettingText.ts
+msgid "Overhead"
+msgstr ""
+
 #: src/lego/generateChecked.ts
 #: src/lego/problems.ts
 msgid "Overlap"
@@ -30429,6 +30609,7 @@ msgid "Overrides the map's gravity for ballistic weapons and missiles; missiles 
 msgstr ""
 
 #: src/career/pages/CareerPage.tsx
+#: src/content/engineSettingText.ts
 #: src/content/pages/GameDetailPage.tsx
 #: src/content/pages/MapDetailPage.tsx
 msgid "Overview"
@@ -31439,6 +31620,7 @@ msgstr ""
 msgid "Player lookup"
 msgstr ""
 
+#: src/content/engineSettingText.ts
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 msgid "Player name"
 msgstr ""
@@ -33174,6 +33356,14 @@ msgstr ""
 msgid "Refight: {mapName}"
 msgstr ""
 
+#: src/content/engineSettingText.ts
+msgid "Reflective"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Reflective and refractive"
+msgstr ""
+
 #: src/lego/pages/components/TextureBuilderPanel.tsx
 msgid "Reflectivity (greyscale, optional)"
 msgstr ""
@@ -34085,7 +34275,6 @@ msgstr ""
 msgid "Resend verification email"
 msgstr ""
 
-#: src/content/pages/components/EngineSettingField.tsx
 #: src/content/pages/components/KeyBindingEditor.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
@@ -34223,6 +34412,14 @@ msgstr ""
 
 #: src/lego/pages/components/StripResizer.tsx
 msgid "Resize this panel"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Resolution height"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Resolution width"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -34613,6 +34810,10 @@ msgstr ""
 
 #: src/lego/pages/ProjectsPage.tsx
 msgid "Rosters"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Rotatable overhead"
 msgstr ""
 
 #: src/lego/pages/components/ModelViewport.tsx
@@ -35454,12 +35655,20 @@ msgstr ""
 msgid "Scroll"
 msgstr ""
 
+#: src/content/engineSettingText.ts
+msgid "Scroll faster the closer the pointer is to the edge."
+msgstr ""
+
 #: src/components/ui/message-scroller.tsx
 msgid "Scroll to end"
 msgstr ""
 
 #: src/components/ui/message-scroller.tsx
 msgid "Scroll to start"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Scroll wheel speed"
 msgstr ""
 
 #: src/lego/pages/components/TimelineTab.tsx
@@ -36552,6 +36761,14 @@ msgstr ""
 msgid "Shading map"
 msgstr ""
 
+#: src/content/engineSettingText.ts
+msgid "Shadow detail"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Shadows"
+msgstr ""
+
 #: src/content/index.ts
 msgid "Shadows, water, particles and anti-aliasing."
 msgstr ""
@@ -37627,6 +37844,10 @@ msgstr ""
 msgid "Smoothing angle"
 msgstr ""
 
+#: src/content/engineSettingText.ts
+msgid "Smooths jagged edges. Costly at high sample counts."
+msgstr ""
+
 #: src/lego/pages/components/ModelViewport.tsx
 msgid "Snapped to \"{snappedTo}\". Hold Alt to place freely"
 msgstr ""
@@ -37961,6 +38182,10 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "Spread of individual projectiles within one burst, using the same angle transform as accuracy."
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Spring"
 msgstr ""
 
 #: src/mapconv/pages/DecompilePage.tsx
@@ -38877,6 +39102,10 @@ msgstr ""
 msgid "Synced"
 msgstr ""
 
+#: src/content/engineSettingText.ts
+msgid "Syncs frames to your monitor. Adaptive drops the sync when the frame rate falls below it."
+msgstr ""
+
 #: src/content/pages/components/ReplayTimelineDock.tsx
 #: src/general/pages/SettingsSection.tsx
 #: src/i18n/frameStrings.ts
@@ -39112,6 +39341,10 @@ msgstr ""
 
 #: src/multiplayer/pages/BattleRoomPage.tsx
 msgid "Team count"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Team highlight"
 msgstr ""
 
 #: src/multiplayer/battle/GameTypePresetsControls.tsx
@@ -44497,6 +44730,10 @@ msgstr ""
 msgid "Uberstress"
 msgstr ""
 
+#: src/content/engineSettingText.ts
+msgid "UI volume"
+msgstr ""
+
 #: src/content/pages/components/ReplayRoster.tsx
 msgid "Unassigned"
 msgstr ""
@@ -44774,6 +45011,10 @@ msgstr ""
 #: src/content/pages/UnitReferencePage.tsx
 #: src/workshop/pages/ReferencePage.tsx
 msgid "Unit reference"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Unit reply volume"
 msgstr ""
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
@@ -45644,6 +45885,10 @@ msgstr ""
 msgid "Vertices"
 msgstr ""
 
+#: src/content/engineSettingText.ts
+msgid "Very high (8192)"
+msgstr ""
+
 #: src/runlite/pages/components/RunHud.tsx
 msgid "Veteran"
 msgstr ""
@@ -45766,6 +46011,10 @@ msgstr ""
 
 #: src/multiplayer/battle/startButtonLabel.ts
 msgid "Vote to start"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "VSync"
 msgstr ""
 
 #: src/lego/scriptMarks.ts
@@ -46018,6 +46267,10 @@ msgstr ""
 
 #: src/mapconv/pages/components/MapinfoOptions.tsx
 msgid "Water opacity"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Water rendering"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -46887,6 +47140,14 @@ msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 msgid "Window of match time"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Windowed height"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Windowed width"
 msgstr ""
 
 #: src/multiplayer/battles/WindowsFirewall.tsx

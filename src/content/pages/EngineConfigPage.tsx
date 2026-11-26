@@ -1,6 +1,8 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Link } from "react-router";
+import { SettingList } from "@/components/SettingRow";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { useEngineEditTarget, useUnitsyncEngineConfig } from "../config";
+import { translateEngineSetting } from "../engineSettingText";
 import { BrowserToolbar } from "./components/BrowserToolbar";
 import { EngineSettingField } from "./components/EngineSettingField";
 import {
@@ -27,6 +29,7 @@ import {
  * unitsync can't enumerate config keys, so the worker reads a hand-picked
  * catalog. Unset keys show the engine default. Each edit is written back
  * immediately. The frame renders the section title, so this is the body only.
+ * With no engine at all, the toolbar says so and points at where to get one.
  */
 export function EngineConfigPage({ category }: { category: string }) {
   const { t } = useLingui();
@@ -70,29 +73,7 @@ export function EngineConfigPage({ category }: { category: string }) {
 
       {busy ? (
         <SkeletonList />
-      ) : targets.length === 0 ? (
-        <EmptyState
-          label={
-            <Trans>
-              No engines found in your content folders. Add a folder in{" "}
-              <Link
-                to="/settings/content-folders"
-                className="underline underline-offset-4"
-              >
-                Content folders
-              </Link>{" "}
-              or install one from{" "}
-              <Link
-                to="/settings/engines"
-                className="underline underline-offset-4"
-              >
-                Engines
-              </Link>
-              .
-            </Trans>
-          }
-        />
-      ) : settings.length === 0 ? (
+      ) : targets.length === 0 ? null : settings.length === 0 ? (
         <EmptyState
           label={
             data
@@ -101,19 +82,18 @@ export function EngineConfigPage({ category }: { category: string }) {
           }
         />
       ) : (
-        // The label column is capped rather than `auto`, because hints live in
-        // it and an `auto` column grows to the longest one, which left the
-        // controls a few pixels wide.
-        <div className="grid grid-cols-[minmax(0,1fr)_minmax(14rem,24rem)] items-center gap-x-4 gap-y-2.5 rounded-lg border border-border/50 bg-card p-3 text-sm">
-          {settings.map((s) => (
-            <EngineSettingField
-              key={s.key}
-              setting={s}
-              writable={writable}
-              onWrite={write}
-            />
-          ))}
-        </div>
+        <TooltipProvider>
+          <SettingList>
+            {settings.map((s) => (
+              <EngineSettingField
+                key={s.key}
+                setting={translateEngineSetting(s)}
+                writable={writable}
+                onWrite={write}
+              />
+            ))}
+          </SettingList>
+        </TooltipProvider>
       )}
 
       {data?.configPath ? (
