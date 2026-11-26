@@ -20980,13 +20980,12 @@ msgstr ""
 msgid "Group"
 msgstr ""
 
-#: src/scenario/pages/components/orderPaths.ts
-#: src/scenario/pages/components/triggers.ts
-msgid "Group {number}"
-msgstr ""
-
 #: src/scenario/pages/components/groups.ts
 msgid "Group {position}"
+msgstr ""
+
+#: src/scenario/pages/components/GroupControls.tsx
+msgid "Group name"
 msgstr ""
 
 #: src/workshop/pages/components/ProjectChecks.tsx

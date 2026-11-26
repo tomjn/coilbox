@@ -25739,16 +25739,14 @@ msgstr "gruppe"
 msgid "Group"
 msgstr "Gruppe"
 
-#: src/scenario/pages/components/orderPaths.ts
-#: src/scenario/pages/components/triggers.ts
-#, fuzzy
-msgid "Group {number}"
-msgstr "Gruppe {number}"
-
 #: src/scenario/pages/components/groups.ts
 #, fuzzy
 msgid "Group {position}"
 msgstr "Gruppe {position}"
+
+#: src/scenario/pages/components/GroupControls.tsx
+msgid "Group name"
+msgstr ""
 
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy

@@ -28,6 +28,7 @@ import type {
 } from "../../model";
 import type { ParamKind } from "../../triggerTypes";
 import {
+  groupLabels,
   moveWaypoint as moveGroupWaypoint,
   parsePathKey,
   removeWaypoint as removeGroupWaypoint,
@@ -138,16 +139,14 @@ export function scenarioPaths(
   scenario: Scenario,
   extensions: ExtensionTypes = NO_EXTENSIONS,
 ): PathSource[] {
+  const names = groupLabels(scenario.groups);
   const groups = scenario.groups
-    .map<PathSource>((group, i) => {
-      const number = i + 1;
-      return {
-        id: group.id,
-        label: t`Group ${number}`,
-        from: group.pos,
-        orders: group.orders,
-      };
-    })
+    .map<PathSource>((group, i) => ({
+      id: group.id,
+      label: names[i],
+      from: group.pos,
+      orders: group.orders,
+    }))
     .filter((source) => source.orders.length > 0);
 
   const held: PathSource[] = [];

@@ -286,6 +286,15 @@ describe("parseScenario — groups", () => {
     expect(read({ startsAsleep: true })?.startsAsleep).toBe(true);
   });
 
+  it("keeps a group's name, and treats a blank one as none", () => {
+    const read = (extra: object) =>
+      parseScenario(doc({ groups: [{ ...group, ...extra }] }))?.groups[0];
+
+    expect(read({ name: "Ridge patrol" })?.name).toBe("Ridge patrol");
+    expect(read({})).not.toHaveProperty("name");
+    expect(read({ name: "  " })).not.toHaveProperty("name");
+  });
+
   it("parses a group with orders and defaults dormant to false", () => {
     const s = parseScenario(
       doc({

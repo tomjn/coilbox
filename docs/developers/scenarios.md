@@ -100,6 +100,8 @@ Triggers refer to actors by id, and so do orders. That is what `unit_dead`, `uni
 
 A group is a block of units spawned and ordered as one: a raiding party, a reinforcement wave, a garrison. You say what is in it (counts per unit type), where it lands, what its orders are, and whether it is there from the start.
 
+You can give a group a name in the box on its bar, and the trigger and order pickers list it by that name. A group without one is listed by its number, such as "Group 3". The name stays in the editor: the compiled mission does not carry it and nothing shows it in game.
+
 A group has two states, and both matter:
 
 - **On the map or not.** A group is placed at game start unless you tick **Waits for a trigger to spawn it**, which makes it dormant.

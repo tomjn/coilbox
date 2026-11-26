@@ -25739,16 +25739,14 @@ msgstr "ομάδα μονάδων"
 msgid "Group"
 msgstr "Ομάδα μονάδων"
 
-#: src/scenario/pages/components/orderPaths.ts
-#: src/scenario/pages/components/triggers.ts
-#, fuzzy
-msgid "Group {number}"
-msgstr "Ομάδα μονάδων {number}"
-
 #: src/scenario/pages/components/groups.ts
 #, fuzzy
 msgid "Group {position}"
 msgstr "Ομάδα μονάδων {position}"
+
+#: src/scenario/pages/components/GroupControls.tsx
+msgid "Group name"
+msgstr ""
 
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy

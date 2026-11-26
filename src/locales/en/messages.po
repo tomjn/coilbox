@@ -20981,14 +20981,13 @@ msgstr "group"
 msgid "Group"
 msgstr "Group"
 
-#: src/scenario/pages/components/orderPaths.ts
-#: src/scenario/pages/components/triggers.ts
-msgid "Group {number}"
-msgstr "Group {number}"
-
 #: src/scenario/pages/components/groups.ts
 msgid "Group {position}"
 msgstr "Group {position}"
+
+#: src/scenario/pages/components/GroupControls.tsx
+msgid "Group name"
+msgstr "Group name"
 
 #: src/workshop/pages/components/ProjectChecks.tsx
 msgid "Group the change ledger by"

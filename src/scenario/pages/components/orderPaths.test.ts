@@ -97,6 +97,13 @@ describe("scenarioPaths", () => {
     ]);
   });
 
+  it("calls a named group's path by its name", () => {
+    const scenario = document();
+    scenario.groups[0] = { ...scenario.groups[0], name: "Ridge patrol" };
+
+    expect(scenarioPaths(scenario)[0].label).toBe("Ridge patrol");
+  });
+
   it("starts both paths where the group stands", () => {
     const paths = scenarioPaths(document());
     expect(paths[0].from).toEqual({ x: 2000, z: 1000 });

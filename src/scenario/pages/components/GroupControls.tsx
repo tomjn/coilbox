@@ -1,14 +1,14 @@
 /**
- * What a selected group is, beyond where it stands: whose it is, what it is made
- * of, whether it starts on the map, and what it is told to do.
+ * What a selected group is, beyond where it stands: what it is called, whose it
+ * is, what it is made of, whether it starts on the map, and what it is told to do.
  *
  * Team is on the bar because it is the one an author changes while looking at
  * the map. The unit list and the orders are behind popovers of their own: both
  * are lists that grow, and a bar wide enough for either would cover the map they
  * describe.
  *
- * Counts are held here while they are being typed and written when the box is
- * left, because every change to the document is saved and a keystroke per file
+ * The name and the counts are held here while they are being typed and written
+ * when the box is left, because every change to the document is saved and a keystroke per file
  * write is not what typing "12" should mean. Mount this keyed by the group's id
  * so moving the selection reseeds them.
  *
@@ -78,6 +78,7 @@ const ORDER_LABELS: Record<OrderKind, MessageDescriptor> = {
 
 export function GroupControls({
   group,
+  fallbackName,
   participants,
   units,
   unitsLoading,
@@ -89,6 +90,8 @@ export function GroupControls({
   onDraw,
 }: {
   group: ScenarioGroup;
+  /** What the group is called while it has no name of its own. */
+  fallbackName: string;
   participants: Participant[];
   /** The game's units, for adding one more type to the group. */
   units: UnitDatasetEntry[];
@@ -111,9 +114,27 @@ export function GroupControls({
   const teamDescribedBy = useId();
   const teamProblem = entryFieldProblem(issues, "groups", group.id, "team");
   const posProblem = entryFieldProblem(issues, "groups", group.id, "pos");
+  const [name, setName] = useFieldText(group.name ?? "");
+
+  const commitName = () => {
+    const next = name.trim() || undefined;
+    setName(next ?? "");
+    if (next !== group.name) onEdit({ name: next });
+  };
 
   return (
     <>
+      <Input
+        aria-label={t`Group name`}
+        placeholder={fallbackName}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onBlur={commitName}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+        }}
+        className="h-7 w-36 text-xs"
+      />
       <div className="flex flex-col gap-0.5">
         <TeamSelect
           participants={participants}

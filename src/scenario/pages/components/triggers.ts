@@ -47,6 +47,7 @@ import { copyName } from "./duplicate";
 import {
   baseLabels,
   buildingTargets,
+  groupLabels,
   groupSize,
   type TargetOption,
   uniqueLabels,
@@ -569,19 +570,20 @@ export function registryOptions(
         })),
       ];
     }
-    case "groupId":
+    case "groupId": {
+      const labels = groupLabels(scenario.groups);
       return scenario.groups.map((group, i) => {
-        const number = i + 1;
         const size = groupSize(group);
         return {
           value: group.id,
-          label: t`Group ${number}`,
+          label: labels[i],
           description: plural(size, {
             one: "# unit",
             other: "# units",
           }),
         };
       });
+    }
     // Only the bases that wait for a trigger, because spawn_base places nothing
     // that is already on the map.
     case "baseId": {

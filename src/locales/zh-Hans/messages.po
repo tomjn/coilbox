@@ -25731,16 +25731,14 @@ msgstr "组"
 msgid "Group"
 msgstr "组"
 
-#: src/scenario/pages/components/orderPaths.ts
-#: src/scenario/pages/components/triggers.ts
-#, fuzzy
-msgid "Group {number}"
-msgstr "组 {number}"
-
 #: src/scenario/pages/components/groups.ts
 #, fuzzy
 msgid "Group {position}"
 msgstr "组 {position}"
+
+#: src/scenario/pages/components/GroupControls.tsx
+msgid "Group name"
+msgstr ""
 
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy

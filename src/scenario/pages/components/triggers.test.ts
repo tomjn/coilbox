@@ -502,6 +502,15 @@ describe("registryOptions", () => {
     );
   });
 
+  it("offers a named group by its name", () => {
+    const scenario = document();
+    scenario.groups[0] = { ...scenario.groups[0], name: "Ridge patrol" };
+
+    expect(registryOptions(scenario, "groupId")?.[0].label).toBe(
+      "Ridge patrol",
+    );
+  });
+
   it("has nothing to offer for a kind that is not a reference", () => {
     expect(registryOptions(document(), "number")).toBeNull();
     expect(registryOptions(document(), "point")).toBeNull();

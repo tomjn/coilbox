@@ -187,6 +187,7 @@ describe("a group's own fields the validator has flagged", () => {
     return (
       <GroupControls
         group={document.groups[0]}
+        fallbackName="Group 1"
         participants={document.setup.participants}
         units={[]}
         unitsLoading={false}
@@ -263,6 +264,7 @@ describe("a group standing off the map", () => {
     return (
       <GroupControls
         group={document.groups[0]}
+        fallbackName="Group 1"
         participants={document.setup.participants}
         units={[]}
         unitsLoading={false}
@@ -306,6 +308,7 @@ describe("a group that holds position until woken", () => {
           dormant: false,
           ...group,
         }}
+        fallbackName="Group 1"
         participants={[]}
         units={[]}
         unitsLoading={false}
@@ -342,6 +345,75 @@ describe("a group that holds position until woken", () => {
 });
 
 /**
+ * Issue #905. The name is what the trigger pickers call the group. It is
+ * written when the box is left, and a blank one is no name at all.
+ */
+describe("a group's name", () => {
+  function open(name?: string) {
+    const edits: unknown[] = [];
+    render(
+      <GroupControls
+        group={{
+          id: "post",
+          name,
+          team: "you",
+          units: [{ def: "armpw", count: 2 }],
+          pos: { x: 100, z: 100 },
+          orders: [],
+          dormant: false,
+        }}
+        fallbackName="Group 3"
+        participants={[]}
+        units={[]}
+        unitsLoading={false}
+        targets={[]}
+        issues={[]}
+        onEdit={(patch) => edits.push(patch)}
+        onDelete={() => {}}
+        drawing={null}
+        onDraw={() => {}}
+      />,
+    );
+    const box = screen.getByLabelText("Group name") as HTMLInputElement;
+    const write = (value: string) => {
+      fireEvent.change(box, { target: { value } });
+      fireEvent.blur(box);
+    };
+    return { edits, box, write };
+  }
+
+  it("shows what an unnamed group is called until it is given a name", () => {
+    const { box } = open();
+
+    expect(box.value).toBe("");
+    expect(box.placeholder).toBe("Group 3");
+  });
+
+  it("writes the name, trimmed, when the box is left", () => {
+    const { edits, box, write } = open();
+    fireEvent.change(box, { target: { value: "Ridge" } });
+    expect(edits).toEqual([]);
+
+    write("  Ridge patrol ");
+    expect(edits).toEqual([{ name: "Ridge patrol" }]);
+  });
+
+  it("takes the name away when the box is emptied", () => {
+    const { edits, write } = open("Reserve");
+    write("   ");
+
+    expect(edits).toEqual([{ name: undefined }]);
+  });
+
+  it("writes nothing when the name has not changed", () => {
+    const { edits, write } = open("Reserve");
+    write("Reserve");
+
+    expect(edits).toEqual([]);
+  });
+});
+
+/**
  * Issue #903. A hunt names a participant rather than a target, out of everybody
  * playing but the group's own side.
  */
@@ -363,6 +435,7 @@ describe("an order to hunt a participant", () => {
           orders,
           dormant: false,
         }}
+        fallbackName="Group 1"
         participants={participants}
         units={[]}
         unitsLoading={false}
@@ -448,6 +521,7 @@ describe("a group unit whose type the game has not got", () => {
     return (
       <GroupControls
         group={document.groups[0]}
+        fallbackName="Group 1"
         participants={document.setup.participants}
         units={[]}
         unitsLoading={false}

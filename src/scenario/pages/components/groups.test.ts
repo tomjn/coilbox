@@ -10,6 +10,7 @@ import {
   drapePoints,
   editGroup,
   groupLabel,
+  groupLabels,
   groupSize,
   huntableTeams,
   MAX_GROUP_COUNT,
@@ -449,5 +450,33 @@ describe("names", () => {
       ]);
       expect(targetLabel(withBase(), "b1")).toBe("The keep's corlab");
     });
+  });
+});
+
+describe("what a group is called", () => {
+  const named = (id: string, name?: string): ScenarioGroup => ({
+    ...raiders,
+    id,
+    name,
+  });
+
+  it("goes by its name, or by its place when it has none", () => {
+    const groups = [named("g1", "Ridge patrol"), named("g2")];
+
+    expect(groupLabels(groups)).toEqual(["Ridge patrol", "Group 2"]);
+    expect(groupLabel(groups, "g1")).toBe("Ridge patrol");
+  });
+
+  it("numbers two groups given the same name", () => {
+    const groups = [named("g1", "Reserve"), named("g2", "Reserve")];
+
+    expect(groupLabels(groups)).toEqual(["Reserve 1", "Reserve 2"]);
+    expect(groupLabel(groups, "g2")).toBe("Reserve 2");
+  });
+
+  it("is what an order's target list offers", () => {
+    const scenario = { ...document(), groups: [named("g1", "Ridge patrol")] };
+
+    expect(targetOptions(scenario).at(-1)?.label).toBe("Ridge patrol");
   });
 });
