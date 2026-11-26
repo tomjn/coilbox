@@ -3,8 +3,8 @@
 -- A scenario's triggers are a flat list of "when these conditions hold, run
 -- these actions". Triggers that enable and disable other triggers are what turn
 -- that list into a state machine, so this module owns enable, disable, repeat,
--- cooldown and "only when it becomes true", and knows nothing about what any
--- other condition or action means. Those are registered into it, by the
+-- cooldown, "only when it becomes true" and conditions that count as holding once
+-- they have held, and knows nothing about what any other condition or action means. Those are registered into it, by the
 -- runtime's own modules and by a game's extensions.
 --
 -- Pure. No engine calls, no globals beyond the Lua standard library. Everything
@@ -154,7 +154,15 @@ function Engine:save(record)
 		if record.onBecomingTrue then
 			held = record.held
 		end
-		self.ctx.save(record.id, record.enabled, record.readyFrame, held)
+		local latched = nil
+		if record.latches then
+			latched = {}
+			for index in pairs(record.latched) do
+				latched[#latched + 1] = index
+			end
+			table.sort(latched)
+		end
+		self.ctx.save(record.id, record.enabled, record.readyFrame, held, latched)
 	end
 end
 
@@ -247,10 +255,17 @@ function M.new(mission, ctx)
 			-- holding it is in, which is what keeps it quiet until they stop.
 			onBecomingTrue = trigger["repeat"] == true and trigger.onBecomingTrue == true,
 			held = false,
+			-- Whether any condition counts as holding once it has held (issue
+			-- #5296), and which of those have, by their place in the list.
+			latches = false,
+			latched = {},
 			-- Before every stamp, so a trigger armed from the start counts whatever
 			-- the player does from the first frame.
 			armedAt = 0,
 		}
+		for _, condition in ipairs((trigger.conditions or {}).conditions or {}) do
+			record.latches = record.latches or condition.latched == true
+		end
 		-- A runtime loaded again into a running game has the host's word for which
 		-- triggers had been switched on or off and how long a repeating one had to
 		-- wait. A trigger the difficulty left out stays out whatever was kept.
@@ -259,6 +274,9 @@ function M.new(mission, ctx)
 			record.enabled = kept.enabled
 			record.readyFrame = tonumber(kept.readyFrame) or record.readyFrame
 			record.held = kept.held == true
+			for _, index in ipairs(kept.latched or {}) do
+				record.latched[index] = true
+			end
 		end
 		self.triggers[#self.triggers + 1] = record
 		self.byId[record.id] = record
@@ -363,25 +381,47 @@ function Engine:test(condition)
 	return not not held
 end
 
+--- Whether a latched condition holds: it has done already, or it does now, which
+-- is then remembered for the rest of the mission.
+function Engine:latch(record, index, condition)
+	if record.latched[index] then
+		return true
+	end
+	if not self:test(condition) then
+		return false
+	end
+	record.latched[index] = true
+	self:save(record)
+	return true
+end
+
 --- Whether a trigger's condition group holds. The group is flat: one op over
 -- one list, because triggers enabling triggers already express what nesting
 -- would, and a flat list is what the editor draws.
 --
 -- An empty list holds under `all` and does not under `any`, the way an empty
 -- conjunction and an empty disjunction always have.
+--
+-- A latched condition is asked even once the answer is settled, so that the
+-- moment it holds is not missed behind another condition.
 function Engine:holds(record)
 	local group = record.def.conditions or {}
-	local list = group.conditions or {}
 	local any = group.op == "any"
+	-- Settled once one condition answers the way that decides the group: true
+	-- under `any`, false under `all`.
+	local settled = false
 
-	for _, condition in ipairs(list) do
-		local held = self:test(condition)
-		if any and held then
-			return true
+	for index, condition in ipairs(group.conditions or {}) do
+		if condition.latched == true then
+			if self:latch(record, index, condition) == any then
+				settled = true
+			end
+		elseif not settled and self:test(condition) == any then
+			settled = true
 		end
-		if not any and not held then
-			return false
-		end
+	end
+	if settled then
+		return any
 	end
 	return not any
 end
@@ -434,11 +474,12 @@ end
 --
 -- A cooldown delays a firing. A trigger waiting for its conditions to become true
 -- is still asked while one runs, so it sees them stop. It fires once the wait is
--- over if they have become true again and still hold.
+-- over if they have become true again and still hold. A trigger with a latched
+-- condition is asked during the wait too, so it sees that condition hold.
 function Engine:consider(record)
 	local ready = self.frameNumber >= record.readyFrame
 	if not record.onBecomingTrue then
-		if ready and self:holds(record) then
+		if (ready or record.latches) and self:holds(record) and ready then
 			self:fire(record)
 		end
 		return

@@ -122,6 +122,7 @@ A trigger fires when its condition group holds. The group is flat, one `op` over
 - `repeat = false` disarms the trigger when it fires. `enable_trigger` re-arms it.
 - `repeat = true` leaves it armed, so it fires on every pass its conditions hold. `cooldown`, in seconds, is how a mission slows that down.
 - `onBecomingTrue = true`, on a repeating trigger, fires it only as its conditions go from not holding to holding. Enabling a disabled trigger while they hold counts, and so does mission start. A cooldown delays the firing and the conditions are still tested while it runs. Straight after a firing they are tested again with no event, so `unit_attacked`, `command_given` and `dialogue_dismissed` are used up and the next one fires it. Such a trigger is on the polled tick as well as on its events, because nothing raises an event when a condition stops holding ([issue #5295](https://github.com/tomjn/coilbox/issues/5295)).
+- A condition may carry `latched = true`, and then, once it has held, it holds for the rest of the mission ([issue #5296](https://github.com/tomjn/coilbox/issues/5296)). It is asked only while its trigger is armed, but then on every pass that reaches the trigger, whatever the other conditions answer and during a cooldown. What is remembered is the answer after `negate`. Which conditions have held is kept per trigger, by their place in the list, and re-arming does not clear it. Nothing changes about when a trigger is evaluated, so a trigger of event-driven conditions is still woken only by its events.
 - Nothing is raised while the start window is open, so a mission's own placed units are not counted as units its team built.
 - A condition may carry `negate = true`, and then it holds when the type underneath it does not. That is how a mission asks whether something has *not* happened, which is what a bonus objective for finishing without building a fusion plant is made of. A flag rather than a table of opposite types, because "has not built one" is the question `unit_built` already asks read the other way round, and a second table would have to grow every time the first one did.
 - A negated condition is polled, whatever the type underneath it watches. Its events are the moments the answer becomes no: "has not built a factory", woken only by a unit being finished, is a question that can only ever answer no. Only a real answer is turned over, so a condition nothing implements and one that raised are false either way round, and a broken trigger does not start firing on the first frame instead of never.
@@ -543,6 +544,7 @@ What it keeps, and where it comes from:
 | Variables | the `coilbox_mission_var_<name>` mirror, which the engine holds as a float |
 | Objectives | the `coilbox_mission_objective_<id>` mirror |
 | Which triggers are armed, when a repeating one may fire next, and whether an `onBecomingTrue` one has fired for conditions that still hold | `coilbox_mission_trigger_<id>`, `coilbox_mission_trigger_ready_<id>` and `coilbox_mission_trigger_held_<id>` |
+| Which `latched` conditions have held | `coilbox_mission_trigger_latched_<id>` |
 | Whether the mission has ended | `coilbox_mission_over` |
 | What a team is paid after a `set_income` | `coilbox_mission_income_<team>_<kind>` |
 | What `unlock_unit` freed | `coilbox_mission_unlocked_<team>_<def id>` |
@@ -571,6 +573,8 @@ scripts/mission-tests.sh
 Every `tests/*_test.lua` file, each in its own `luajit`. Adding a suite is adding a file, and running one on its own is still `luajit lua/mission-runtime/tests/<name>_test.lua`. This is what the lint workflow runs.
 
 `tests/support.lua` holds the shared scaffolding: a stub of the slice of the engine the runtime touches, which records what the runtime asked for and plays back the callins it reacts to.
+
+`latched_test.lua` plays "visit both ridges, in either order" with a reload between the two visits.
 
 `attacked_test.lua` proves what `unit_attacked` counts and for how long, and that a mission without it defines no `UnitDamaged`.
 
