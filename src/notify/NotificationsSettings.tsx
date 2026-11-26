@@ -5,7 +5,9 @@ import {
   requestPermission,
 } from "@tauri-apps/plugin-notification";
 import { useEffect, useState } from "react";
+import { SettingList, SettingRow } from "@/components/SettingRow";
 import { Switch } from "@/components/ui/switch";
+import { getProfile } from "@/profile/profile";
 import { SavedSearchSettings } from "../multiplayer/battles/SavedSearchSettings";
 import { NOTIFY_OS_ENABLED_KEY, NOTIFY_OS_SOUND_KEY } from "./NotifyProvider";
 import { notify } from "./notify";
@@ -20,6 +22,7 @@ export default function NotificationsSettings() {
   );
   const [osSound, setOsSound] = useSetting<boolean>(NOTIFY_OS_SOUND_KEY, true);
   const [granted, setGranted] = useState<boolean | null>(null);
+  const [grantError, setGrantError] = useState<string | null>(null);
 
   useEffect(() => {
     isPermissionGranted()
@@ -28,95 +31,96 @@ export default function NotificationsSettings() {
   }, []);
 
   const grant = async () => {
-    const result = await requestPermission();
-    const ok = result === "granted";
+    setGrantError(null);
+    let ok = false;
+    try {
+      ok = (await requestPermission()) === "granted";
+    } catch {
+      ok = false;
+    }
     setGranted(ok);
     setPermGranted(ok);
+    if (!ok) {
+      setGrantError(
+        t`Not allowed. Turn on notifications for this app in your system settings.`,
+      );
+    }
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <label
-        htmlFor="notifications-os-enabled"
-        className="flex items-center justify-between gap-4"
-      >
-        <span className="flex flex-col">
-          <span className="text-sm font-medium">
-            <Trans>Desktop notifications</Trans>
-          </span>
-          <span className="text-xs text-muted-foreground">
-            <Trans>
-              Show a native notification when the app is in the background.
-            </Trans>
-          </span>
-        </span>
-        <Switch
-          id="notifications-os-enabled"
-          checked={osEnabled}
-          onCheckedChange={setOsEnabled}
-        />
-      </label>
-
-      <label
-        htmlFor="notifications-os-sound"
-        className="flex items-center justify-between gap-4"
-      >
-        <span className="flex flex-col">
-          <span className="text-sm font-medium">
-            <Trans>Notification sound</Trans>
-          </span>
-          <span className="text-xs text-muted-foreground">
-            <Trans>
-              Let the banner make your system's notification sound. Your
-              operating system owns that sound and its volume, so Coilbox's own
-              volume does not apply, though muting all sound does.
-            </Trans>
-          </span>
-        </span>
-        <Switch
-          id="notifications-os-sound"
-          checked={osSound}
-          onCheckedChange={setOsSound}
-          disabled={!osEnabled}
-        />
-      </label>
-
-      <div className="flex items-center gap-3">
-        {granted === null ? (
-          <span className="text-sm text-muted-foreground">
-            <Trans>Checking permission…</Trans>
-          </span>
-        ) : granted ? (
-          <span className="text-sm text-muted-foreground">
-            <Trans>Permission granted.</Trans>
-          </span>
-        ) : (
-          <>
-            <span className="text-sm text-muted-foreground">
-              <Trans>Permission not granted.</Trans>
-            </span>
-            <Button onClick={() => void grant()}>
-              <Trans>Grant permission</Trans>
+    <div className="flex flex-col gap-10 pb-8">
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold">
+          <Trans>Desktop</Trans>
+        </h2>
+        <SettingList>
+          <SettingRow
+            id="notifications-os-enabled"
+            label={t`Show notifications`}
+            description={t`When the app is in the background`}
+          >
+            <Switch
+              id="notifications-os-enabled"
+              aria-describedby="notifications-os-enabled-description"
+              checked={osEnabled}
+              onCheckedChange={setOsEnabled}
+            />
+          </SettingRow>
+          <SettingRow
+            id="notifications-os-sound"
+            label={t`Notification sound`}
+            helpLabel={t`About the notification sound`}
+            help={
+              <p>
+                <Trans>
+                  Your system plays this sound at its own volume, so Coilbox's
+                  volume does not change it. Muting all sound does turn it off.
+                </Trans>
+              </p>
+            }
+          >
+            <Switch
+              id="notifications-os-sound"
+              checked={osSound}
+              onCheckedChange={setOsSound}
+              disabled={!osEnabled}
+            />
+          </SettingRow>
+          <SettingRow
+            label={t`System permission`}
+            description={
+              granted === null
+                ? t`Checking…`
+                : granted
+                  ? t`Allowed`
+                  : t`Not allowed`
+            }
+            error={grantError}
+          >
+            {granted === false && (
+              <Button variant="outline" onClick={() => void grant()}>
+                <Trans>Allow</Trans>
+              </Button>
+            )}
+          </SettingRow>
+          <SettingRow label={t`Test notification`}>
+            <Button
+              variant="outline"
+              onClick={() =>
+                void notify({
+                  title: getProfile().title ?? "Coilbox",
+                  body: t`Test notification`,
+                  level: "success",
+                })
+              }
+            >
+              <Trans>Send</Trans>
             </Button>
-          </>
-        )}
-      </div>
+          </SettingRow>
+        </SettingList>
+      </section>
 
       <SavedSearchSettings />
-
-      <div>
-        <Button
-          onClick={() =>
-            void notify({
-              title: "Coilbox",
-              body: t`Test notification`,
-              level: "success",
-            })
-          }
-        >
-          <Trans>Send test notification</Trans>
-        </Button>
-      </div>
     </div>
   );
 }

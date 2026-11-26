@@ -8354,6 +8354,10 @@ msgstr ""
 msgid "About the music source"
 msgstr ""
 
+#: src/notify/NotificationsSettings.tsx
+msgid "About the notification sound"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 msgid "About the pivot point"
 msgstr ""
@@ -9299,6 +9303,10 @@ msgstr ""
 msgid "Allies on one side each have their own figures. Only players who share control of one army have the same figures."
 msgstr ""
 
+#: src/notify/NotificationsSettings.tsx
+msgid "Allow"
+msgstr ""
+
 #: src/scenario/pages/components/RestrictionPanel.tsx
 msgid "Allow {name} again"
 msgstr ""
@@ -9321,6 +9329,10 @@ msgstr ""
 
 #: src/campaign/pages/components/UnitRestrictions.tsx
 msgid "allowed"
+msgstr ""
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Allowed"
 msgstr ""
 
 #: src/multiplayer/battle/BattleMembersTable.tsx
@@ -12814,10 +12826,6 @@ msgstr ""
 msgid "Checking match result…"
 msgstr ""
 
-#: src/notify/NotificationsSettings.tsx
-msgid "Checking permission…"
-msgstr ""
-
 #: src/campaign/pages/MissionBriefingPage.tsx
 msgid "Checking result…"
 msgstr ""
@@ -12881,6 +12889,7 @@ msgstr ""
 #: src/deeplink/pages/ImportSection.tsx
 #: src/game-updates/pages/GameUpdatesSection.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
+#: src/notify/NotificationsSettings.tsx
 #: src/packs/pages/components/ImportPackForm.tsx
 #: src/scenario/pages/components/ImportScenarioForm.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
@@ -16684,7 +16693,7 @@ msgid "Desert"
 msgstr ""
 
 #: src/notify/NotificationsSettings.tsx
-msgid "Desktop notifications"
+msgid "Desktop"
 msgstr ""
 
 #: src/content/pages/components/ReplayStartUnitLayer.tsx
@@ -20770,10 +20779,6 @@ msgstr ""
 msgid "Going away"
 msgstr ""
 
-#: src/notify/NotificationsSettings.tsx
-msgid "Grant permission"
-msgstr ""
-
 #: src/content/index.ts
 msgid "Graphics"
 msgstr ""
@@ -24003,10 +24008,6 @@ msgstr ""
 
 #: src/scenario/pages/components/ScenarioMapBars.tsx
 msgid "Let go of all of it (Esc)"
-msgstr ""
-
-#: src/notify/NotificationsSettings.tsx
-msgid "Let the banner make your system's notification sound. Your operating system owns that sound and its volume, so Coilbox's own volume does not apply, though muting all sound does."
 msgstr ""
 
 #: src/multiplayer/battles/HostZerokBattlePopover.tsx
@@ -28778,6 +28779,14 @@ msgstr ""
 msgid "not a Spring root"
 msgstr ""
 
+#: src/notify/NotificationsSettings.tsx
+msgid "Not allowed"
+msgstr ""
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Not allowed. Turn on notifications for this app in your system settings."
+msgstr ""
+
 #: src/lego/scriptMarks.ts
 msgid "not an effect the engine knows"
 msgstr ""
@@ -31305,14 +31314,6 @@ msgstr ""
 
 #: src/runlite/pages/components/RunEndScreen.tsx
 msgid "Perks earned"
-msgstr ""
-
-#: src/notify/NotificationsSettings.tsx
-msgid "Permission granted."
-msgstr ""
-
-#: src/notify/NotificationsSettings.tsx
-msgid "Permission not granted."
 msgstr ""
 
 #: src/lego/pages/components/FourViews.tsx
@@ -36461,6 +36462,7 @@ msgstr ""
 #: src/multiplayer/battle/BonusButton.tsx
 #: src/multiplayer/chat/ChatPane.tsx
 #: src/multiplayer/ConsoleDrawer.tsx
+#: src/notify/NotificationsSettings.tsx
 msgid "Send"
 msgstr ""
 
@@ -36495,10 +36497,6 @@ msgstr ""
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 msgid "Send reset email"
-msgstr ""
-
-#: src/notify/NotificationsSettings.tsx
-msgid "Send test notification"
 msgstr ""
 
 #: src/workshop/pages/components/UnitFieldRow.tsx
@@ -37356,10 +37354,6 @@ msgstr ""
 msgid "Show {pieceName}"
 msgstr ""
 
-#: src/notify/NotificationsSettings.tsx
-msgid "Show a native notification when the app is in the background."
-msgstr ""
-
 #: src/content/pages/components/MatchStatsChart.tsx
 msgid "Show all"
 msgstr ""
@@ -37448,6 +37442,10 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "Show nano spray"
+msgstr ""
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Show notifications"
 msgstr ""
 
 #: src/content/pages/GameDetailPage.tsx
@@ -39346,6 +39344,10 @@ msgstr ""
 #: src/play/pages/components/CrashDrawer.tsx
 #: src/play/pages/EngineLogSection.tsx
 msgid "System"
+msgstr ""
+
+#: src/notify/NotificationsSettings.tsx
+msgid "System permission"
 msgstr ""
 
 #: src/content/pages/components/MatchStatsChart.tsx
@@ -46932,6 +46934,10 @@ msgstr ""
 msgid "When collapsed, hide the sidebar and slide it out on hovering the left edge."
 msgstr ""
 
+#: src/notify/NotificationsSettings.tsx
+msgid "When the app is in the background"
+msgstr ""
+
 #: src/lego/animPresets.ts
 msgid "When the unit dies it comes apart along its joins. A light hit throws off a few of the biggest groups of parts, a heavy hit throws off every part one by one, smallest first, and the wreck follows what the hit left. A unit with no joins breaks along its piece tree."
 msgstr ""
@@ -48325,6 +48331,10 @@ msgstr ""
 
 #: src/runlite/pages/components/EncounterOverlay.tsx
 msgid "Your start unit and unlocked units are all in {gameName}."
+msgstr ""
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Your system plays this sound at its own volume, so Coilbox's volume does not change it. Muting all sound does turn it off."
 msgstr ""
 
 #: src/lego/pages/components/UnitCounts.tsx

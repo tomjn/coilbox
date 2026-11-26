@@ -10293,6 +10293,10 @@ msgstr ""
 msgid "About the music source"
 msgstr ""
 
+#: src/notify/NotificationsSettings.tsx
+msgid "About the notification sound"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "About the pivot point"
@@ -11452,6 +11456,10 @@ msgstr "味方"
 msgid "Allies on one side each have their own figures. Only players who share control of one army have the same figures."
 msgstr "同じ陣営の味方にもそれぞれ独自のデータがあります。同じデータになるのは、1 つの軍を共同で操作するプレイヤーだけです。"
 
+#: src/notify/NotificationsSettings.tsx
+msgid "Allow"
+msgstr ""
+
 #: src/scenario/pages/components/RestrictionPanel.tsx
 #, fuzzy
 msgid "Allow {name} again"
@@ -11481,6 +11489,10 @@ msgstr "ファイアウォールで許可する"
 #, fuzzy
 msgid "allowed"
 msgstr "許可"
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Allowed"
+msgstr ""
 
 #: src/multiplayer/battle/BattleMembersTable.tsx
 #: src/play/pages/components/ParticipantsTable.tsx
@@ -15769,11 +15781,6 @@ msgstr "インストール済みのコンテンツを確認しています…"
 msgid "Checking match result…"
 msgstr "試合の結果を確認しています…"
 
-#: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Checking permission…"
-msgstr "許可を確認しています…"
-
 #: src/campaign/pages/MissionBriefingPage.tsx
 #, fuzzy
 msgid "Checking result…"
@@ -15850,6 +15857,7 @@ msgstr "確認中…"
 #: src/deeplink/pages/ImportSection.tsx
 #: src/game-updates/pages/GameUpdatesSection.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
+#: src/notify/NotificationsSettings.tsx
 #: src/packs/pages/components/ImportPackForm.tsx
 #: src/scenario/pages/components/ImportScenarioForm.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
@@ -20516,9 +20524,8 @@ msgid "Desert"
 msgstr "砂漠"
 
 #: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Desktop notifications"
-msgstr "デスクトップ通知"
+msgid "Desktop"
+msgstr ""
 
 #: src/content/pages/components/ReplayStartUnitLayer.tsx
 #, fuzzy
@@ -25519,11 +25526,6 @@ msgstr "ミューテーターの経路を使います。直接書き込みでは
 msgid "Going away"
 msgstr "遠ざかる"
 
-#: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Grant permission"
-msgstr "許可する"
-
 #: src/content/index.ts
 #, fuzzy
 msgid "Graphics"
@@ -29508,11 +29510,6 @@ msgstr "長さは 0 より大きくしてください。"
 #, fuzzy
 msgid "Let go of all of it (Esc)"
 msgstr "すべて解除（Esc）"
-
-#: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Let the banner make your system's notification sound. Your operating system owns that sound and its volume, so Coilbox's own volume does not apply, though muting all sound does."
-msgstr "バナー表示時にシステムの通知音を鳴らします。その音と音量は OS が管理するため、Coilbox の音量は適用されませんが、すべてのサウンドをミュートした場合は鳴りません。"
 
 #: src/multiplayer/battles/HostZerokBattlePopover.tsx
 #, fuzzy
@@ -35382,6 +35379,14 @@ msgstr "数値ではありません"
 msgid "not a Spring root"
 msgstr "Spring のルートではありません"
 
+#: src/notify/NotificationsSettings.tsx
+msgid "Not allowed"
+msgstr ""
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Not allowed. Turn on notifications for this app in your system settings."
+msgstr ""
+
 #: src/lego/scriptMarks.ts
 #, fuzzy
 msgid "not an effect the engine knows"
@@ -38500,16 +38505,6 @@ msgstr "パーク：{0}"
 #, fuzzy
 msgid "Perks earned"
 msgstr "獲得したパーク"
-
-#: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Permission granted."
-msgstr "許可されました。"
-
-#: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Permission not granted."
-msgstr "許可されませんでした。"
 
 #: src/lego/pages/components/FourViews.tsx
 #, fuzzy
@@ -44811,6 +44806,7 @@ msgstr "自爆する"
 #: src/multiplayer/battle/BonusButton.tsx
 #: src/multiplayer/chat/ChatPane.tsx
 #: src/multiplayer/ConsoleDrawer.tsx
+#: src/notify/NotificationsSettings.tsx
 #, fuzzy
 msgid "Send"
 msgstr "送信"
@@ -44855,11 +44851,6 @@ msgstr "マップの画像を送信"
 #, fuzzy
 msgid "Send reset email"
 msgstr "リセットメールを送信"
-
-#: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Send test notification"
-msgstr "テスト通知を送信"
 
 #: src/workshop/pages/components/UnitFieldRow.tsx
 #, fuzzy
@@ -45913,11 +45904,6 @@ msgstr "{orderCount} 件中さらに {moreCount} 件を表示"
 msgid "Show {pieceName}"
 msgstr "{pieceName} を表示"
 
-#: src/notify/NotificationsSettings.tsx
-#, fuzzy
-msgid "Show a native notification when the app is in the background."
-msgstr "アプリがバックグラウンドのときに、OS の通知を表示します。"
-
 #: src/content/pages/components/MatchStatsChart.tsx
 #, fuzzy
 msgid "Show all"
@@ -46028,6 +46014,10 @@ msgstr "発言禁止を表示"
 #, fuzzy
 msgid "Show nano spray"
 msgstr "ナノスプレーを表示"
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Show notifications"
+msgstr ""
 
 #: src/content/pages/GameDetailPage.tsx
 #: src/content/pages/MapDetailPage.tsx
@@ -48365,6 +48355,10 @@ msgstr ""
 #, fuzzy
 msgid "System"
 msgstr "システム"
+
+#: src/notify/NotificationsSettings.tsx
+msgid "System permission"
+msgstr ""
 
 #: src/content/pages/components/MatchStatsChart.tsx
 #: src/workshop/pages/components/CompiledLuaPanel.tsx
@@ -57751,6 +57745,10 @@ msgstr ""
 msgid "When collapsed, hide the sidebar and slide it out on hovering the left edge."
 msgstr "折りたたみ時にサイドバーを隠し、左端にポインターを合わせるとスライド表示します。"
 
+#: src/notify/NotificationsSettings.tsx
+msgid "When the app is in the background"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "When the unit dies it comes apart along its joins. A light hit throws off a few of the biggest groups of parts, a heavy hit throws off every part one by one, smallest first, and the wreck follows what the hit left. A unit with no joins breaks along its piece tree."
@@ -59476,6 +59474,10 @@ msgstr "船が力尽きました。ウォーパスは終わりです。"
 #, fuzzy
 msgid "Your start unit and unlocked units are all in {gameName}."
 msgstr "開始ユニットと解放したユニットはすべて {gameName} にあります。"
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Your system plays this sound at its own volume, so Coilbox's volume does not change it. Muting all sound does turn it off."
+msgstr ""
 
 #: src/lego/pages/components/UnitCounts.tsx
 #, fuzzy

@@ -8355,6 +8355,10 @@ msgstr "About the master volume"
 msgid "About the music source"
 msgstr "About the music source"
 
+#: src/notify/NotificationsSettings.tsx
+msgid "About the notification sound"
+msgstr "About the notification sound"
+
 #: src/lego/pages/BuilderPage.tsx
 msgid "About the pivot point"
 msgstr "About the pivot point"
@@ -9300,6 +9304,10 @@ msgstr "Allies"
 msgid "Allies on one side each have their own figures. Only players who share control of one army have the same figures."
 msgstr "Allies on one side each have their own figures. Only players who share control of one army have the same figures."
 
+#: src/notify/NotificationsSettings.tsx
+msgid "Allow"
+msgstr "Allow"
+
 #: src/scenario/pages/components/RestrictionPanel.tsx
 msgid "Allow {name} again"
 msgstr "Allow {name} again"
@@ -9323,6 +9331,10 @@ msgstr "Allow them through the firewall"
 #: src/campaign/pages/components/UnitRestrictions.tsx
 msgid "allowed"
 msgstr "allowed"
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Allowed"
+msgstr "Allowed"
 
 #: src/multiplayer/battle/BattleMembersTable.tsx
 #: src/play/pages/components/ParticipantsTable.tsx
@@ -12815,10 +12827,6 @@ msgstr "Checking installed content…"
 msgid "Checking match result…"
 msgstr "Checking match result…"
 
-#: src/notify/NotificationsSettings.tsx
-msgid "Checking permission…"
-msgstr "Checking permission…"
-
 #: src/campaign/pages/MissionBriefingPage.tsx
 msgid "Checking result…"
 msgstr "Checking result…"
@@ -12882,6 +12890,7 @@ msgstr "checking…"
 #: src/deeplink/pages/ImportSection.tsx
 #: src/game-updates/pages/GameUpdatesSection.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
+#: src/notify/NotificationsSettings.tsx
 #: src/packs/pages/components/ImportPackForm.tsx
 #: src/scenario/pages/components/ImportScenarioForm.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
@@ -16685,8 +16694,8 @@ msgid "Desert"
 msgstr "Desert"
 
 #: src/notify/NotificationsSettings.tsx
-msgid "Desktop notifications"
-msgstr "Desktop notifications"
+msgid "Desktop"
+msgstr "Desktop"
 
 #: src/content/pages/components/ReplayStartUnitLayer.tsx
 msgid "destroyed"
@@ -20771,10 +20780,6 @@ msgstr "Goes through the mutator route. Writing in place skips this whole copy."
 msgid "Going away"
 msgstr "Going away"
 
-#: src/notify/NotificationsSettings.tsx
-msgid "Grant permission"
-msgstr "Grant permission"
-
 #: src/content/index.ts
 msgid "Graphics"
 msgstr "Graphics"
@@ -24005,10 +24010,6 @@ msgstr "Length must be above 0."
 #: src/scenario/pages/components/ScenarioMapBars.tsx
 msgid "Let go of all of it (Esc)"
 msgstr "Let go of all of it (Esc)"
-
-#: src/notify/NotificationsSettings.tsx
-msgid "Let the banner make your system's notification sound. Your operating system owns that sound and its volume, so Coilbox's own volume does not apply, though muting all sound does."
-msgstr "Let the banner make your system's notification sound. Your operating system owns that sound and its volume, so Coilbox's own volume does not apply, though muting all sound does."
 
 #: src/multiplayer/battles/HostZerokBattlePopover.tsx
 msgid "Let the server pick"
@@ -28779,6 +28780,14 @@ msgstr "Not a number"
 msgid "not a Spring root"
 msgstr "not a Spring root"
 
+#: src/notify/NotificationsSettings.tsx
+msgid "Not allowed"
+msgstr "Not allowed"
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Not allowed. Turn on notifications for this app in your system settings."
+msgstr "Not allowed. Turn on notifications for this app in your system settings."
+
 #: src/lego/scriptMarks.ts
 msgid "not an effect the engine knows"
 msgstr "not an effect the engine knows"
@@ -31307,14 +31316,6 @@ msgstr "Perk: {0}"
 #: src/runlite/pages/components/RunEndScreen.tsx
 msgid "Perks earned"
 msgstr "Perks earned"
-
-#: src/notify/NotificationsSettings.tsx
-msgid "Permission granted."
-msgstr "Permission granted."
-
-#: src/notify/NotificationsSettings.tsx
-msgid "Permission not granted."
-msgstr "Permission not granted."
 
 #: src/lego/pages/components/FourViews.tsx
 msgctxt "view"
@@ -36462,6 +36463,7 @@ msgstr "Self-destructs"
 #: src/multiplayer/battle/BonusButton.tsx
 #: src/multiplayer/chat/ChatPane.tsx
 #: src/multiplayer/ConsoleDrawer.tsx
+#: src/notify/NotificationsSettings.tsx
 msgid "Send"
 msgstr "Send"
 
@@ -36497,10 +36499,6 @@ msgstr "Send pictures of your maps"
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 msgid "Send reset email"
 msgstr "Send reset email"
-
-#: src/notify/NotificationsSettings.tsx
-msgid "Send test notification"
-msgstr "Send test notification"
 
 #: src/workshop/pages/components/UnitFieldRow.tsx
 msgid "Send this change to the mutator"
@@ -37357,10 +37355,6 @@ msgstr "Show {moreCount} more of {orderCount}"
 msgid "Show {pieceName}"
 msgstr "Show {pieceName}"
 
-#: src/notify/NotificationsSettings.tsx
-msgid "Show a native notification when the app is in the background."
-msgstr "Show a native notification when the app is in the background."
-
 #: src/content/pages/components/MatchStatsChart.tsx
 msgid "Show all"
 msgstr "Show all"
@@ -37450,6 +37444,10 @@ msgstr "Show mutes"
 #: src/content/unitFieldNotes.ts
 msgid "Show nano spray"
 msgstr "Show nano spray"
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Show notifications"
+msgstr "Show notifications"
 
 #: src/content/pages/GameDetailPage.tsx
 #: src/content/pages/MapDetailPage.tsx
@@ -39348,6 +39346,10 @@ msgstr "Syncs frames to your monitor. Adaptive drops the sync when the frame rat
 #: src/play/pages/EngineLogSection.tsx
 msgid "System"
 msgstr "System"
+
+#: src/notify/NotificationsSettings.tsx
+msgid "System permission"
+msgstr "System permission"
 
 #: src/content/pages/components/MatchStatsChart.tsx
 #: src/workshop/pages/components/CompiledLuaPanel.tsx
@@ -46933,6 +46935,10 @@ msgstr "When coilbox starts, it looks for content folders if it has none yet, th
 msgid "When collapsed, hide the sidebar and slide it out on hovering the left edge."
 msgstr "When collapsed, hide the sidebar and slide it out on hovering the left edge."
 
+#: src/notify/NotificationsSettings.tsx
+msgid "When the app is in the background"
+msgstr "When the app is in the background"
+
 #: src/lego/animPresets.ts
 msgid "When the unit dies it comes apart along its joins. A light hit throws off a few of the biggest groups of parts, a heavy hit throws off every part one by one, smallest first, and the wreck follows what the hit left. A unit with no joins breaks along its piece tree."
 msgstr "When the unit dies it comes apart along its joins. A light hit throws off a few of the biggest groups of parts, a heavy hit throws off every part one by one, smallest first, and the wreck follows what the hit left. A unit with no joins breaks along its piece tree."
@@ -48327,6 +48333,10 @@ msgstr "Your ship gave out. The warpath is over."
 #: src/runlite/pages/components/EncounterOverlay.tsx
 msgid "Your start unit and unlocked units are all in {gameName}."
 msgstr "Your start unit and unlocked units are all in {gameName}."
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Your system plays this sound at its own volume, so Coilbox's volume does not change it. Muting all sound does turn it off."
+msgstr "Your system plays this sound at its own volume, so Coilbox's volume does not change it. Muting all sound does turn it off."
 
 #: src/lego/pages/components/UnitCounts.tsx
 msgid "Your unit"
