@@ -10152,6 +10152,10 @@ msgstr ""
 msgid "About hosting your own server"
 msgstr ""
 
+#: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "About ignoring"
+msgstr ""
+
 #: src/deeplink/pages/ImportSection.tsx
 msgid "About importing"
 msgstr ""
@@ -10483,6 +10487,7 @@ msgstr "Рівень доступу"
 #: src/hub/pages/components/AccountControl.tsx
 #: src/multiplayer/AccountPicker.tsx
 #: src/multiplayer/admin/PlayerLookupSection.tsx
+#: src/multiplayer/pages/IgnoreSettings.tsx
 #, fuzzy
 msgid "Account"
 msgstr "Обліковий запис"
@@ -17981,6 +17986,10 @@ msgstr "Під’єднатися як {username} і приєднатися"
 msgid "Connect on startup"
 msgstr "Під’єднуватися під час запуску"
 
+#: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "Connect to a lobby server to see this account's list."
+msgstr ""
+
 #: src/multiplayer/LobbyStatusButton.tsx
 #, fuzzy
 msgid "Connect to multiplayer"
@@ -21699,6 +21708,10 @@ msgstr "напр. cost < 200"
 #, fuzzy
 msgid "e.g. Popular water maps"
 msgstr "напр. Популярні водні мапи"
+
+#: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "Each account has its own list. You can also ignore someone from their name in chat."
+msgstr ""
 
 #: src/content/pages/components/ReplayBaseCrops.tsx
 #, fuzzy
@@ -26077,11 +26090,6 @@ msgstr "Приховані налаштування"
 msgid "Hidden until it is settled"
 msgstr "Приховано, доки не вирішиться"
 
-#: src/multiplayer/pages/IgnoreSettings.tsx
-#, fuzzy
-msgid "Hidden users' channel and private messages are hidden in the client."
-msgstr "Канальні й особисті повідомлення прихованих користувачів не показуються в клієнті."
-
 #: src/lego/pages/components/GuidesPopover.tsx
 #: src/multiplayer/battles/BattleFilterPopover.tsx
 #, fuzzy
@@ -27070,6 +27078,10 @@ msgstr "Ігнорувати"
 msgid "Ignore {dmPeer}"
 msgstr "Ігнорувати {dmPeer}"
 
+#: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "Ignore list"
+msgstr ""
+
 #: src/deeplink/DeepLinkHandler.tsx
 #, fuzzy
 msgid "Ignored a coilbox link"
@@ -27084,11 +27096,6 @@ msgstr "Проігноровано файл"
 #, fuzzy
 msgid "Ignored users"
 msgstr "Ігноровані гравці"
-
-#: src/multiplayer/pages/IgnoreSettings.tsx
-#, fuzzy
-msgid "Ignores are per-account. Connect to a lobby server to manage the ignore list for that account."
-msgstr "Список ігнорування окремий для кожного облікового запису. Підключіться до сервера лобі, щоб керувати списком ігнорування для цього облікового запису."
 
 #: src/campaign/pages/components/CampaignImage.tsx
 #: src/campaign/slots.ts
@@ -33962,9 +33969,8 @@ msgid "No icon or background yet"
 msgstr "Ще немає іконки чи тла"
 
 #: src/multiplayer/pages/IgnoreSettings.tsx
-#, fuzzy
-msgid "No ignored users. Add one above, or use the ignore action next to a user in chat."
-msgstr "Немає ігнорованих користувачів. Додайте когось вище або скористайтеся дією ігнорування поруч із користувачем у чаті."
+msgid "No ignored users."
+msgstr ""
 
 #: src/campaign/pages/components/ArchiveMediaImportButton.tsx
 #, fuzzy
@@ -47969,6 +47975,10 @@ msgid "Stop and return to the built pose"
 msgstr "Зупинити й повернутися до збудованої пози"
 
 #: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "Stop ignoring"
+msgstr ""
+
+#: src/multiplayer/pages/IgnoreSettings.tsx
 #, fuzzy
 msgid "Stop ignoring {name}"
 msgstr "Не ігнорувати {name}"
@@ -59215,6 +59225,10 @@ msgstr "Ви починаєте в центрі, а ваші суперники 
 #, fuzzy
 msgid "You start on the western edge, with your rivals far across the map."
 msgstr "Ви починаєте на західному краю, а ваші суперники – далеко через мапу."
+
+#: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "You stop seeing an ignored user's channel and private messages. Where the lobby server supports it, the server is told too."
+msgstr ""
 
 #: src/hub/uploadOutcomes.ts
 #, fuzzy

@@ -124,3 +124,20 @@ it("ignores a name against the picked connection, not only the focused one", () 
     username: "troll",
   });
 });
+
+it("clears a typed name when another account is picked", () => {
+  connections = {
+    [KEY_A]: { serverKey: KEY_A, live: true },
+    [KEY_B]: { serverKey: KEY_B, live: true },
+  };
+  activeKey = KEY_A;
+  render(<IgnoreSettings />);
+
+  fireEvent.change(screen.getByLabelText("Username to ignore"), {
+    target: { value: "troll" },
+  });
+  fireEvent.click(screen.getByText(`pick ${KEY_B}`));
+
+  const input = screen.getByLabelText("Username to ignore") as HTMLInputElement;
+  expect(input.value).toBe("");
+});

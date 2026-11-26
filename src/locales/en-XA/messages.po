@@ -8229,6 +8229,10 @@ msgstr ""
 msgid "About hosting your own server"
 msgstr ""
 
+#: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "About ignoring"
+msgstr ""
+
 #: src/deeplink/pages/ImportSection.tsx
 msgid "About importing"
 msgstr ""
@@ -8527,6 +8531,7 @@ msgstr ""
 #: src/hub/pages/components/AccountControl.tsx
 #: src/multiplayer/AccountPicker.tsx
 #: src/multiplayer/admin/PlayerLookupSection.tsx
+#: src/multiplayer/pages/IgnoreSettings.tsx
 msgid "Account"
 msgstr ""
 
@@ -14647,6 +14652,10 @@ msgstr ""
 msgid "Connect on startup"
 msgstr ""
 
+#: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "Connect to a lobby server to see this account's list."
+msgstr ""
+
 #: src/multiplayer/LobbyStatusButton.tsx
 msgid "Connect to multiplayer"
 msgstr ""
@@ -17689,6 +17698,10 @@ msgstr ""
 
 #: src/packs/pages/components/ExportPackForm.tsx
 msgid "e.g. Popular water maps"
+msgstr ""
+
+#: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "Each account has its own list. You can also ignore someone from their name in chat."
 msgstr ""
 
 #: src/content/pages/components/ReplayBaseCrops.tsx
@@ -21257,10 +21270,6 @@ msgstr ""
 msgid "Hidden until it is settled"
 msgstr ""
 
-#: src/multiplayer/pages/IgnoreSettings.tsx
-msgid "Hidden users' channel and private messages are hidden in the client."
-msgstr ""
-
 #: src/lego/pages/components/GuidesPopover.tsx
 #: src/multiplayer/battles/BattleFilterPopover.tsx
 msgid "Hide"
@@ -22060,6 +22069,10 @@ msgstr ""
 msgid "Ignore {dmPeer}"
 msgstr ""
 
+#: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "Ignore list"
+msgstr ""
+
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Ignored a coilbox link"
 msgstr ""
@@ -22070,10 +22083,6 @@ msgstr ""
 
 #: src/multiplayer/index.tsx
 msgid "Ignored users"
-msgstr ""
-
-#: src/multiplayer/pages/IgnoreSettings.tsx
-msgid "Ignores are per-account. Connect to a lobby server to manage the ignore list for that account."
 msgstr ""
 
 #: src/campaign/pages/components/CampaignImage.tsx
@@ -27680,7 +27689,7 @@ msgid "No icon or background yet"
 msgstr ""
 
 #: src/multiplayer/pages/IgnoreSettings.tsx
-msgid "No ignored users. Add one above, or use the ignore action next to a user in chat."
+msgid "No ignored users."
 msgstr ""
 
 #: src/campaign/pages/components/ArchiveMediaImportButton.tsx
@@ -39088,6 +39097,10 @@ msgid "Stop and return to the built pose"
 msgstr ""
 
 #: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "Stop ignoring"
+msgstr ""
+
+#: src/multiplayer/pages/IgnoreSettings.tsx
 msgid "Stop ignoring {name}"
 msgstr ""
 
@@ -48192,6 +48205,10 @@ msgstr ""
 
 #: src/conquest/pages/components/StartPositionSelect.tsx
 msgid "You start on the western edge, with your rivals far across the map."
+msgstr ""
+
+#: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "You stop seeing an ignored user's channel and private messages. Where the lobby server supports it, the server is told too."
 msgstr ""
 
 #: src/hub/uploadOutcomes.ts

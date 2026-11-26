@@ -10152,6 +10152,10 @@ msgstr ""
 msgid "About hosting your own server"
 msgstr ""
 
+#: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "About ignoring"
+msgstr ""
+
 #: src/deeplink/pages/ImportSection.tsx
 msgid "About importing"
 msgstr ""
@@ -10483,6 +10487,7 @@ msgstr "访问级别"
 #: src/hub/pages/components/AccountControl.tsx
 #: src/multiplayer/AccountPicker.tsx
 #: src/multiplayer/admin/PlayerLookupSection.tsx
+#: src/multiplayer/pages/IgnoreSettings.tsx
 #, fuzzy
 msgid "Account"
 msgstr "账号"
@@ -17981,6 +17986,10 @@ msgstr "以 {username} 身份连接并加入"
 msgid "Connect on startup"
 msgstr "启动时连接"
 
+#: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "Connect to a lobby server to see this account's list."
+msgstr ""
+
 #: src/multiplayer/LobbyStatusButton.tsx
 #, fuzzy
 msgid "Connect to multiplayer"
@@ -21699,6 +21708,10 @@ msgstr "例如 cost < 200"
 #, fuzzy
 msgid "e.g. Popular water maps"
 msgstr "例如：热门水域地图"
+
+#: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "Each account has its own list. You can also ignore someone from their name in chat."
+msgstr ""
 
 #: src/content/pages/components/ReplayBaseCrops.tsx
 #, fuzzy
@@ -26077,11 +26090,6 @@ msgstr "隐藏的设置"
 msgid "Hidden until it is settled"
 msgstr "结果确定前隐藏"
 
-#: src/multiplayer/pages/IgnoreSettings.tsx
-#, fuzzy
-msgid "Hidden users' channel and private messages are hidden in the client."
-msgstr "被隐藏用户的频道消息和私信会在客户端中隐藏。"
-
 #: src/lego/pages/components/GuidesPopover.tsx
 #: src/multiplayer/battles/BattleFilterPopover.tsx
 #, fuzzy
@@ -27070,6 +27078,10 @@ msgstr "忽略"
 msgid "Ignore {dmPeer}"
 msgstr "忽略 {dmPeer}"
 
+#: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "Ignore list"
+msgstr ""
+
 #: src/deeplink/DeepLinkHandler.tsx
 #, fuzzy
 msgid "Ignored a coilbox link"
@@ -27084,11 +27096,6 @@ msgstr "已忽略一个文件"
 #, fuzzy
 msgid "Ignored users"
 msgstr "已忽略的用户"
-
-#: src/multiplayer/pages/IgnoreSettings.tsx
-#, fuzzy
-msgid "Ignores are per-account. Connect to a lobby server to manage the ignore list for that account."
-msgstr "忽略列表按账号区分。连接到大厅服务器即可管理该账号的忽略列表。"
 
 #: src/campaign/pages/components/CampaignImage.tsx
 #: src/campaign/slots.ts
@@ -33962,9 +33969,8 @@ msgid "No icon or background yet"
 msgstr "还没有图标或背景"
 
 #: src/multiplayer/pages/IgnoreSettings.tsx
-#, fuzzy
-msgid "No ignored users. Add one above, or use the ignore action next to a user in chat."
-msgstr "没有被忽略的用户。在上方添加，或使用聊天中用户旁边的忽略操作。"
+msgid "No ignored users."
+msgstr ""
 
 #: src/campaign/pages/components/ArchiveMediaImportButton.tsx
 #, fuzzy
@@ -47969,6 +47975,10 @@ msgid "Stop and return to the built pose"
 msgstr "停止并回到建造姿势"
 
 #: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "Stop ignoring"
+msgstr ""
+
+#: src/multiplayer/pages/IgnoreSettings.tsx
 #, fuzzy
 msgid "Stop ignoring {name}"
 msgstr "取消忽略 {name}"
@@ -59215,6 +59225,10 @@ msgstr "你从中央开始，对手们在你周围的边缘开始。"
 #, fuzzy
 msgid "You start on the western edge, with your rivals far across the map."
 msgstr "你从西侧边缘开始，对手们远在地图另一端。"
+
+#: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "You stop seeing an ignored user's channel and private messages. Where the lobby server supports it, the server is told too."
+msgstr ""
 
 #: src/hub/uploadOutcomes.ts
 #, fuzzy

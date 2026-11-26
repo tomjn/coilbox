@@ -10153,6 +10153,10 @@ msgstr ""
 msgid "About hosting your own server"
 msgstr ""
 
+#: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "About ignoring"
+msgstr ""
+
 #: src/deeplink/pages/ImportSection.tsx
 msgid "About importing"
 msgstr ""
@@ -10484,6 +10488,7 @@ msgstr "Livello di accesso"
 #: src/hub/pages/components/AccountControl.tsx
 #: src/multiplayer/AccountPicker.tsx
 #: src/multiplayer/admin/PlayerLookupSection.tsx
+#: src/multiplayer/pages/IgnoreSettings.tsx
 #, fuzzy
 msgid "Account"
 msgstr "Account"
@@ -17985,6 +17990,10 @@ msgstr "Connettiti come {username} ed entra"
 msgid "Connect on startup"
 msgstr "Connetti all’avvio"
 
+#: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "Connect to a lobby server to see this account's list."
+msgstr ""
+
 #: src/multiplayer/LobbyStatusButton.tsx
 #, fuzzy
 msgid "Connect to multiplayer"
@@ -21704,6 +21713,10 @@ msgstr "per es. cost < 200"
 #, fuzzy
 msgid "e.g. Popular water maps"
 msgstr "per es. Mappe acquatiche popolari"
+
+#: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "Each account has its own list. You can also ignore someone from their name in chat."
+msgstr ""
 
 #: src/content/pages/components/ReplayBaseCrops.tsx
 #, fuzzy
@@ -26085,11 +26098,6 @@ msgstr "Impostazioni nascoste"
 msgid "Hidden until it is settled"
 msgstr "Nascosto finché non si risolve"
 
-#: src/multiplayer/pages/IgnoreSettings.tsx
-#, fuzzy
-msgid "Hidden users' channel and private messages are hidden in the client."
-msgstr "I messaggi nei canali e i messaggi privati degli utenti nascosti vengono nascosti nel client."
-
 #: src/lego/pages/components/GuidesPopover.tsx
 #: src/multiplayer/battles/BattleFilterPopover.tsx
 #, fuzzy
@@ -27078,6 +27086,10 @@ msgstr "Ignora"
 msgid "Ignore {dmPeer}"
 msgstr "Ignora {dmPeer}"
 
+#: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "Ignore list"
+msgstr ""
+
 #: src/deeplink/DeepLinkHandler.tsx
 #, fuzzy
 msgid "Ignored a coilbox link"
@@ -27092,11 +27104,6 @@ msgstr "File ignorato"
 #, fuzzy
 msgid "Ignored users"
 msgstr "Utenti ignorati"
-
-#: src/multiplayer/pages/IgnoreSettings.tsx
-#, fuzzy
-msgid "Ignores are per-account. Connect to a lobby server to manage the ignore list for that account."
-msgstr "Gli utenti ignorati valgono per account. Connettiti a un server lobby per gestire l’elenco degli ignorati di quell’account."
 
 #: src/campaign/pages/components/CampaignImage.tsx
 #: src/campaign/slots.ts
@@ -33974,9 +33981,8 @@ msgid "No icon or background yet"
 msgstr "Ancora nessuna icona o sfondo"
 
 #: src/multiplayer/pages/IgnoreSettings.tsx
-#, fuzzy
-msgid "No ignored users. Add one above, or use the ignore action next to a user in chat."
-msgstr "Nessun utente ignorato. Aggiungine uno sopra, o usa l’azione Ignora accanto a un utente in chat."
+msgid "No ignored users."
+msgstr ""
 
 #: src/campaign/pages/components/ArchiveMediaImportButton.tsx
 #, fuzzy
@@ -47999,6 +48005,10 @@ msgid "Stop and return to the built pose"
 msgstr "Ferma e torna alla posa costruita"
 
 #: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "Stop ignoring"
+msgstr ""
+
+#: src/multiplayer/pages/IgnoreSettings.tsx
 #, fuzzy
 msgid "Stop ignoring {name}"
 msgstr "Non ignorare più {name}"
@@ -59246,6 +59256,10 @@ msgstr "Parti al centro, e i tuoi rivali partono sul bordo tutto intorno a te."
 #, fuzzy
 msgid "You start on the western edge, with your rivals far across the map."
 msgstr "Parti sul bordo ovest, con i tuoi rivali dall’altra parte della mappa."
+
+#: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "You stop seeing an ignored user's channel and private messages. Where the lobby server supports it, the server is told too."
+msgstr ""
 
 #: src/hub/uploadOutcomes.ts
 #, fuzzy
