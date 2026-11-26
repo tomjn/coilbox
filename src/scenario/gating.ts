@@ -216,6 +216,14 @@ const BECOMING_TRUE_VERSION = 16;
  */
 const LATCHED_CONDITION_VERSION = 20;
 
+/**
+ * The runtime that first carried a var from one campaign mission to the next
+ * (issue #5294). A runtime behind this starts every var from the scenario's
+ * value and saves nothing back, so a choice made in one mission is forgotten by
+ * the next.
+ */
+const PERSISTENT_VAR_VERSION = 21;
+
 /** Whether any condition counts as holding once it has held. */
 function latchesACondition(scenario: Scenario): boolean {
   return scenario.triggers.some((trigger) =>
@@ -355,6 +363,9 @@ export function requiredRuntimeVersion(
   }
   if (latchesACondition(scenario)) {
     version = Math.max(version, LATCHED_CONDITION_VERSION);
+  }
+  if ((scenario.persistentVars?.length ?? 0) > 0) {
+    version = Math.max(version, PERSISTENT_VAR_VERSION);
   }
   return version;
 }

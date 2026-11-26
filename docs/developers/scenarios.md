@@ -384,6 +384,18 @@ Renaming one carries the triggers that read it over. Undeclaring one leaves them
 
 Anywhere a `var` condition, `set_var` or `add_var` asks for a number you can name a variable instead, with the dropdown beside the box. So "kills reached the quota" is a `var` condition on `kills` reading `quota`, and "add the bonus to the score" is an `add_var` on `score` reading `bonus`. A scenario that does this needs mission runtime 3, which is what stops an older game reading the variable as nothing and comparing against zero.
 
+### Persistent variables
+
+Turn on **Persistent** beside a variable to carry it from one campaign mission to the next. When the player wins a mission, coilbox saves what each persistent variable ended at. A later mission in the same campaign that has a persistent variable of the same name starts it from the saved value instead of the one in the editor.
+
+- The name is the link. Mission 1's `pilotsRescued` reaches mission 2 only if mission 2 declares `pilotsRescued` and marks it persistent too.
+- Only a won mission saves. A lost mission is played again from the values the last win saved, so a failed attempt does not leak into the next one.
+- A variable that is not persistent always starts from the editor's value, even if the campaign has saved one of that name.
+- Outside a campaign, for example in **Test in game**, every variable starts from the editor's value and nothing is saved.
+- The values are kept with the campaign's progress, beside which missions are complete, whether the campaign is your own, bundled with coilbox or shipped by a game.
+
+In the saved scenario and the compiled mission this is `persistentVars`, a list of variable names. It needs runtime 21, and only a scenario that uses it asks for 21.
+
 ## Test and play
 
 **Test in game** is in the Setup card at the top of the editor. It compiles the scenario, writes it where the game will look for it, **reads it back out and checks every reference resolves**, and only then starts the engine. A zone name a trigger points at that no longer exists stops there rather than playing as a trigger that never fires.

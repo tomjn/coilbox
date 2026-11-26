@@ -491,6 +491,14 @@ export interface Scenario {
   restrictions: ScenarioRestrictions;
   /** Mission variables, keyed by name. Numbers only, so `add_var` can do sums. */
   vars: Record<string, number>;
+  /**
+   * The vars a campaign carries from one mission to the next (issue #5294), by
+   * name, sorted. A mission played as part of a campaign starts each of these
+   * from the value the campaign saved, and a won mission saves them back. A var
+   * not named here never reads a saved value. Absent when there are none, so a
+   * document that marks nothing round trips to the bytes it came in as.
+   */
+  persistentVars?: string[];
   triggers: ScenarioTrigger[];
   objectives: ScenarioObjective[];
   dialogue: ScenarioDialogue[];
@@ -1193,6 +1201,26 @@ function parseRestrictions(value: unknown): ScenarioRestrictions {
   return out;
 }
 
+/**
+ * The persistent var names, keeping only declared ones, deduped and sorted, or
+ * undefined when none are left. A name nothing declares has no starting value
+ * to replace, so marking it would mean nothing.
+ */
+function parsePersistentVars(
+  value: unknown,
+  vars: Record<string, number>,
+): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const names = [
+    ...new Set(
+      value.filter(
+        (name): name is string => typeof name === "string" && name in vars,
+      ),
+    ),
+  ].sort();
+  return names.length > 0 ? names : undefined;
+}
+
 function parseVars(value: unknown): Record<string, number> {
   if (!isRecord(value)) return {};
   const out: Record<string, number> = {};
@@ -1335,6 +1363,7 @@ export function parseScenario(value: unknown): Scenario | null {
     return null;
   }
 
+  const vars = parseVars(value.vars);
   return {
     schemaVersion: SCENARIO_SCHEMA_VERSION,
     id: sid,
@@ -1350,7 +1379,8 @@ export function parseScenario(value: unknown): Scenario | null {
     blueprints: split.blueprints,
     bases: split.bases,
     restrictions: parseRestrictions(value.restrictions),
-    vars: parseVars(value.vars),
+    vars,
+    persistentVars: parsePersistentVars(value.persistentVars, vars),
     triggers,
     objectives,
     dialogue,

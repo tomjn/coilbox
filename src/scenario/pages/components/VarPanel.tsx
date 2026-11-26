@@ -15,7 +15,9 @@ import { plural } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Plus, Trash2, Variable } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { useFieldText } from "@/lib/useFieldText";
 import type { ExtensionTypes } from "../../extensions";
 import type { Scenario } from "../../model";
@@ -29,6 +31,7 @@ import {
   removeVar,
   renameVar,
   setVar,
+  setVarPersistent,
 } from "./registries";
 
 export function VarPanel({
@@ -127,6 +130,13 @@ export function VarPanel({
                   label={t`Starting value of ${name}`}
                   onCommit={(value) => onChange(setVar(scenario, name, value))}
                 />
+                <PersistentSwitch
+                  checked={scenario.persistentVars?.includes(name) === true}
+                  label={t`Carry ${name} to the next mission`}
+                  onChange={(persistent) =>
+                    onChange(setVarPersistent(scenario, name, persistent))
+                  }
+                />
                 <Button
                   size="sm"
                   variant="ghost"
@@ -163,6 +173,36 @@ export function VarPanel({
         )}
       </div>
     </EditorPanel>
+  );
+}
+
+/**
+ * Whether a campaign carries this variable on to its next mission (issue
+ * #5294). The visible word is short because the row is narrow, and the full
+ * meaning is the switch's accessible name.
+ */
+function PersistentSwitch({
+  checked,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  label: string;
+  onChange: (persistent: boolean) => void;
+}) {
+  const id = useId();
+  return (
+    <div className="flex shrink-0 items-center gap-1.5">
+      <Switch
+        id={id}
+        checked={checked}
+        aria-label={label}
+        onCheckedChange={onChange}
+      />
+      <Label htmlFor={id} className="text-xs font-normal">
+        <Trans>Persistent</Trans>
+      </Label>
+    </div>
   );
 }
 

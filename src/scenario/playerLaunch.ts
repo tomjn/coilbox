@@ -18,7 +18,11 @@ import type { BattleConfig } from "../play/bindings";
 import type { CompatTarget } from "../play/compatTarget";
 import type { PlayTarget } from "../play/config";
 import { scenarioMediaWrite } from "./bindings";
-import { launchScenario, type ScenarioLaunchResult } from "./launch";
+import {
+  type CampaignVarsLaunch,
+  launchScenario,
+  type ScenarioLaunchResult,
+} from "./launch";
 import type { Difficulty, Scenario } from "./model";
 
 export interface PlayerScenarioLaunch {
@@ -32,6 +36,8 @@ export interface PlayerScenarioLaunch {
   disabledUnits?: string[];
   /** How hard to play it, for a scenario that varies by difficulty. */
   difficulty?: Difficulty;
+  /** A campaign's saved vars and the launch's token. See `launchScenario`. */
+  campaignVars?: CampaignVarsLaunch;
   /** A generated game carrying a campaign's builder units. See `launchScenario`. */
   unitsGame?: string;
   /** The game's compatibility mutator, when its switch is on. See `launchScenario`. */
@@ -48,6 +54,7 @@ export async function launchScenarioForPlayer(
     launch,
     disabledUnits,
     difficulty,
+    campaignVars,
     unitsGame,
     compat,
   } = opts;
@@ -59,6 +66,7 @@ export async function launchScenarioForPlayer(
     games,
     disabledUnits,
     difficulty,
+    campaignVars,
     unitsGame,
     compat,
     // A rescan whose unitsync `Init` failed throws the engine's reason. It is

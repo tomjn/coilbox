@@ -2,7 +2,7 @@
 -- Do not edit: change the scenario and compile again.
 return {
   schemaVersion = 1,
-  runtimeVersion = 20,
+  runtimeVersion = 21,
   id = "convoy",
   name = "Convoy",
   description = "Triggers that count units: the convoy arriving and thinning out, the raiders being wiped, the depot cleared of everything but walls, counted each time they come back to it, woken when they fire on the convoy, and a scout who has visited the depot and the ford in either order.",
@@ -68,6 +68,7 @@ return {
   prefabs = {},
   restrictions = {},
   vars = { arrived = 0 },
+  persistentVars = { "arrived" },
   triggers = {
     {
       id = "convoy-arrived",

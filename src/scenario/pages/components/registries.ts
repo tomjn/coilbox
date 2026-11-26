@@ -308,6 +308,11 @@ export function renameVar(
   return {
     ...rewriteRefs(scenario, "varName", from, wanted, extensions),
     vars,
+    persistentVars: persistentList(
+      (scenario.persistentVars ?? []).map((name) =>
+        name === from ? wanted : name,
+      ),
+    ),
   };
 }
 
@@ -317,7 +322,38 @@ export function removeVar(scenario: Scenario, name: string): Scenario {
   if (!(name in scenario.vars)) return scenario;
   const vars = { ...scenario.vars };
   delete vars[name];
-  return { ...scenario, vars };
+  return {
+    ...scenario,
+    vars,
+    persistentVars: persistentList(
+      (scenario.persistentVars ?? []).filter((n) => n !== name),
+    ),
+  };
+}
+
+/** The sorted list `parsePersistentVars` reads back, or undefined for none. */
+function persistentList(names: string[]): string[] | undefined {
+  return names.length > 0 ? [...new Set(names)].sort() : undefined;
+}
+
+/**
+ * Mark a variable as one a campaign carries to its next mission, or unmark it
+ * (issue #5294). Unchanged for a name nothing declares.
+ */
+export function setVarPersistent(
+  scenario: Scenario,
+  name: string,
+  persistent: boolean,
+): Scenario {
+  if (!(name in scenario.vars)) return scenario;
+  const current = scenario.persistentVars ?? [];
+  if (current.includes(name) === persistent) return scenario;
+  return {
+    ...scenario,
+    persistentVars: persistentList(
+      persistent ? [...current, name] : current.filter((n) => n !== name),
+    ),
+  };
 }
 
 /* -------------------------------------------------------------------------- *

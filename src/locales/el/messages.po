@@ -15362,6 +15362,10 @@ msgstr "Καριέρα"
 msgid "Carried as written ({readOnlyCount})"
 msgstr "Μεταφέρθηκαν όπως γράφτηκαν ({readOnlyCount})"
 
+#: src/scenario/pages/components/VarPanel.tsx
+msgid "Carry {name} to the next mission"
+msgstr ""
+
 #: src/content/achievements.ts
 #, fuzzy
 msgid "Cartographer"
@@ -38656,6 +38660,10 @@ msgstr "Πλεονέκτημα: {0}"
 #, fuzzy
 msgid "Perks earned"
 msgstr "Πλεονεκτήματα που κερδήθηκαν"
+
+#: src/scenario/pages/components/VarPanel.tsx
+msgid "Persistent"
+msgstr ""
 
 #: src/lego/pages/components/FourViews.tsx
 #, fuzzy

@@ -28,6 +28,7 @@ import {
   renameVar,
   setBuildableMode,
   setVar,
+  setVarPersistent,
   withLockedUnits,
 } from "./registries";
 
@@ -305,6 +306,32 @@ describe("dialogue", () => {
 });
 
 describe("vars", () => {
+  // Issue #5294.
+  it("marks a var persistent and unmarks it", () => {
+    const marked = setVarPersistent(document(), "waves", true);
+    expect(marked.persistentVars).toEqual(["waves"]);
+    expect(loads(marked)).toBe(true);
+    expect(
+      parseScenario(JSON.parse(JSON.stringify(marked)))?.persistentVars,
+    ).toEqual(["waves"]);
+    expect(
+      setVarPersistent(marked, "waves", false).persistentVars,
+    ).toBeUndefined();
+  });
+
+  it("refuses to mark a var nothing declares", () => {
+    const scenario = document();
+    expect(setVarPersistent(scenario, "ghost", true)).toBe(scenario);
+  });
+
+  it("carries the mark through a rename and drops it with the var", () => {
+    const marked = setVarPersistent(document(), "waves", true);
+    expect(renameVar(marked, "waves", "rounds").persistentVars).toEqual([
+      "rounds",
+    ]);
+    expect(removeVar(marked, "waves").persistentVars).toBeUndefined();
+  });
+
   it("mints a name nothing has taken", () => {
     expect(nextVarName({ var1: 0, var2: 0 })).toBe("var3");
   });
