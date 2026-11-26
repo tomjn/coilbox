@@ -65,6 +65,24 @@ describe("applyVictory", () => {
     expect(next.campaigns.c.completedMissionIds).toEqual(["a", "b"]);
   });
 
+  // Issue #5294.
+  it("saves a won mission's vars over the saved ones, keeping the rest", () => {
+    const file: ProgressFile = {
+      schemaVersion: 1,
+      campaigns: {
+        c: { completedMissionIds: [], updatedAt: "", vars: { a: 1, b: 2 } },
+      },
+    };
+    const next = applyVictory(file, "c", "m", NOW, { b: 5, c: 3 });
+    expect(next.campaigns.c.vars).toEqual({ a: 1, b: 5, c: 3 });
+  });
+
+  it("adds no vars key to a run that carries none", () => {
+    expect(
+      applyVictory(empty, "c", "a", NOW, {}).campaigns.c,
+    ).not.toHaveProperty("vars");
+  });
+
   it("does not mutate the input document", () => {
     const file: ProgressFile = {
       schemaVersion: 1,

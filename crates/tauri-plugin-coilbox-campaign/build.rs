@@ -16,6 +16,7 @@ const COMMANDS: &[&str] = &[
     "campaign_import",
     "campaign_progress_load",
     "campaign_progress_save",
+    "campaign_mission_vars_read",
     "campaign_unit_save",
     "campaign_unit_list",
     "campaign_unit_delete",

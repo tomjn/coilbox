@@ -130,6 +130,16 @@ export const campaignProgressSave = defineCommand<
   Record<string, never>
 >("coilbox-campaign", "campaign_progress_save");
 
+/**
+ * The file the mission runtime writes a campaign mission's persistent vars to
+ * (issue #5294), read from the write directory that holds the replay's
+ * `demos/` folder. `json` is null when there is no such file.
+ */
+export const campaignMissionVarsRead = defineCommand<
+  { replayPath: string },
+  { json: string | null }
+>("coilbox-campaign", "campaign_mission_vars_read");
+
 /** One stored copy of a builder unit, as `campaign_unit_list` answers it. */
 export interface StoredCampaignUnit {
   unitName: string;

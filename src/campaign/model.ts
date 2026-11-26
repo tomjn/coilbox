@@ -262,6 +262,18 @@ export interface CampaignProgress {
    * own default, exactly as those runs already did.
    */
   difficulty?: Difficulty;
+  /**
+   * The persistent vars this run has carried so far, by name (issue #5294).
+   * Written when a mission is won, from what the mission ended with, and handed
+   * to every later mission that marks a var of the same name persistent. Keyed
+   * by name rather than by mission, because the name is how one mission's var
+   * is the next one's.
+   *
+   * Here rather than in the campaign document for the reason difficulty is: a
+   * bundled campaign and a game's own campaign are read only, and their
+   * progress lives in coilbox's progress file all the same.
+   */
+  vars?: Record<string, number>;
   updatedAt: string;
 }
 

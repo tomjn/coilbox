@@ -651,6 +651,34 @@ async fn campaign_progress_save<R: Runtime>(app: AppHandle<R>, json: String) -> 
     }
 }
 
+/// The file the mission runtime writes a campaign mission's persistent vars to,
+/// in the engine's write directory (issue #5294). Kept in step with
+/// `VARS_FILE` in `lua/mission-runtime/luarules/gadgets/coilbox_mission_runtime.lua`.
+const MISSION_VARS_FILE: &str = "coilbox-campaign-vars.json";
+
+/// Where the vars file of the launch that wrote `replay` is: the engine writes
+/// a replay to `<write dir>/demos/`, so the write directory is two folders up.
+fn mission_vars_path(replay: &Path) -> Option<PathBuf> {
+    Some(replay.parent()?.parent()?.join(MISSION_VARS_FILE))
+}
+
+/// `campaign_mission_vars_read` - the persistent vars file beside the replay a
+/// campaign mission just wrote, or `null` when there is none. The frontend
+/// checks the launch token inside it.
+#[tauri::command]
+async fn campaign_mission_vars_read(replay_path: String) -> CliResult {
+    let Some(path) = mission_vars_path(Path::new(&replay_path)) else {
+        return CliResult::ok(json!({ "json": null }));
+    };
+    match std::fs::read_to_string(&path) {
+        Ok(text) => CliResult::ok(json!({ "json": text })),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            CliResult::ok(json!({ "json": null }))
+        }
+        Err(e) => CliResult::err(format!("could not read {}: {e}", path.display())),
+    }
+}
+
 /// Build the plugin. Registered as `"coilbox-campaign"` (crate name minus the
 /// `tauri-plugin-` prefix); the frontend invokes `plugin:coilbox-campaign|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -669,6 +697,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             campaign_import,
             campaign_progress_load,
             campaign_progress_save,
+            campaign_mission_vars_read,
             campaign_unit_save,
             campaign_unit_list,
             campaign_unit_delete,
@@ -683,6 +712,15 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mission_vars_sit_beside_the_demos_folder() {
+        let replay = Path::new("/w/demos/20261126_mission.sdfz");
+        assert_eq!(
+            mission_vars_path(replay),
+            Some(PathBuf::from("/w/coilbox-campaign-vars.json"))
+        );
+    }
 
     #[test]
     fn valid_id_accepts_charset() {

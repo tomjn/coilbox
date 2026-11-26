@@ -16,6 +16,7 @@ permissions = [
   "allow-campaign-import",
   "allow-campaign-progress-load",
   "allow-campaign-progress-save",
+  "allow-campaign-mission-vars-read",
   "allow-campaign-unit-save",
   "allow-campaign-unit-list",
   "allow-campaign-unit-delete",

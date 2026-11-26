@@ -22,7 +22,9 @@ import type { SkirmishDraft } from "../play/drafts";
 
 const {
   composeUnits,
+  detectBattleResult,
   installedAtlases,
+  varsRead,
   launchScenario,
   loadUnitCopies,
   playLaunch,
@@ -32,6 +34,9 @@ const {
   scanState,
 } = vi.hoisted(() => ({
   composeUnits: vi.fn(),
+  detectBattleResult: vi.fn(),
+  // What the runtime's vars file says after a launch, null for no file.
+  varsRead: vi.fn(),
   // The folders of the atlas packs installed, set per test.
   installedAtlases: { folders: [] as string[] },
   launchScenario: vi.fn(),
@@ -50,6 +55,14 @@ vi.mock("../content/compatSettings", () => ({
   useCompatSettings: () => [{}],
 }));
 vi.mock("../play/compatTarget", () => ({ resolveCompatTarget }));
+vi.mock("../play/detect", async (importActual) => ({
+  ...(await importActual<typeof import("../play/detect")>()),
+  detectBattleResult,
+}));
+vi.mock("./bindings", async (importActual) => ({
+  ...(await importActual<typeof import("./bindings")>()),
+  campaignMissionVarsRead: varsRead,
+}));
 vi.mock("./units", async (importActual) => ({
   ...(await importActual<typeof import("./units")>()),
   composeUnits,
@@ -244,6 +257,10 @@ beforeEach(() => {
   playLaunch.mockResolvedValue({ exitCode: null });
   resolveCompatTarget.mockReset();
   resolveCompatTarget.mockResolvedValue({ kind: "off" });
+  detectBattleResult.mockReset();
+  detectBattleResult.mockResolvedValue({ outcome: "ambiguous", replay: null });
+  varsRead.mockReset();
+  varsRead.mockResolvedValue({ json: null });
 });
 
 afterEach(() => {
@@ -631,5 +648,96 @@ describe("a campaign whose units need an atlas pack", () => {
     await act(async () => {});
     expect(result.current.needs).toEqual([]);
     expect(result.current.canStart).toBe(true);
+  });
+});
+
+/**
+ * Issue #5294. A persistent var goes in as the campaign's saved value, comes
+ * back out of the file the runtime wrote beside the replay, and is saved only
+ * when the mission is won.
+ */
+describe("a campaign mission's persistent vars", () => {
+  /** A scenario declaring two vars, of which only `rescued` is persistent. */
+  function carrying(): Scenario {
+    return {
+      ...flat(),
+      vars: { rescued: 0, wave: 0 },
+      persistentVars: ["rescued"],
+    };
+  }
+
+  function progressWithVars(vars: Record<string, number>): ProgressFile {
+    return {
+      schemaVersion: 1,
+      campaigns: { c1: { completedMissionIds: [], updatedAt: "", vars } },
+    };
+  }
+
+  /** The engine exits, the replay names `outcome`, and the vars file says `vars`. */
+  async function play(
+    outcome: "victory" | "defeat",
+    file: (run: string) => unknown,
+  ) {
+    launchScenario.mockImplementation(async (input) => {
+      varsRead.mockResolvedValue({
+        json: JSON.stringify(file(input.campaignVars.run)),
+      });
+      return { ok: true, config: { myPlayerName: "Player" }, exitCode: 0 };
+    });
+    detectBattleResult.mockResolvedValue({
+      outcome,
+      replay: { path: "/w/demos/m1.sdfz", filename: "m1.sdfz" },
+    });
+    const { campaign, mission } = campaignWith(carrying());
+    const { result } = renderHook(() => useMissionRun(campaign, mission));
+    await act(async () => {
+      await result.current.start();
+    });
+    await waitFor(() => expect(result.current.phase).toBe(outcome));
+    expect(varsRead).toHaveBeenCalledWith({ replayPath: "/w/demos/m1.sdfz" });
+    return saved.at(-1) as ProgressFile;
+  }
+
+  it("hands the mission the saved value of each persistent var, and no other", async () => {
+    progressState.file = progressWithVars({ rescued: 4, wave: 9 });
+
+    const input = await launchInput(carrying());
+    expect(input.campaignVars.values).toEqual({ rescued: 4 });
+    expect(input.campaignVars.run).toMatch(/.+/);
+  });
+
+  it("hands nothing over for a mission that marks no var persistent", async () => {
+    progressState.file = progressWithVars({ rescued: 4 });
+
+    expect((await launchInput(flat())).campaignVars).toBeUndefined();
+  });
+
+  it("saves what a won mission ended with, keeping other saved vars", async () => {
+    progressState.file = progressWithVars({ rescued: 4, other: 1 });
+
+    const next = await play("victory", (run) => ({
+      run,
+      vars: { rescued: 6, wave: 3 },
+    }));
+    // `wave` is not persistent in this mission, so it is not saved.
+    expect(next.campaigns.c1.vars).toEqual({ rescued: 6, other: 1 });
+    expect(next.campaigns.c1.completedMissionIds).toEqual(["m1"]);
+  });
+
+  it("saves nothing from a lost mission", async () => {
+    progressState.file = progressWithVars({ rescued: 4 });
+
+    const next = await play("defeat", (run) => ({ run, vars: { rescued: 6 } }));
+    expect(next.campaigns.c1.vars).toEqual({ rescued: 4 });
+  });
+
+  it("ignores a vars file an earlier launch left behind", async () => {
+    progressState.file = progressWithVars({ rescued: 4 });
+
+    const next = await play("victory", () => ({
+      run: "an-earlier-launch",
+      vars: { rescued: 99 },
+    }));
+    expect(next.campaigns.c1.vars).toEqual({ rescued: 4 });
   });
 });

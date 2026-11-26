@@ -1,5 +1,5 @@
 import { t } from "@lingui/core/macro";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { describeError } from "@/i18n/uiError";
 import { useCompatSettings } from "../content/compatSettings";
 import { useUnitsyncScan } from "../content/config";
@@ -22,6 +22,7 @@ import { launchScenarioForPlayer } from "../scenario/playerLaunch";
 import { useCampaignProgress } from "./campaigns";
 import { type MissionNeed, missionNeeds } from "./missionNeeds";
 import type { Campaign, CampaignMission } from "./model";
+import { launchVars, readReturnedVars } from "./persistentVars";
 import {
   applyDefeat,
   applyVictory,
@@ -161,6 +162,11 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
   // could not carry and builders the base game lacks or never reads a build
   // list for. Kept after the game closes, the way the Test drawer keeps them.
   const [leftOut, setLeftOut] = useState<string[]>([]);
+  // What the last launch left its persistent vars at, read back from the file
+  // the runtime wrote beside the replay (issue #5294). Only a win saves them,
+  // so they wait here until the result is known, automatically or from the
+  // player's own Victory.
+  const returnedVars = useRef<Record<string, number> | null>(null);
 
   const atlasPacks = useMissingAtlasPacks(campaign);
   const snapshot = mission.snapshot;
@@ -243,7 +249,13 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
       try {
         const next =
           outcome === "victory"
-            ? applyVictory(progress, campaign.id, mission.id)
+            ? applyVictory(
+                progress,
+                campaign.id,
+                mission.id,
+                undefined,
+                returnedVars.current ?? undefined,
+              )
             : applyDefeat(progress, campaign.id, mission.id);
         await save(next);
         setAutoDetected(auto);
@@ -286,6 +298,7 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
         dataDir: target.dataDir,
       });
     setLeftOut([]);
+    returnedVars.current = null;
     try {
       // The campaign's builder units go in a mutator over whichever game this
       // mission plays, written now because its `depend` names that game
@@ -329,6 +342,16 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
       // scenario mission's config is built inside `launchScenario` from the
       // scenario's own setup, not from the snapshot read here.
       let launched: BattleConfig;
+      // The campaign's saved vars for this mission, and a token new to this
+      // launch (issue #5294). Undefined for a mission that carries nothing.
+      const carried = mission.scenario
+        ? launchVars(
+            mission.scenario,
+            progress,
+            campaign.id,
+            crypto.randomUUID(),
+          )
+        : undefined;
       if (mission.scenario) {
         // A bundled campaign's dialogue clips have never been written into the
         // media store, and that store is where the compile step copies them
@@ -349,6 +372,7 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
           // a run nobody has chosen a level for, so both produce the start
           // script they always did.
           difficulty: variesByDifficulty ? difficulty : undefined,
+          campaignVars: carried,
           unitsGame: units?.name,
           compat: compat.kind === "use" ? compat : undefined,
           launch: startEngine,
@@ -404,6 +428,13 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
         outcome: "ambiguous",
         replay: null,
       }));
+      if (replay && carried && mission.scenario) {
+        returnedVars.current = await readReturnedVars(
+          carried,
+          mission.scenario,
+          replay.path,
+        );
+      }
       if (replay) {
         setProvenance(replay.filename, {
           mode: "campaign",
@@ -447,6 +478,7 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
     difficulty,
     dependencyBlock,
     compatSettings,
+    progress,
   ]);
 
   /**
