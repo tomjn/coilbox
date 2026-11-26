@@ -84,6 +84,10 @@ it("lists the maps found and uploads only the ones still ticked", async () => {
   );
   await screen.findByText("Tabula");
   expect(screen.getByText("It is an unpacked folder.")).toBeTruthy();
+  // Counts as labels, since the sentence read "1 are already on the hub".
+  expect(
+    screen.getByText("Can upload: 2. Cannot upload: 1. Already on the hub: 4."),
+  ).toBeTruthy();
 
   fireEvent.click(screen.getByRole("checkbox", { name: /Comet/ }));
   fireEvent.click(screen.getByRole("button", { name: /Upload 1 map/ }));

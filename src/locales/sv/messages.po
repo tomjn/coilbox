@@ -1450,14 +1450,6 @@ msgstr "{0} på en position utan namn."
 msgid "{0} called a vote: {1}"
 msgstr "{0} startade en omröstning: {1}"
 
-#. placeholder {0}: found.candidates.length
-#. placeholder {1}: found.skipped.length
-#. placeholder {2}: found.listed
-#: src/hub/pages/components/MapArchivesControl.tsx
-#, fuzzy
-msgid "{0} can be uploaded, {1} cannot, and {2} are already on the hub."
-msgstr "{0} kan laddas upp, {1} kan inte det, och {2} finns redan på hubben."
-
 #. placeholder {0}: d.asset
 #: src/content/gameSourceRows.ts
 #, fuzzy
@@ -10261,10 +10253,34 @@ msgstr ""
 msgid "About scanning on startup"
 msgstr ""
 
+#: src/hub/pages/components/AssetUploadControl.tsx
+msgid "About sending pictures"
+msgstr ""
+
+#: src/hub/pages/components/GamePicturesControl.tsx
+msgid "About sending pictures of your games"
+msgstr ""
+
+#: src/hub/pages/components/MapPicturesControl.tsx
+msgid "About sending pictures of your maps"
+msgstr ""
+
+#: src/hub/pages/components/GameFactsControl.tsx
+msgid "About sending what your games say"
+msgstr ""
+
+#: src/hub/pages/components/MapCatalogControl.tsx
+msgid "About sending what your maps say"
+msgstr ""
+
 #: src/lego/pages/components/CollisionPanel.tsx
 #, fuzzy
 msgid "About shooting at each piece"
 msgstr "Om att skjuta på varje del"
+
+#: src/hub/pages/components/AccountControl.tsx
+msgid "About signing out"
+msgstr ""
 
 #: src/sound/SoundSettings.tsx
 msgid "About sounds"
@@ -10358,6 +10374,10 @@ msgstr "Om det här scenariot"
 msgid "About unit values"
 msgstr "Om enhetsvärden"
 
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "About uploading map files"
+msgstr ""
+
 #: src/lego/pages/components/CollisionPanel.tsx
 #, fuzzy
 msgid "About using each piece"
@@ -10450,6 +10470,7 @@ msgstr "Behörighetsnivå"
 
 #: src/account/index.ts
 #: src/account/pages/SettingsSection.tsx
+#: src/hub/pages/components/AccountControl.tsx
 #: src/multiplayer/AccountPicker.tsx
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
@@ -15072,6 +15093,10 @@ msgstr "Kan sikta på marken"
 msgid "Can travel underwater"
 msgstr "Kan färdas under vatten"
 
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Can upload: {can}. Cannot upload: {cannot}. Already on the hub: {listed}."
+msgstr ""
+
 #: src/multiplayer/battle/contentBlock.ts
 #, fuzzy
 msgid "Can't check content"
@@ -15860,6 +15885,9 @@ msgid "Checking what can be deleted..."
 msgstr "Kontrollerar vad som kan tas bort..."
 
 #: src/hub/pages/components/AccountControl.tsx
+msgid "Checking whether you are signed in"
+msgstr ""
+
 #: src/hub/PublishSection.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -16814,6 +16842,10 @@ msgstr ""
 #, fuzzy
 msgid "Coilbox could not build {baseName} (compat {version}) for this battle: {error}"
 msgstr "Coilbox kunde inte bygga {baseName} (compat {version}) för den här striden: {error}"
+
+#: src/hub/pages/components/AccountControl.tsx
+msgid "Coilbox could not check the name this time."
+msgstr ""
 
 #: src/downloads/pages/components/EngineUpload.tsx
 msgid "Coilbox could not check the official Recoil releases, so it cannot tell whether the hub needs this build. {why}"
@@ -21420,11 +21452,6 @@ msgstr "Ritar {at} av {total}: {game}"
 
 #: src/hub/pages/components/GamePicturesControl.tsx
 #, fuzzy
-msgid "Drawing your units…"
-msgstr "Ritar dina enheter…"
-
-#: src/hub/pages/components/GamePicturesControl.tsx
-#, fuzzy
 msgid "Drawing: {game}"
 msgstr "Ritar: {game}"
 
@@ -23634,6 +23661,7 @@ msgstr "Filter och sortering"
 msgid "Filters: {filters}"
 msgstr "Filter: {filters}"
 
+#: src/hub/pages/components/MapArchivesControl.tsx
 #: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 #, fuzzy
 msgid "Find"
@@ -23701,9 +23729,8 @@ msgid "Find other accounts on this IP"
 msgstr "Hitta andra konton på den här IP-adressen"
 
 #: src/hub/pages/components/MapArchivesControl.tsx
-#, fuzzy
-msgid "Finding maps…"
-msgstr "Letar efter kartor…"
+msgid "Finds the map files on this computer that the hub does not have yet, so you can choose which to upload. Reading each one takes a while on a large library."
+msgstr ""
 
 #: src/content/pages/StorageSection.tsx
 msgid "Finish or cancel downloads first"
@@ -30702,6 +30729,10 @@ msgstr "Karta och spel saknas"
 msgid "Map compiler"
 msgstr ""
 
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Map files"
+msgstr ""
+
 #: src/conquest/pages/ConquestListPage.tsx
 #, fuzzy
 msgid "Map folder \"{folder}\""
@@ -30944,6 +30975,10 @@ msgstr "Kartorna kunde inte läsas"
 #, fuzzy
 msgid "Maps that could not be listed"
 msgstr "Kartor som inte kunde listas"
+
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Maps the hub is missing"
+msgstr ""
 
 #: src/mapconv/pages/ProjectsPage.tsx
 #, fuzzy
@@ -35773,6 +35808,10 @@ msgstr "Inte angivet, motorn använder 0,5"
 msgid "Not set, the unit never backs up"
 msgstr "Inte angivet, enheten backar aldrig"
 
+#: src/hub/pages/components/AccountControl.tsx
+msgid "Not signed in"
+msgstr ""
+
 #: src/account/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Not signed in. Connect as {lastUsername} to manage that account."
@@ -38766,6 +38805,14 @@ msgstr "Bilden exporterad."
 msgid "Picture uploads stopped early"
 msgstr "Bilduppladdningen stoppades i förtid"
 
+#: src/hub/pages/components/GamePicturesControl.tsx
+msgid "Pictures of your games"
+msgstr ""
+
+#: src/hub/pages/components/MapPicturesControl.tsx
+msgid "Pictures of your maps"
+msgstr ""
+
 #: src/content/pages/components/ReplayBaseCrops.tsx
 #, fuzzy
 msgid "Pictures show orders given from {from} to {to}."
@@ -40991,7 +41038,6 @@ msgid "Reading which routes {gameName} supports…"
 msgstr "Läser vilka vägar {gameName} stöder…"
 
 #: src/blueprint/pages/BlueprintsPage.tsx
-#: src/hub/pages/components/GameFactsControl.tsx
 #: src/play/pages/components/GamePickerGrid.tsx
 #, fuzzy
 msgid "Reading your games…"
@@ -41008,12 +41054,6 @@ msgstr "Läser dina installerade spel"
 #, fuzzy
 msgid "Reading your maps"
 msgstr "Läser dina kartor"
-
-#: src/hub/pages/components/MapCatalogControl.tsx
-#: src/hub/pages/components/MapPicturesControl.tsx
-#, fuzzy
-msgid "Reading your maps…"
-msgstr "Läser dina kartor…"
 
 #: src/lego/pages/ProjectsPage.tsx
 #, fuzzy
@@ -44846,6 +44886,7 @@ msgstr "Självförstörelseexplosion"
 msgid "Self-destructs"
 msgstr "Självförstörs"
 
+#: src/hub/pages/components/SendButton.tsx
 #: src/multiplayer/admin/AnnouncementsSection.tsx
 #: src/multiplayer/battle/BonusButton.tsx
 #: src/multiplayer/chat/ChatPane.tsx
@@ -44980,21 +45021,6 @@ msgstr "Skickar bilder"
 msgid "Sending pictures for the hub. Open to stop."
 msgstr "Skickar bilder till hubben. Öppna för att stoppa."
 
-#: src/hub/pages/components/GamePicturesControl.tsx
-#, fuzzy
-msgid "Sending pictures of your games"
-msgstr "Skickar bilder av dina spel"
-
-#: src/hub/pages/components/MapPicturesControl.tsx
-#, fuzzy
-msgid "Sending pictures of your maps"
-msgstr "Skickar bilder av dina kartor"
-
-#: src/hub/pages/components/AssetUploadControl.tsx
-#, fuzzy
-msgid "Sending pictures to the hub"
-msgstr "Skickar bilder till hubben"
-
 #: src/hub/assets/UploadRunBadge.tsx
 #, fuzzy
 msgid "Sending to hub"
@@ -45004,16 +45030,6 @@ msgstr "Skickar till hubben"
 #, fuzzy
 msgid "Sending to the hub. Open to stop."
 msgstr "Skickar till hubben. Öppna för att stoppa."
-
-#: src/hub/pages/components/GameFactsControl.tsx
-#, fuzzy
-msgid "Sending what your games say"
-msgstr "Skickar vad dina spel säger"
-
-#: src/hub/pages/components/MapCatalogControl.tsx
-#, fuzzy
-msgid "Sending what your maps say"
-msgstr "Skickar vad dina kartor säger"
 
 #: src/hub/pages/components/GameFactsControl.tsx
 #, fuzzy
@@ -45653,6 +45669,10 @@ msgstr "Delar lag med {leaderName} — laginställningarna kommer från den för
 #, fuzzy
 msgid "Shares a team with {sharedName} — team settings come from the first member"
 msgstr "Delar lag med {sharedName} — laginställningarna kommer från den första medlemmen"
+
+#: src/hub/pages/components/ShareAssetsPanel.tsx
+msgid "Sharing"
+msgstr ""
 
 #: src/workshop/weaponSlots.ts
 #, fuzzy
@@ -46437,6 +46457,7 @@ msgstr "Logga ut"
 msgid "Sign-in"
 msgstr "Inloggning"
 
+#: src/hub/pages/components/AccountControl.tsx
 #: src/hub/pages/components/HeaderAccount.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -46444,14 +46465,8 @@ msgid "Signed in"
 msgstr "Inloggad"
 
 #: src/hub/pages/components/AccountControl.tsx
-#, fuzzy
-msgid "Signed in as {accountName}."
-msgstr "Inloggad som {accountName}."
-
-#: src/hub/pages/components/AccountControl.tsx
-#, fuzzy
-msgid "Signed in. Coilbox could not check the name this time."
-msgstr "Inloggad. Coilbox kunde inte kontrollera namnet den här gången."
+msgid "Signed in as {accountName}"
+msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -56458,11 +56473,6 @@ msgstr "Laddar upp till hubben"
 msgid "Uploading to the hub. Open to stop."
 msgstr "Laddar upp till hubben. Öppna för att stoppa."
 
-#: src/hub/pages/components/MapArchivesControl.tsx
-#, fuzzy
-msgid "Uploading your map files"
-msgstr "Laddar upp dina kartfiler"
-
 #: src/hub/upload/UploadToHubButton.tsx
 #, fuzzy
 msgid "Uploading…"
@@ -57731,14 +57741,25 @@ msgid "What uberserver cleans up by itself, and what no client can do"
 msgstr "Vad uberserver rensar själv, och vad ingen klient kan göra"
 
 #: src/hub/pages/components/AssetUploadControl.tsx
-#, fuzzy
-msgid "What you send is public and hard to take back. It goes into a public repository and stays in its history, so it is not like deleting a file you uploaded by mistake. The pictures are made from other people's game and map archives, and not every archive is clear about what you may do with what is inside it. Every upload also spends storage the whole community shares."
-msgstr "Det du skickar är offentligt och svårt att ta tillbaka. Det hamnar i ett offentligt repo och stannar i dess historik, så det är inte som att ta bort en fil som du laddade upp av misstag. Bilderna görs från andras spel- och kartarkiv, och alla arkiv är inte tydliga med vad du får göra med innehållet. Varje uppladdning förbrukar också lagringsutrymme som hela communityn delar."
+msgid "What you send goes into a public repository and stays in its history, so it is not like deleting a file you uploaded by mistake. The pictures are made from other people's game and map archives, and not every archive is clear about what you may do with what is inside it. Every upload also spends storage the whole community shares."
+msgstr ""
+
+#: src/hub/pages/components/AssetUploadControl.tsx
+msgid "What you send is public and hard to take back."
+msgstr ""
+
+#: src/hub/pages/components/GameFactsControl.tsx
+msgid "What your games say"
+msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
 msgid "What your library knows about it"
 msgstr "Vad ditt bibliotek vet om den"
+
+#: src/hub/pages/components/MapCatalogControl.tsx
+msgid "What your maps say"
+msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
@@ -59373,11 +59394,6 @@ msgstr "Dina spel kunde inte läsas, så inget här har kontrollerats mot dem: {
 #, fuzzy
 msgid "Your games could not be read: {scanError}"
 msgstr "Dina spel kunde inte läsas: {scanError}"
-
-#: src/hub/pages/components/AccountControl.tsx
-#, fuzzy
-msgid "Your hub account"
-msgstr "Ditt hubbkonto"
 
 #: src/direct/ReachablePorts.tsx
 #, fuzzy

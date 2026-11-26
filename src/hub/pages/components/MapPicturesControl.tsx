@@ -1,8 +1,8 @@
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Button } from "@picoframe/frame";
 import { useState } from "react";
+import { SettingRow } from "@/components/SettingRow";
 import { describeError } from "@/i18n/uiError";
 import { formatDateTime } from "@/lib/format";
 import { usePreferredTarget } from "@/play/config";
@@ -13,6 +13,7 @@ import {
   mapPictureSweepSummary,
   sweepMapPictures,
 } from "../../maps/pictureSweep";
+import { SendButton } from "./SendButton";
 
 /**
  * Sending the hub pictures of the maps on this computer, in Settings > Coilbox
@@ -85,68 +86,62 @@ export function MapPicturesControl({
   const lastRun = swept === null ? null : formatDateTime(new Date(swept));
 
   return (
-    <section className="space-y-2">
-      <h3 className="text-sm font-medium leading-none">
-        <Trans>Sending pictures of your maps</Trans>
-      </h3>
-      <p className="text-sm text-muted-foreground">
-        <Trans>
-          Coilbox can read the minimap, terrain, metal and ground types out of
-          every map on this computer and send them to the hub, so a map somebody
-          is looking at there has a picture and terrain rather than a drawing of
-          its name. It asks the hub what it already has first, so a map somebody
-          else has covered costs one question.
-        </Trans>
-      </p>
-      <p className="text-sm text-muted-foreground">
-        <Trans>
-          A big collection takes several goes. Every picture spends part of an
-          hourly allowance the whole community shares, so one press covers what
-          is left of this hour and picks up where it stopped the next time you
-          press it.
-        </Trans>
-      </p>
-      <div className="flex items-center gap-3 pt-1">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={run}
-          disabled={running || !target?.enginePath}
-        >
-          {running ? t`Reading your maps…` : t`Send pictures of your maps`}
-        </Button>
-        {progress && (
-          <span className="text-sm text-muted-foreground">
-            {i18n._(phaseWords(progress))}
-          </span>
-        )}
-      </div>
-      {!target?.enginePath && (
-        <p className="text-sm text-muted-foreground">
-          <Trans>
-            Coilbox needs an engine installed before it can read your maps.
-          </Trans>
-        </p>
-      )}
-      {swept !== null && !running && (
-        <p className="text-sm text-muted-foreground">
-          <Trans>Last run {lastRun}.</Trans>
-        </p>
-      )}
-      {report && (
+    <SettingRow
+      label={t`Pictures of your maps`}
+      description={
+        progress ? (
+          i18n._(phaseWords(progress))
+        ) : !target?.enginePath ? (
+          t`Coilbox needs an engine installed before it can read your maps.`
+        ) : report || lastRun ? (
+          <>
+            {report && (
+              <span className="block">{mapPictureSweepSummary(report)}</span>
+            )}
+            {report?.errors.map((said) => (
+              <span className="block text-destructive" key={said}>
+                {said}
+              </span>
+            ))}
+            {lastRun && (
+              <span className="block">
+                <Trans>Last run {lastRun}.</Trans>
+              </span>
+            )}
+          </>
+        ) : undefined
+      }
+      error={failed}
+      help={
         <>
-          <p className="text-sm text-muted-foreground">
-            {mapPictureSweepSummary(report)}
+          <p>
+            <Trans>
+              Coilbox can read the minimap, terrain, metal and ground types out
+              of every map on this computer and send them to the hub, so a map
+              somebody is looking at there has a picture and terrain rather than
+              a drawing of its name. It asks the hub what it already has first,
+              so a map somebody else has covered costs one question.
+            </Trans>
           </p>
-          {report.errors.map((said) => (
-            <p className="text-sm text-destructive" key={said}>
-              {said}
-            </p>
-          ))}
+          <p>
+            <Trans>
+              A big collection takes several goes. Every picture spends part of
+              an hourly allowance the whole community shares, so one press
+              covers what is left of this hour and picks up where it stopped the
+              next time you press it.
+            </Trans>
+          </p>
         </>
-      )}
-      {failed && <p className="text-sm text-destructive">{failed}</p>}
-    </section>
+      }
+      helpLabel={t`About sending pictures of your maps`}
+    >
+      <SendButton
+        label={t`Send pictures of your maps`}
+        running={running}
+        disabled={!target?.enginePath}
+        onClick={() => void run()}
+      />
+    </SettingRow>
   );
 }
 

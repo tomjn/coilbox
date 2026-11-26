@@ -1,8 +1,8 @@
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Button } from "@picoframe/frame";
 import { useState } from "react";
+import { SettingRow } from "@/components/SettingRow";
 import { describeError } from "@/i18n/uiError";
 import { usePreferredTarget } from "@/play/config";
 import {
@@ -11,6 +11,7 @@ import {
   gameSweepSummary,
   sweepGameFacts,
 } from "../../games/factsSweep";
+import { SendButton } from "./SendButton";
 
 /**
  * Telling the hub what the installed games say about their units, in Settings >
@@ -77,62 +78,53 @@ export function GameFactsControl({
   if (!agreed) return null;
 
   return (
-    <section className="space-y-2">
-      <h3 className="text-sm font-medium leading-none">
-        <Trans>Sending what your games say</Trans>
-      </h3>
-      <p className="text-sm text-muted-foreground">
-        <Trans>
-          Coilbox can read the games on this computer and tell the hub what
-          units each one has: their names, what each one builds, and which
-          faction they belong to. It sends no pictures and no files, only those
-          names.
-        </Trans>
-      </p>
-      <p className="text-sm text-muted-foreground">
-        <Trans>
-          Released games only. A game you are working on in a loose folder stays
-          on this machine, and so do the games coilbox writes for itself.
-        </Trans>
-      </p>
-      <div className="flex items-center gap-3 pt-1">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={run}
-          disabled={running || !target?.enginePath}
-        >
-          {running ? t`Reading your games…` : t`Send what your games say`}
-        </Button>
-        {progress && (
-          <span className="text-sm text-muted-foreground">
-            {i18n._(phaseWords(progress))}
-          </span>
-        )}
-      </div>
-      {!target?.enginePath && (
-        <p className="text-sm text-muted-foreground">
-          <Trans>
-            Coilbox needs an engine installed before it can read your games.
-          </Trans>
-        </p>
-      )}
-      {report && (
-        <p className="text-sm text-muted-foreground">
-          {gameSweepSummary(report)}
-        </p>
-      )}
-      {report && report.failed.length > 0 && (
-        <ul className="space-y-1 text-sm text-destructive">
-          {report.failed.map(({ game, said }) => (
-            <li key={game}>
-              {game}: {said}
-            </li>
-          ))}
-        </ul>
-      )}
-      {failed && <p className="text-sm text-destructive">{failed}</p>}
-    </section>
+    <SettingRow
+      label={t`What your games say`}
+      description={
+        progress ? (
+          i18n._(phaseWords(progress))
+        ) : !target?.enginePath ? (
+          t`Coilbox needs an engine installed before it can read your games.`
+        ) : report ? (
+          <>
+            <span className="block">{gameSweepSummary(report)}</span>
+            {report.failed.map(({ game, said }) => (
+              <span className="block text-destructive" key={game}>
+                {game}: {said}
+              </span>
+            ))}
+          </>
+        ) : undefined
+      }
+      error={failed}
+      help={
+        <>
+          <p>
+            <Trans>
+              Coilbox can read the games on this computer and tell the hub what
+              units each one has: their names, what each one builds, and which
+              faction they belong to. It sends no pictures and no files, only
+              those names.
+            </Trans>
+          </p>
+          <p>
+            <Trans>
+              Released games only. A game you are working on in a loose folder
+              stays on this machine, and so do the games coilbox writes for
+              itself.
+            </Trans>
+          </p>
+        </>
+      }
+      helpLabel={t`About sending what your games say`}
+    >
+      <SendButton
+        label={t`Send what your games say`}
+        running={running}
+        disabled={!target?.enginePath}
+        onClick={() => void run()}
+      />
+    </SettingRow>
   );
 }
 

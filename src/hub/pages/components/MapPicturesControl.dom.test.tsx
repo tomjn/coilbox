@@ -59,7 +59,9 @@ beforeEach(() => {
 afterEach(cleanup);
 
 const press = async () => {
-  fireEvent.click(screen.getByRole("button"));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Send pictures of your maps" }),
+  );
   // The click starts a promise, so let it settle before reading the screen.
   await vi.waitFor(() => expect(sweep).toHaveBeenCalled());
 };
@@ -86,9 +88,13 @@ it("offers a button once it has", () => {
  * collection takes several goes, and that pressing it again carries on rather
  * than starting over.
  */
-it("says a collection takes several goes and that pressing again carries on", () => {
+it("says a collection takes several goes and that pressing again carries on", async () => {
   render(<MapPicturesControl hubUrl="https://hub.example" agreed />);
-  const words = document.body.textContent ?? "";
+  fireEvent.click(
+    screen.getByRole("button", { name: "About sending pictures of your maps" }),
+  );
+  const help = await screen.findByRole("dialog");
+  const words = help.textContent ?? "";
   expect(words).toContain("several goes");
   expect(words).toContain("picks up where it stopped");
 });
@@ -119,14 +125,20 @@ it("says how far along it is while it runs", async () => {
       }),
   );
   render(<MapPicturesControl hubUrl="https://hub.example" agreed />);
-  fireEvent.click(screen.getByRole("button"));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Send pictures of your maps" }),
+  );
 
   await vi.waitFor(() => expect(reporters).toHaveLength(1));
   reporters[0]({ phase: "sending", done: 4, total: 12 });
 
   await screen.findByText("Sending 4 of 12");
-  // And the button says it is going, so nobody presses it twice.
-  expect(screen.getByRole("button").textContent).toContain("Reading your maps");
+  // And the button is held while it runs, so nobody presses it twice.
+  const button = screen.getByRole("button", {
+    name: "Send pictures of your maps",
+  });
+  expect(button.hasAttribute("disabled")).toBe(true);
+  expect(button.getAttribute("aria-busy")).toBe("true");
 });
 
 /** Whether this has ever happened. Somebody who agreed months ago and saw

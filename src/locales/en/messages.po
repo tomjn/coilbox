@@ -1205,13 +1205,6 @@ msgstr "{0} at a position with no name."
 msgid "{0} called a vote: {1}"
 msgstr "{0} called a vote: {1}"
 
-#. placeholder {0}: found.candidates.length
-#. placeholder {1}: found.skipped.length
-#. placeholder {2}: found.listed
-#: src/hub/pages/components/MapArchivesControl.tsx
-msgid "{0} can be uploaded, {1} cannot, and {2} are already on the hub."
-msgstr "{0} can be uploaded, {1} cannot, and {2} are already on the hub."
-
 #. placeholder {0}: d.asset
 #: src/content/gameSourceRows.ts
 msgid "{0} from the newest release"
@@ -8329,9 +8322,33 @@ msgstr "About saved keymaps"
 msgid "About scanning on startup"
 msgstr "About scanning on startup"
 
+#: src/hub/pages/components/AssetUploadControl.tsx
+msgid "About sending pictures"
+msgstr "About sending pictures"
+
+#: src/hub/pages/components/GamePicturesControl.tsx
+msgid "About sending pictures of your games"
+msgstr "About sending pictures of your games"
+
+#: src/hub/pages/components/MapPicturesControl.tsx
+msgid "About sending pictures of your maps"
+msgstr "About sending pictures of your maps"
+
+#: src/hub/pages/components/GameFactsControl.tsx
+msgid "About sending what your games say"
+msgstr "About sending what your games say"
+
+#: src/hub/pages/components/MapCatalogControl.tsx
+msgid "About sending what your maps say"
+msgstr "About sending what your maps say"
+
 #: src/lego/pages/components/CollisionPanel.tsx
 msgid "About shooting at each piece"
 msgstr "About shooting at each piece"
+
+#: src/hub/pages/components/AccountControl.tsx
+msgid "About signing out"
+msgstr "About signing out"
 
 #: src/sound/SoundSettings.tsx
 msgid "About sounds"
@@ -8417,6 +8434,10 @@ msgstr "About this scenario"
 msgid "About unit values"
 msgstr "About unit values"
 
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "About uploading map files"
+msgstr "About uploading map files"
+
 #: src/lego/pages/components/CollisionPanel.tsx
 msgid "About using each piece"
 msgstr "About using each piece"
@@ -8492,6 +8513,7 @@ msgstr "Access level"
 
 #: src/account/index.ts
 #: src/account/pages/SettingsSection.tsx
+#: src/hub/pages/components/AccountControl.tsx
 #: src/multiplayer/AccountPicker.tsx
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 msgid "Account"
@@ -12248,6 +12270,10 @@ msgstr "Can target ground"
 msgid "Can travel underwater"
 msgstr "Can travel underwater"
 
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Can upload: {can}. Cannot upload: {cannot}. Already on the hub: {listed}."
+msgstr "Can upload: {can}. Cannot upload: {cannot}. Already on the hub: {listed}."
+
 #: src/multiplayer/battle/contentBlock.ts
 msgid "Can't check content"
 msgstr "Can't check content"
@@ -12901,6 +12927,9 @@ msgid "Checking what can be deleted..."
 msgstr "Checking what can be deleted..."
 
 #: src/hub/pages/components/AccountControl.tsx
+msgid "Checking whether you are signed in"
+msgstr "Checking whether you are signed in"
+
 #: src/hub/PublishSection.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "Checking whether you are signed in."
@@ -13691,6 +13720,10 @@ msgstr "Coilbox connects to any TASServer-compatible lobby, including one you ru
 #: src/multiplayer/battle/compatBattle.ts
 msgid "Coilbox could not build {baseName} (compat {version}) for this battle: {error}"
 msgstr "Coilbox could not build {baseName} (compat {version}) for this battle: {error}"
+
+#: src/hub/pages/components/AccountControl.tsx
+msgid "Coilbox could not check the name this time."
+msgstr "Coilbox could not check the name this time."
 
 #: src/downloads/pages/components/EngineUpload.tsx
 msgid "Coilbox could not check the official Recoil releases, so it cannot tell whether the hub needs this build. {why}"
@@ -17445,10 +17478,6 @@ msgid "Drawing {at} of {total}: {game}"
 msgstr "Drawing {at} of {total}: {game}"
 
 #: src/hub/pages/components/GamePicturesControl.tsx
-msgid "Drawing your units…"
-msgstr "Drawing your units…"
-
-#: src/hub/pages/components/GamePicturesControl.tsx
 msgid "Drawing: {game}"
 msgstr "Drawing: {game}"
 
@@ -19253,6 +19282,7 @@ msgstr "Filters and sorting"
 msgid "Filters: {filters}"
 msgstr "Filters: {filters}"
 
+#: src/hub/pages/components/MapArchivesControl.tsx
 #: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 msgid "Find"
 msgstr "Find"
@@ -19307,8 +19337,8 @@ msgid "Find other accounts on this IP"
 msgstr "Find other accounts on this IP"
 
 #: src/hub/pages/components/MapArchivesControl.tsx
-msgid "Finding maps…"
-msgstr "Finding maps…"
+msgid "Finds the map files on this computer that the hub does not have yet, so you can choose which to upload. Reading each one takes a while on a large library."
+msgstr "Finds the map files on this computer that the hub does not have yet, so you can choose which to upload. Reading each one takes a while on a large library."
 
 #: src/content/pages/StorageSection.tsx
 msgid "Finish or cancel downloads first"
@@ -25005,6 +25035,10 @@ msgstr "Map and game missing"
 msgid "Map compiler"
 msgstr "Map compiler"
 
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Map files"
+msgstr "Map files"
+
 #: src/conquest/pages/ConquestListPage.tsx
 msgid "Map folder \"{folder}\""
 msgstr "Map folder \"{folder}\""
@@ -25204,6 +25238,10 @@ msgstr "Maps could not be read"
 #: src/conquest/pages/ConquestListPage.tsx
 msgid "Maps that could not be listed"
 msgstr "Maps that could not be listed"
+
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Maps the hub is missing"
+msgstr "Maps the hub is missing"
 
 #: src/mapconv/pages/ProjectsPage.tsx
 msgid "Maps you've decompiled or compiled. Open one to recompile with its remembered options, or reveal its folder. Decompiling extracts to a <0>.sdd</0> directory the engine can load directly."
@@ -29123,6 +29161,10 @@ msgstr "Not set, the engine uses 0.5"
 msgid "Not set, the unit never backs up"
 msgstr "Not set, the unit never backs up"
 
+#: src/hub/pages/components/AccountControl.tsx
+msgid "Not signed in"
+msgstr "Not signed in"
+
 #: src/account/pages/SettingsSection.tsx
 msgid "Not signed in. Connect as {lastUsername} to manage that account."
 msgstr "Not signed in. Connect as {lastUsername} to manage that account."
@@ -31550,6 +31592,14 @@ msgstr "Picture exported."
 msgid "Picture uploads stopped early"
 msgstr "Picture uploads stopped early"
 
+#: src/hub/pages/components/GamePicturesControl.tsx
+msgid "Pictures of your games"
+msgstr "Pictures of your games"
+
+#: src/hub/pages/components/MapPicturesControl.tsx
+msgid "Pictures of your maps"
+msgstr "Pictures of your maps"
+
 #: src/content/pages/components/ReplayBaseCrops.tsx
 msgid "Pictures show orders given from {from} to {to}."
 msgstr "Pictures show orders given from {from} to {to}."
@@ -33361,7 +33411,6 @@ msgid "Reading which routes {gameName} supports…"
 msgstr "Reading which routes {gameName} supports…"
 
 #: src/blueprint/pages/BlueprintsPage.tsx
-#: src/hub/pages/components/GameFactsControl.tsx
 #: src/play/pages/components/GamePickerGrid.tsx
 msgid "Reading your games…"
 msgstr "Reading your games…"
@@ -33375,11 +33424,6 @@ msgstr "Reading your installed games"
 #: src/hub/pages/components/MapPicturesControl.tsx
 msgid "Reading your maps"
 msgstr "Reading your maps"
-
-#: src/hub/pages/components/MapCatalogControl.tsx
-#: src/hub/pages/components/MapPicturesControl.tsx
-msgid "Reading your maps…"
-msgstr "Reading your maps…"
 
 #: src/lego/pages/ProjectsPage.tsx
 msgid "Reading your saved models."
@@ -36513,6 +36557,7 @@ msgstr "Self-destruct explosion"
 msgid "Self-destructs"
 msgstr "Self-destructs"
 
+#: src/hub/pages/components/SendButton.tsx
 #: src/multiplayer/admin/AnnouncementsSection.tsx
 #: src/multiplayer/battle/BonusButton.tsx
 #: src/multiplayer/chat/ChatPane.tsx
@@ -36622,18 +36667,6 @@ msgstr "Sending pictures"
 msgid "Sending pictures for the hub. Open to stop."
 msgstr "Sending pictures for the hub. Open to stop."
 
-#: src/hub/pages/components/GamePicturesControl.tsx
-msgid "Sending pictures of your games"
-msgstr "Sending pictures of your games"
-
-#: src/hub/pages/components/MapPicturesControl.tsx
-msgid "Sending pictures of your maps"
-msgstr "Sending pictures of your maps"
-
-#: src/hub/pages/components/AssetUploadControl.tsx
-msgid "Sending pictures to the hub"
-msgstr "Sending pictures to the hub"
-
 #: src/hub/assets/UploadRunBadge.tsx
 msgid "Sending to hub"
 msgstr "Sending to hub"
@@ -36641,14 +36674,6 @@ msgstr "Sending to hub"
 #: src/hub/assets/UploadRunBadge.tsx
 msgid "Sending to the hub. Open to stop."
 msgstr "Sending to the hub. Open to stop."
-
-#: src/hub/pages/components/GameFactsControl.tsx
-msgid "Sending what your games say"
-msgstr "Sending what your games say"
-
-#: src/hub/pages/components/MapCatalogControl.tsx
-msgid "Sending what your maps say"
-msgstr "Sending what your maps say"
 
 #: src/hub/pages/components/GameFactsControl.tsx
 msgid "Sending: {game}"
@@ -37171,6 +37196,10 @@ msgstr "Shares a team with {leaderName} — team settings come from the first me
 #: src/multiplayer/battle/MemberRow.tsx
 msgid "Shares a team with {sharedName} — team settings come from the first member"
 msgstr "Shares a team with {sharedName} — team settings come from the first member"
+
+#: src/hub/pages/components/ShareAssetsPanel.tsx
+msgid "Sharing"
+msgstr "Sharing"
 
 #: src/workshop/weaponSlots.ts
 msgid "Shield"
@@ -37805,18 +37834,15 @@ msgstr "Sign out"
 msgid "Sign-in"
 msgstr "Sign-in"
 
+#: src/hub/pages/components/AccountControl.tsx
 #: src/hub/pages/components/HeaderAccount.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "Signed in"
 msgstr "Signed in"
 
 #: src/hub/pages/components/AccountControl.tsx
-msgid "Signed in as {accountName}."
-msgstr "Signed in as {accountName}."
-
-#: src/hub/pages/components/AccountControl.tsx
-msgid "Signed in. Coilbox could not check the name this time."
-msgstr "Signed in. Coilbox could not check the name this time."
+msgid "Signed in as {accountName}"
+msgstr "Signed in as {accountName}"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "Signed in. Coilbox holds a token for this login, not a password."
@@ -45908,10 +45934,6 @@ msgstr "Uploading to hub"
 msgid "Uploading to the hub. Open to stop."
 msgstr "Uploading to the hub. Open to stop."
 
-#: src/hub/pages/components/MapArchivesControl.tsx
-msgid "Uploading your map files"
-msgstr "Uploading your map files"
-
 #: src/hub/upload/UploadToHubButton.tsx
 msgid "Uploading…"
 msgstr "Uploading…"
@@ -46944,12 +46966,24 @@ msgid "What uberserver cleans up by itself, and what no client can do"
 msgstr "What uberserver cleans up by itself, and what no client can do"
 
 #: src/hub/pages/components/AssetUploadControl.tsx
-msgid "What you send is public and hard to take back. It goes into a public repository and stays in its history, so it is not like deleting a file you uploaded by mistake. The pictures are made from other people's game and map archives, and not every archive is clear about what you may do with what is inside it. Every upload also spends storage the whole community shares."
-msgstr "What you send is public and hard to take back. It goes into a public repository and stays in its history, so it is not like deleting a file you uploaded by mistake. The pictures are made from other people's game and map archives, and not every archive is clear about what you may do with what is inside it. Every upload also spends storage the whole community shares."
+msgid "What you send goes into a public repository and stays in its history, so it is not like deleting a file you uploaded by mistake. The pictures are made from other people's game and map archives, and not every archive is clear about what you may do with what is inside it. Every upload also spends storage the whole community shares."
+msgstr "What you send goes into a public repository and stays in its history, so it is not like deleting a file you uploaded by mistake. The pictures are made from other people's game and map archives, and not every archive is clear about what you may do with what is inside it. Every upload also spends storage the whole community shares."
+
+#: src/hub/pages/components/AssetUploadControl.tsx
+msgid "What you send is public and hard to take back."
+msgstr "What you send is public and hard to take back."
+
+#: src/hub/pages/components/GameFactsControl.tsx
+msgid "What your games say"
+msgstr "What your games say"
 
 #: src/content/pages/components/MapRecords.tsx
 msgid "What your library knows about it"
 msgstr "What your library knows about it"
+
+#: src/hub/pages/components/MapCatalogControl.tsx
+msgid "What your maps say"
+msgstr "What your maps say"
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "Whatever had already been written is still in the output folder."
@@ -48274,10 +48308,6 @@ msgstr "Your games could not be read, so nothing here has been checked against t
 #: src/blueprint/pages/BlueprintsPage.tsx
 msgid "Your games could not be read: {scanError}"
 msgstr "Your games could not be read: {scanError}"
-
-#: src/hub/pages/components/AccountControl.tsx
-msgid "Your hub account"
-msgstr "Your hub account"
 
 #: src/direct/ReachablePorts.tsx
 msgid "Your internet provider blocks the way in"

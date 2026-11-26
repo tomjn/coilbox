@@ -1,3 +1,5 @@
+import { Trans } from "@lingui/react/macro";
+import { SettingList } from "@/components/SettingRow";
 import { isHubAssetUploadOffered } from "../../../profile/profile";
 import { useAssetUploadConsent } from "../../assetUploads";
 import { AccountControl } from "./AccountControl";
@@ -25,7 +27,7 @@ import { MapPicturesControl } from "./MapPicturesControl";
  * it has been given - either sweep reads every archive of its kind on the
  * machine, and nothing about opening this panel says that is wanted now.
  *
- * Four sections and not three, because a map and a game each have two halves
+ * Four rows and not three, because a map and a game each have two halves
  * to contribute: what it says, and what it looks like.
  */
 export function ShareAssetsPanel({ hubUrl }: { hubUrl: string }) {
@@ -33,21 +35,28 @@ export function ShareAssetsPanel({ hubUrl }: { hubUrl: string }) {
   const offered = isHubAssetUploadOffered();
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-10">
       <AccountControl hubUrl={hubUrl} />
-      <AssetUploadControl
-        agreed={uploadsAgreed}
-        onChange={setUploadsAgreed}
-        offered={offered}
-      />
-      {offered && (
-        <>
-          <MapCatalogControl hubUrl={hubUrl} agreed={uploadsAgreed} />
-          <MapPicturesControl hubUrl={hubUrl} agreed={uploadsAgreed} />
-          <GameFactsControl hubUrl={hubUrl} agreed={uploadsAgreed} />
-          <GamePicturesControl hubUrl={hubUrl} agreed={uploadsAgreed} />
-        </>
-      )}
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold">
+          <Trans>Sharing</Trans>
+        </h2>
+        <SettingList>
+          <AssetUploadControl
+            agreed={uploadsAgreed}
+            onChange={setUploadsAgreed}
+            offered={offered}
+          />
+          {offered && (
+            <>
+              <MapCatalogControl hubUrl={hubUrl} agreed={uploadsAgreed} />
+              <MapPicturesControl hubUrl={hubUrl} agreed={uploadsAgreed} />
+              <GameFactsControl hubUrl={hubUrl} agreed={uploadsAgreed} />
+              <GamePicturesControl hubUrl={hubUrl} agreed={uploadsAgreed} />
+            </>
+          )}
+        </SettingList>
+      </section>
     </div>
   );
 }

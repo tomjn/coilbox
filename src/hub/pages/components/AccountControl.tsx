@@ -1,7 +1,8 @@
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
-import { RotateCw } from "lucide-react";
+import { Loader2, RotateCw } from "lucide-react";
+import { SettingList, SettingRow } from "@/components/SettingRow";
 import {
   Popover,
   PopoverContent,
@@ -41,83 +42,84 @@ export function AccountControl({ hubUrl }: { hubUrl: string }) {
   const accountName = account?.name;
 
   return (
-    <section className="space-y-2">
-      <h3 className="text-sm font-medium leading-none">
-        <Trans>Your hub account</Trans>
-      </h3>
-      {loading ? (
-        <p className="text-sm text-muted-foreground">
-          <Trans>Checking whether you are signed in.</Trans>
-        </p>
-      ) : signedIn ? (
-        <>
-          <p className="text-sm text-muted-foreground">
-            {accountName
-              ? t`Signed in as ${accountName}.`
-              : t`Signed in. Coilbox could not check the name this time.`}
-          </p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => void signOut()}
-            disabled={busy}
-            aria-busy={busy}
+    <section className="flex flex-col gap-3">
+      <h2 className="text-sm font-semibold">
+        <Trans>Account</Trans>
+      </h2>
+      <SettingList>
+        {loading ? (
+          <SettingRow label={t`Checking whether you are signed in`}>
+            <Loader2
+              className="size-4 animate-spin text-muted-foreground"
+              aria-hidden
+            />
+          </SettingRow>
+        ) : signedIn ? (
+          <SettingRow
+            label={accountName ? t`Signed in as ${accountName}` : t`Signed in`}
+            description={
+              accountName
+                ? undefined
+                : t`Coilbox could not check the name this time.`
+            }
+            error={problem}
+            help={
+              <p>
+                <Trans>
+                  Signing out only affects this computer. It does not remove
+                  anything you have already shared.
+                </Trans>
+              </p>
+            }
+            helpLabel={t`About signing out`}
           >
-            <Trans>Sign out</Trans>
-          </Button>
-          <p className="text-xs leading-snug text-muted-foreground">
-            <Trans>
-              Signing out only affects this computer. It does not remove
-              anything you have already shared.
-            </Trans>
-          </p>
-        </>
-      ) : unknown ? (
-        // The check failed, so this is not a signed-out reader and must not be
-        // told what an account is for (issue #1470). Settings is where somebody
-        // goes to sort their account out, and it was the one place that could
-        // not ask the question again. The sign-in stays beside it, because it
-        // works whatever the keychain said a moment ago.
-        <>
-          <p className="text-sm text-muted-foreground">
-            {i18n._(COULD_NOT_CHECK)}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <TryAgainButton onRecheck={recheck} />
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => void signOut()}
+              disabled={busy}
+              aria-busy={busy}
+            >
+              <Trans>Sign out</Trans>
+            </Button>
+          </SettingRow>
+        ) : unknown ? (
+          // The check failed, so this is not a signed-out reader and must not
+          // be told what an account is for (issue #1470). Settings is where
+          // somebody goes to sort their account out, and it was the one place
+          // that could not ask the question again. The sign-in stays beside it,
+          // because it works whatever the keychain said a moment ago.
+          <SettingRow label={i18n._(COULD_NOT_CHECK)} error={problem}>
+            <div className="flex flex-wrap justify-end gap-2">
+              <TryAgainButton onRecheck={recheck} />
+              <SignInButton
+                hubUrl={hubUrl}
+                busy={busy}
+                onSignIn={signIn}
+                size="sm"
+              />
+            </div>
+          </SettingRow>
+        ) : (
+          <SettingRow
+            label={t`Not signed in`}
+            description={
+              busy
+                ? t`Finish signing in the browser window that opened. Coilbox stops waiting after a minute.`
+                : t`You need an account to share things on the hub. Browsing and importing need no account.`
+            }
+            error={problem}
+          >
             <SignInButton
               hubUrl={hubUrl}
               busy={busy}
               onSignIn={signIn}
               size="sm"
+              variant="default"
             />
-          </div>
-        </>
-      ) : (
-        <>
-          <p className="text-sm text-muted-foreground">
-            <Trans>
-              You need an account to share things on the hub. Browsing and
-              importing need no account.
-            </Trans>
-          </p>
-          <SignInButton
-            hubUrl={hubUrl}
-            busy={busy}
-            onSignIn={signIn}
-            size="sm"
-            variant="default"
-          />
-          {busy && (
-            <p className="text-xs leading-snug text-muted-foreground">
-              <Trans>
-                Finish signing in the browser window that opened. Coilbox stops
-                waiting after a minute.
-              </Trans>
-            </p>
-          )}
-        </>
-      )}
-      {problem && <p className="text-sm text-destructive">{problem}</p>}
+          </SettingRow>
+        )}
+      </SettingList>
     </section>
   );
 }

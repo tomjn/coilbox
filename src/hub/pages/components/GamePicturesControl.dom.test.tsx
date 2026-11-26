@@ -131,9 +131,15 @@ it("offers a button once it has", () => {
  * takes several goes, and that pressing it again carries on rather than starting
  * over.
  */
-it("says a game takes several goes and that pressing again carries on", () => {
+it("says a game takes several goes and that pressing again carries on", async () => {
   render(<GamePicturesControl hubUrl="https://hub.example" agreed />);
-  const words = document.body.textContent ?? "";
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: "About sending pictures of your games",
+    }),
+  );
+  const help = await screen.findByRole("dialog");
+  const words = help.textContent ?? "";
   expect(words).toContain("several goes");
   expect(words).toContain("picks up where it stopped");
 });
@@ -182,10 +188,10 @@ it("says how far along it is while it runs", async () => {
   reporters[0]({ phase: "filling", done: 1, total: 3, game: "Evolution RTS" });
 
   await screen.findByText("Drawing 2 of 3: Evolution RTS");
-  // And the button says it is going, so nobody presses it twice.
-  expect(
-    screen.getByRole("button", { name: /send pictures|drawing/i }).textContent,
-  ).toContain("Drawing your units");
+  // And the button is held while it runs, so nobody presses it twice.
+  const button = screen.getByRole("button", { name: /send pictures/i });
+  expect(button.hasAttribute("disabled")).toBe(true);
+  expect(button.getAttribute("aria-busy")).toBe("true");
 });
 
 /**

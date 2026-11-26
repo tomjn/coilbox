@@ -48,12 +48,13 @@ export function SettingRow({
           )}
         </div>
         {description && (
-          <p
+          // A div rather than a p, so a description can hold a progress bar.
+          <div
             id={id && `${id}-description`}
             className="mt-0.5 text-xs text-muted-foreground"
           >
             {description}
-          </p>
+          </div>
         )}
         {error && (
           <p
