@@ -434,11 +434,6 @@ msgstr "({shownCount} από {totalCount})"
 msgid "({totalCount})"
 msgstr "({totalCount})"
 
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "(auto)"
-msgstr "(αυτόματο)"
-
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 #, fuzzy
 msgid "(copies into the library)"
@@ -10078,6 +10073,10 @@ msgstr ""
 msgid "About banking"
 msgstr "Σχετικά με την κλίση"
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "About bench mode"
+msgstr ""
+
 #: src/content/pages/StorageSection.tsx
 msgid "About caches"
 msgstr ""
@@ -10163,6 +10162,10 @@ msgstr ""
 msgid "About keys with more than one action"
 msgstr ""
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "About lobby servers"
+msgstr ""
+
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "About logging back in on startup"
 msgstr ""
@@ -10228,6 +10231,10 @@ msgstr "Σχετικά με τα ίχνη επαναλήψεων"
 msgid "About replay unit lists"
 msgstr ""
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "About resetting the database"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "About roles"
@@ -10237,6 +10244,10 @@ msgstr "Σχετικά με τους ρόλους"
 #, fuzzy
 msgid "About round shapes"
 msgstr "Σχετικά με τα στρογγυλά σχήματα"
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "About run defaults"
+msgstr ""
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 msgid "About saved copies"
@@ -10274,6 +10285,10 @@ msgstr "Σχετικά με τον όγκο σύγκρουσης"
 msgid "About the colour texture"
 msgstr "Σχετικά με την υφή χρώματος"
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "About the duration"
+msgstr ""
+
 #: src/play/pages/EngineLogSection.tsx
 msgid "About the engine log"
 msgstr ""
@@ -10310,6 +10325,14 @@ msgstr ""
 #, fuzzy
 msgid "About the pivot point"
 msgstr "Σχετικά με το σημείο περιστροφής"
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "About the Python path"
+msgstr ""
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "About the ramp"
+msgstr ""
 
 #: src/lego/pages/components/TextureBuilderPanel.tsx
 #, fuzzy
@@ -12863,6 +12886,7 @@ msgid "Autohost vote"
 msgstr "Ψηφοφορία autohost"
 
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Automatic"
 msgstr "Αυτόματο"
@@ -13713,9 +13737,8 @@ msgid "bench"
 msgstr "bench"
 
 #: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Bench & database"
-msgstr "Bench και βάση δεδομένων"
+msgid "Bench"
+msgstr ""
 
 #: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
@@ -19675,6 +19698,14 @@ msgstr "Τα δεδομένα δεν είναι JSON: {reason}"
 msgid "Data table"
 msgstr "Πίνακας δεδομένων"
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "Database"
+msgstr ""
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "Database name"
+msgstr ""
+
 #: src/multiplayer/battles/OaPorts.tsx
 #, fuzzy
 msgid "Datagrams"
@@ -19695,36 +19726,6 @@ msgstr "Δημιουργία"
 #, fuzzy
 msgid "Days"
 msgstr "Ημέρες"
-
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "DB driver"
-msgstr "Οδηγός ΒΔ"
-
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "DB host"
-msgstr "Διακομιστής ΒΔ"
-
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "DB name"
-msgstr "Όνομα ΒΔ"
-
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "DB password"
-msgstr "Κωδικός ΒΔ"
-
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "DB port"
-msgstr "Θύρα ΒΔ"
-
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "DB user"
-msgstr "Χρήστης ΒΔ"
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 #, fuzzy
@@ -19920,11 +19921,6 @@ msgstr "Προεπιλογή: {defaultText}"
 #, fuzzy
 msgid "defaults"
 msgstr "προεπιλογές"
-
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "defaults to <server-dir>/venv/bin/python3"
-msgstr "προεπιλογή <server-dir>/venv/bin/python3"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -21496,6 +21492,10 @@ msgstr "Σχεδιάζει το βλήμα ακόμη και εκτός οπτι
 msgid "Drive a scenario against a lobby server (load) or launch one locally and benchmark it (bench)."
 msgstr "Εκτελέστε ένα σενάριο εναντίον διακομιστή λόμπι (load) ή ξεκινήστε ένα τοπικά και μετρήστε την απόδοσή του (bench)."
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "Driver"
+msgstr ""
+
 #: src/lego/scriptPlayback.ts
 #, fuzzy
 msgid "Drives along a path while its weapon keeps aiming at a target that keeps moving, from where the unit is and which way it faces."
@@ -21552,9 +21552,8 @@ msgid "Drops a point on a team's map, labelled if you give it text."
 msgstr "Τοποθετεί ένα σημείο στον χάρτη μιας ομάδας, με ετικέτα αν δώσετε κείμενο."
 
 #: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Drops and recreates the database. Required for register-storm; leave on for clean A/B runs."
-msgstr "Διαγράφει και ξαναδημιουργεί τη βάση δεδομένων. Απαιτείται για το register-storm. Αφήστε το ενεργό για καθαρές εκτελέσεις A/B."
+msgid "Drops and recreates the database. The register-storm scenario needs this, and it keeps A/B runs comparable."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -21654,7 +21653,6 @@ msgid "e.g. 10m, 2h, 3d"
 msgstr "π.χ. 10m, 2h, 3d"
 
 #: src/uberstress/pages/RunPage.tsx
-#: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
 msgid "e.g. 10s"
 msgstr "π.χ. 10s"
@@ -25488,11 +25486,6 @@ msgstr "Η λάμψη πηγαίνει στο κόκκινο, η ανακλασ�
 msgid "glTF Binary"
 msgstr "glTF Binary"
 
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Go duration, e.g. 30s"
-msgstr "Διάρκεια Go, π.χ. 30s"
-
 #: src/multiplayer/pages/ChatPage.tsx
 #: src/multiplayer/RelayIndicator.tsx
 #, fuzzy
@@ -26489,6 +26482,7 @@ msgstr "Οριζόντια"
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #: src/multiplayer/battle/MemberRow.tsx
 #: src/play/pages/SkirmishPage.tsx
+#: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Host"
 msgstr "Οικοδεσπότης"
@@ -26716,6 +26710,14 @@ msgstr "Πόσο έντονα αντλεί αυτός ο εξορυκτής απ
 #, fuzzy
 msgid "How long a match runs"
 msgstr "Πόσο διαρκεί ένας αγώνας"
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "How long it takes to open every connection, such as 10s."
+msgstr ""
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "How long the run lasts. A number and a unit, such as 30s, 2m or 1m30s."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -29356,6 +29358,10 @@ msgstr "Έξοδος από το εργαλείο μέτρησης"
 msgid "Leave the measure tool ({measureKey})"
 msgstr "Έξοδος από το εργαλείο μέτρησης ({measureKey})"
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "Leave this empty to use venv/bin/python3 in the uberserver folder."
+msgstr ""
+
 #: src/hub/pages/components/AssetUploadControl.tsx
 #, fuzzy
 msgid "Leave this off unless you are happy to publish pictures made from the games and maps you have installed."
@@ -30052,11 +30058,6 @@ msgstr "Διακομιστές λόμπι"
 #, fuzzy
 msgid "Local"
 msgstr "Τοπικό"
-
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Local dev"
-msgstr "Τοπική ανάπτυξη"
 
 #: src/multiplayer/admin/ServerAddressSection.tsx
 #, fuzzy
@@ -32436,9 +32437,8 @@ msgid "My server"
 msgstr "Ο διακομιστής μου"
 
 #: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "mysql binary"
-msgstr "εκτελέσιμο mysql"
+msgid "mysql program"
+msgstr ""
 
 #: src/blueprint/pages/BlueprintsPage.tsx
 #: src/content/pages/components/MapRecords.tsx
@@ -34787,9 +34787,8 @@ msgid "No server would say what your public address is."
 msgstr "Κανένας διακομιστής δεν είπε ποια είναι η δημόσια διεύθυνσή σας."
 
 #: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "No servers yet. Add one to target it from the Run page."
-msgstr "Κανένας διακομιστής ακόμη. Προσθέστε έναν για να τον στοχεύσετε από τη σελίδα Εκτέλεση."
+msgid "No servers."
+msgstr ""
 
 #: src/content/pages/components/ReplaySetPicker.tsx
 #, fuzzy
@@ -36949,6 +36948,10 @@ msgstr "Μόνο {activeName}"
 msgid "Only another admin, or a direct change to the database, can give it back."
 msgstr "Μόνο άλλος διαχειριστής ή άμεση αλλαγή στη βάση δεδομένων μπορεί να το επαναφέρει."
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "Only bench mode uses these. It starts an uberserver checkout on this machine and can reset its database before each run. It needs the checkout, a Python virtual environment and a MySQL server you can reach."
+msgstr ""
+
 #: src/content/pages/components/MissionRuntimeSection.tsx
 #, fuzzy
 msgid "Only coilbox's own files. The game's gadgets, widgets and missions stay where they are. This can't be undone."
@@ -38294,6 +38297,7 @@ msgstr "Οι επιβάτες επιζούν από την καταστροφή 
 #: src/lobby-servers/RegisterForm.tsx
 #: src/uberstress/pages/components/SeedSqlForm.tsx
 #: src/uberstress/pages/RunPage.tsx
+#: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Password"
 msgstr "Κωδικός πρόσβασης"
@@ -39416,6 +39420,7 @@ msgstr "Κακοί στόχοι"
 #: src/direct/JoinRoomForm.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Port"
 msgstr "Θύρα"
@@ -41673,6 +41678,7 @@ msgstr "Remix από"
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/multiplayer/battle/MemberRow.tsx
 #: src/play/ChobbyPresetsView.tsx
+#: src/uberstress/pages/SettingsSection.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 #, fuzzy
@@ -42539,11 +42545,6 @@ msgstr "Κάντε ξανά επαναφορά για να σταλούν όσε
 msgid "Reset all shortcuts"
 msgstr "Επαναφορά όλων των συντομεύσεων"
 
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Reset database before each bench run"
-msgstr "Επαναφορά της βάσης δεδομένων πριν από κάθε εκτέλεση συγκριτικής δοκιμής"
-
 #: src/multiplayer/battles/BattleFilterPopover.tsx
 #, fuzzy
 msgid "Reset filters"
@@ -42577,6 +42578,10 @@ msgstr "Επαναφορά συνεδρίας"
 #, fuzzy
 msgid "Reset the armour class to {inherited}, the game's own"
 msgstr "Επαναφορά της κατηγορίας θωράκισης σε {inherited}, αυτή του παιχνιδιού"
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "Reset the database before each run"
+msgstr ""
 
 #: src/components/ViewControls.tsx
 #: src/lego/pages/components/AxisCompass.tsx
@@ -45126,11 +45131,6 @@ msgstr "Ο διακομιστής ζήτησε επαλήθευση κατά τ�
 #, fuzzy
 msgid "Server battles are listed here once you log in. This list is empty because coilbox has no lobby connection, not because nobody is playing."
 msgstr "Οι μάχες του διακομιστή εμφανίζονται εδώ μόλις συνδεθείτε. Αυτή η λίστα είναι κενή επειδή το coilbox δεν έχει σύνδεση σε λόμπι, όχι επειδή δεν παίζει κανείς."
-
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Server dir"
-msgstr "Φάκελος διακομιστή"
 
 #: src/multiplayer/chat/FriendRow.tsx
 #, fuzzy
@@ -51540,6 +51540,14 @@ msgstr "Λείπει το ριζικό τμήμα."
 msgid "The rules are grouped under Coilbox, so you can find and remove them in Windows Defender Firewall whenever you like."
 msgstr "Οι κανόνες ομαδοποιούνται κάτω από το Coilbox, ώστε να μπορείτε να τους βρείτε και να τους αφαιρέσετε στο Τείχος προστασίας του Windows Defender όποτε θέλετε."
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "The Run page offers these as targets. A server needs an address, such as 127.0.0.1:8200."
+msgstr ""
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "The Run page starts with these. You can still change them there for each run."
+msgstr ""
+
 #: src/scenario/pages/components/TriggerSteps.tsx
 #, fuzzy
 msgid "The runtime that would play this scenario does not implement this type, so the mission is refused at launch until the game's runtime catches up or the step goes."
@@ -55336,9 +55344,8 @@ msgid "Type your message..."
 msgstr "Γράψτε το μήνυμά σας..."
 
 #: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "uberserver checkout path"
-msgstr "διαδρομή checkout του uberserver"
+msgid "uberserver folder"
+msgstr ""
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
@@ -56596,17 +56603,13 @@ msgstr "Χρησιμοποιείται για κάθε κατηγορία θωρ
 msgid "Used for collisions and for melee impulse. Defaults to the metal cost."
 msgstr "Χρησιμοποιείται για συγκρούσεις και για ώθηση σώμα με σώμα. Από προεπιλογή ίσο με το κόστος μετάλλου."
 
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Used only by bench mode, which launches an uberserver checkout locally and resets the database before each run. Requires a checkout, a Python venv, and a reachable MySQL on this machine."
-msgstr "Χρησιμοποιείται μόνο από τη λειτουργία συγκριτικής δοκιμής, που ξεκινά τοπικά ένα checkout του uberserver και επαναφέρει τη βάση δεδομένων πριν από κάθε εκτέλεση. Απαιτεί checkout, Python venv και προσβάσιμη MySQL σε αυτόν τον υπολογιστή."
-
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Used when the weapon has no model. EmgCannon defaults to a different colour."
 msgstr "Χρησιμοποιείται όταν το όπλο δεν έχει μοντέλο. Το EmgCannon έχει διαφορετικό προεπιλεγμένο χρώμα."
 
 #: src/multiplayer/admin/StaffSection.tsx
+#: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
 msgid "User"
 msgstr "Χρήστης"
@@ -56666,9 +56669,8 @@ msgid "Username, IP or email to unban"
 msgstr "Όνομα χρήστη, IP ή email για άρση αποκλεισμού"
 
 #: src/uberstress/pages/RunPage.tsx
-#, fuzzy
-msgid "Uses the bench/DB settings on the Servers page. Uncheck to benchmark an external address."
-msgstr "Χρησιμοποιεί τις ρυθμίσεις συγκριτικής δοκιμής και βάσης δεδομένων της σελίδας Διακομιστές. Αποεπιλέξτε για συγκριτική δοκιμή σε εξωτερική διεύθυνση."
+msgid "Uses the Bench and Database settings for uberstress. Uncheck to benchmark an external address."
+msgstr ""
 
 #: src/profile/useHealthChecks.ts
 #, fuzzy

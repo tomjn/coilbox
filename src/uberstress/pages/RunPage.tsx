@@ -12,7 +12,7 @@ import {
   Square,
   Zap,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { CheckField, Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
@@ -183,6 +183,11 @@ export default function RunPage() {
   const { t } = useLingui();
   // Config is reactive from the frame settings store; seeds the form below.
   const [cfg] = useUberstressConfig();
+  // A server row added in settings but not yet given an address is no target.
+  const servers = useMemo(
+    () => cfg.servers.filter((s) => s.addr.trim() !== ""),
+    [cfg.servers],
+  );
   const drawer = useDrawer();
   const navigate = useNavigate();
   const location = useLocation();
@@ -190,7 +195,7 @@ export default function RunPage() {
 
   const [mode, setMode] = useState<"load" | "bench">("load");
   const [serverChoice, setServerChoice] = useState<string>(
-    () => cfg.servers[0]?.id ?? MANUAL,
+    () => servers[0]?.id ?? MANUAL,
   );
   const [manualAddr, setManualAddr] = useState("127.0.0.1:8200");
   const [launch, setLaunch] = useState(true);
@@ -252,7 +257,7 @@ export default function RunPage() {
     prefilled.current = true;
 
     setScenario(rr.scenario);
-    const match = cfg.servers.find((s) => s.addr === rr.addr);
+    const match = servers.find((s) => s.addr === rr.addr);
     if (match) {
       setServerChoice(match.id);
     } else if (rr.addr) {
@@ -292,7 +297,7 @@ export default function RunPage() {
       "ping_interval",
     ];
     if (advancedKeys.some((k) => p[k] != null)) setShowAdvanced(true);
-  }, [location.state, cfg.servers]);
+  }, [location.state, servers]);
 
   // Auto-scroll the log to the newest line.
   // biome-ignore lint/correctness/useExhaustiveDependencies: logLines is the trigger that should re-run the scroll, not read in the body
@@ -315,7 +320,7 @@ export default function RunPage() {
   const effectiveAddr =
     serverChoice === MANUAL
       ? manualAddr
-      : (cfg.servers.find((s) => s.id === serverChoice)?.addr ?? manualAddr);
+      : (servers.find((s) => s.id === serverChoice)?.addr ?? manualAddr);
 
   // load always needs an addr; bench needs one only when not launching locally.
   const needsAddr = mode === "load" || (mode === "bench" && !launch);
@@ -477,7 +482,7 @@ export default function RunPage() {
           {mode === "bench" && (
             <CheckField
               label={t`Launch a local server`}
-              hint={t`Uses the bench/DB settings on the Servers page. Uncheck to benchmark an external address.`}
+              hint={t`Uses the Bench and Database settings for uberstress. Uncheck to benchmark an external address.`}
               checked={launch}
               onChange={setLaunch}
             />
@@ -490,7 +495,7 @@ export default function RunPage() {
                   onValueChange={setServerChoice}
                   disabled={running}
                   options={[
-                    ...cfg.servers.map((s) => ({
+                    ...servers.map((s) => ({
                       value: s.id,
                       label: `${s.name || s.addr} (${s.addr})`,
                     })),

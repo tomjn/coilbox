@@ -434,11 +434,6 @@ msgstr "（{shownCount} / {totalCount}）"
 msgid "({totalCount})"
 msgstr "（{totalCount}）"
 
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "(auto)"
-msgstr "（自动）"
-
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 #, fuzzy
 msgid "(copies into the library)"
@@ -10077,6 +10072,10 @@ msgstr ""
 msgid "About banking"
 msgstr "关于倾斜"
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "About bench mode"
+msgstr ""
+
 #: src/content/pages/StorageSection.tsx
 msgid "About caches"
 msgstr ""
@@ -10162,6 +10161,10 @@ msgstr ""
 msgid "About keys with more than one action"
 msgstr ""
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "About lobby servers"
+msgstr ""
+
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "About logging back in on startup"
 msgstr ""
@@ -10227,6 +10230,10 @@ msgstr "关于回放录制轨道"
 msgid "About replay unit lists"
 msgstr ""
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "About resetting the database"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "About roles"
@@ -10236,6 +10243,10 @@ msgstr "关于作用"
 #, fuzzy
 msgid "About round shapes"
 msgstr "关于圆形形状"
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "About run defaults"
+msgstr ""
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 msgid "About saved copies"
@@ -10273,6 +10284,10 @@ msgstr "关于碰撞体积"
 msgid "About the colour texture"
 msgstr "关于颜色纹理"
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "About the duration"
+msgstr ""
+
 #: src/play/pages/EngineLogSection.tsx
 msgid "About the engine log"
 msgstr ""
@@ -10309,6 +10324,14 @@ msgstr ""
 #, fuzzy
 msgid "About the pivot point"
 msgstr "关于枢轴点"
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "About the Python path"
+msgstr ""
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "About the ramp"
+msgstr ""
 
 #: src/lego/pages/components/TextureBuilderPanel.tsx
 #, fuzzy
@@ -12862,6 +12885,7 @@ msgid "Autohost vote"
 msgstr "自动主机投票"
 
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Automatic"
 msgstr "自动"
@@ -13712,9 +13736,8 @@ msgid "bench"
 msgstr "bench"
 
 #: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Bench & database"
-msgstr "bench 和数据库"
+msgid "Bench"
+msgstr ""
 
 #: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
@@ -19671,6 +19694,14 @@ msgstr "数据不是 JSON：{reason}"
 msgid "Data table"
 msgstr "数据表"
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "Database"
+msgstr ""
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "Database name"
+msgstr ""
+
 #: src/multiplayer/battles/OaPorts.tsx
 #, fuzzy
 msgid "Datagrams"
@@ -19691,36 +19722,6 @@ msgstr "创建日期"
 #, fuzzy
 msgid "Days"
 msgstr "天"
-
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "DB driver"
-msgstr "DB 驱动"
-
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "DB host"
-msgstr "DB 主机"
-
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "DB name"
-msgstr "DB 名称"
-
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "DB password"
-msgstr "DB 密码"
-
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "DB port"
-msgstr "DB 端口"
-
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "DB user"
-msgstr "DB 用户"
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 #, fuzzy
@@ -19916,11 +19917,6 @@ msgstr "默认：{defaultText}"
 #, fuzzy
 msgid "defaults"
 msgstr "默认值"
-
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "defaults to <server-dir>/venv/bin/python3"
-msgstr "默认为 <server-dir>/venv/bin/python3"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -21491,6 +21487,10 @@ msgstr "即使在视野外也绘制弹体。"
 msgid "Drive a scenario against a lobby server (load) or launch one locally and benchmark it (bench)."
 msgstr "对大厅服务器运行场景（load），或在本地启动服务器并进行基准测试（bench）。"
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "Driver"
+msgstr ""
+
 #: src/lego/scriptPlayback.ts
 #, fuzzy
 msgid "Drives along a path while its weapon keeps aiming at a target that keeps moving, from where the unit is and which way it faces."
@@ -21547,9 +21547,8 @@ msgid "Drops a point on a team's map, labelled if you give it text."
 msgstr "在某支队伍的地图上放置一个标记点，如果提供文字则加上标签。"
 
 #: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Drops and recreates the database. Required for register-storm; leave on for clean A/B runs."
-msgstr "删除并重新创建数据库。register-storm 需要此项，做干净的 A/B 运行时请保持开启。"
+msgid "Drops and recreates the database. The register-storm scenario needs this, and it keeps A/B runs comparable."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -21649,7 +21648,6 @@ msgid "e.g. 10m, 2h, 3d"
 msgstr "例如 10m、2h、3d"
 
 #: src/uberstress/pages/RunPage.tsx
-#: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
 msgid "e.g. 10s"
 msgstr "例如 10s"
@@ -25480,11 +25478,6 @@ msgstr "发光写入红色通道，反射写入绿色通道。引擎不读取蓝
 msgid "glTF Binary"
 msgstr "glTF 二进制"
 
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Go duration, e.g. 30s"
-msgstr "运行时长，例如 30s"
-
 #: src/multiplayer/pages/ChatPage.tsx
 #: src/multiplayer/RelayIndicator.tsx
 #, fuzzy
@@ -26481,6 +26474,7 @@ msgstr "水平"
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #: src/multiplayer/battle/MemberRow.tsx
 #: src/play/pages/SkirmishPage.tsx
+#: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Host"
 msgstr "主机"
@@ -26708,6 +26702,14 @@ msgstr "此金属提取器从其下方抽取金属的力度。覆盖的地面范
 #, fuzzy
 msgid "How long a match runs"
 msgstr "对局时长"
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "How long it takes to open every connection, such as 10s."
+msgstr ""
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "How long the run lasts. A number and a unit, such as 30s, 2m or 1m30s."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -29346,6 +29348,10 @@ msgstr "退出测量工具"
 msgid "Leave the measure tool ({measureKey})"
 msgstr "退出测量工具（{measureKey}）"
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "Leave this empty to use venv/bin/python3 in the uberserver folder."
+msgstr ""
+
 #: src/hub/pages/components/AssetUploadControl.tsx
 #, fuzzy
 msgid "Leave this off unless you are happy to publish pictures made from the games and maps you have installed."
@@ -30042,11 +30048,6 @@ msgstr "大厅服务器"
 #, fuzzy
 msgid "Local"
 msgstr "本地"
-
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Local dev"
-msgstr "本地开发"
 
 #: src/multiplayer/admin/ServerAddressSection.tsx
 #, fuzzy
@@ -32424,9 +32425,8 @@ msgid "My server"
 msgstr "我的服务器"
 
 #: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "mysql binary"
-msgstr "mysql 可执行文件"
+msgid "mysql program"
+msgstr ""
 
 #: src/blueprint/pages/BlueprintsPage.tsx
 #: src/content/pages/components/MapRecords.tsx
@@ -34775,9 +34775,8 @@ msgid "No server would say what your public address is."
 msgstr "没有服务器能告知你的公网地址。"
 
 #: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "No servers yet. Add one to target it from the Run page."
-msgstr "还没有服务器。添加一个即可在运行页面中将其作为目标。"
+msgid "No servers."
+msgstr ""
 
 #: src/content/pages/components/ReplaySetPicker.tsx
 #, fuzzy
@@ -36935,6 +36934,10 @@ msgstr "仅 {activeName}"
 msgid "Only another admin, or a direct change to the database, can give it back."
 msgstr "只有其他管理员或直接修改数据库才能恢复。"
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "Only bench mode uses these. It starts an uberserver checkout on this machine and can reset its database before each run. It needs the checkout, a Python virtual environment and a MySQL server you can reach."
+msgstr ""
+
 #: src/content/pages/components/MissionRuntimeSection.tsx
 #, fuzzy
 msgid "Only coilbox's own files. The game's gadgets, widgets and missions stay where they are. This can't be undone."
@@ -38278,6 +38281,7 @@ msgstr "乘员在其被摧毁后存活"
 #: src/lobby-servers/RegisterForm.tsx
 #: src/uberstress/pages/components/SeedSqlForm.tsx
 #: src/uberstress/pages/RunPage.tsx
+#: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Password"
 msgstr "密码"
@@ -39400,6 +39404,7 @@ msgstr "不良目标"
 #: src/direct/JoinRoomForm.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Port"
 msgstr "端口"
@@ -41654,6 +41659,7 @@ msgstr "改编自"
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/multiplayer/battle/MemberRow.tsx
 #: src/play/ChobbyPresetsView.tsx
+#: src/uberstress/pages/SettingsSection.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 #, fuzzy
@@ -42520,11 +42526,6 @@ msgstr "再次重置以发送未生效的选项。已是默认值的选项会被
 msgid "Reset all shortcuts"
 msgstr "重置所有快捷键"
 
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Reset database before each bench run"
-msgstr "每次 bench 运行前重置数据库"
-
 #: src/multiplayer/battles/BattleFilterPopover.tsx
 #, fuzzy
 msgid "Reset filters"
@@ -42558,6 +42559,10 @@ msgstr "重置会话"
 #, fuzzy
 msgid "Reset the armour class to {inherited}, the game's own"
 msgstr "将护甲类型重置为游戏自身的 {inherited}"
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "Reset the database before each run"
+msgstr ""
 
 #: src/components/ViewControls.tsx
 #: src/lego/pages/components/AxisCompass.tsx
@@ -45104,11 +45109,6 @@ msgstr "服务器在注册时要求验证。请尝试登录以输入验证码。
 #, fuzzy
 msgid "Server battles are listed here once you log in. This list is empty because coilbox has no lobby connection, not because nobody is playing."
 msgstr "登录后这里会列出服务器上的对局。列表为空是因为 coilbox 没有连接到大厅，而不是因为没人在玩。"
-
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Server dir"
-msgstr "服务器目录"
 
 #: src/multiplayer/chat/FriendRow.tsx
 #, fuzzy
@@ -51510,6 +51510,14 @@ msgstr "缺少根部件。"
 msgid "The rules are grouped under Coilbox, so you can find and remove them in Windows Defender Firewall whenever you like."
 msgstr "这些规则归在 Coilbox 下，所以你可以随时在 Windows Defender 防火墙中找到并移除它们。"
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "The Run page offers these as targets. A server needs an address, such as 127.0.0.1:8200."
+msgstr ""
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "The Run page starts with these. You can still change them there for each run."
+msgstr ""
+
 #: src/scenario/pages/components/TriggerSteps.tsx
 #, fuzzy
 msgid "The runtime that would play this scenario does not implement this type, so the mission is refused at launch until the game's runtime catches up or the step goes."
@@ -55305,9 +55313,8 @@ msgid "Type your message..."
 msgstr "输入消息…"
 
 #: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "uberserver checkout path"
-msgstr "uberserver checkout 路径"
+msgid "uberserver folder"
+msgstr ""
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
@@ -56565,17 +56572,13 @@ msgstr "用于在 damage 中没有自己条目的任何护甲类型。"
 msgid "Used for collisions and for melee impulse. Defaults to the metal cost."
 msgstr "用于碰撞和近战冲量。默认为金属消耗。"
 
-#: src/uberstress/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Used only by bench mode, which launches an uberserver checkout locally and resets the database before each run. Requires a checkout, a Python venv, and a reachable MySQL on this machine."
-msgstr "仅用于 bench 模式，该模式会在本地启动一个 uberserver checkout，并在每次运行前重置数据库。需要 checkout、Python venv，以及这台机器上可访问的 MySQL。"
-
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Used when the weapon has no model. EmgCannon defaults to a different colour."
 msgstr "在武器没有模型时使用。EmgCannon 默认使用另一种颜色。"
 
 #: src/multiplayer/admin/StaffSection.tsx
+#: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
 msgid "User"
 msgstr "用户"
@@ -56635,9 +56638,8 @@ msgid "Username, IP or email to unban"
 msgstr "要解封的用户名、IP 或邮箱"
 
 #: src/uberstress/pages/RunPage.tsx
-#, fuzzy
-msgid "Uses the bench/DB settings on the Servers page. Uncheck to benchmark an external address."
-msgstr "使用“服务器”页面上的 bench 和数据库设置。取消勾选即可对外部地址进行基准测试。"
+msgid "Uses the Bench and Database settings for uberstress. Uncheck to benchmark an external address."
+msgstr ""
 
 #: src/profile/useHealthChecks.ts
 #, fuzzy

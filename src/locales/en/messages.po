@@ -350,10 +350,6 @@ msgstr "({shownCount} of {totalCount})"
 msgid "({totalCount})"
 msgstr "({totalCount})"
 
-#: src/uberstress/pages/SettingsSection.tsx
-msgid "(auto)"
-msgstr "(auto)"
-
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 msgid "(copies into the library)"
 msgstr "(copies into the library)"
@@ -8157,6 +8153,10 @@ msgstr "About backing up before restoring"
 msgid "About banking"
 msgstr "About banking"
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "About bench mode"
+msgstr "About bench mode"
+
 #: src/content/pages/StorageSection.tsx
 msgid "About caches"
 msgstr "About caches"
@@ -8237,6 +8237,10 @@ msgstr "About interface size"
 msgid "About keys with more than one action"
 msgstr "About keys with more than one action"
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "About lobby servers"
+msgstr "About lobby servers"
+
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "About logging back in on startup"
 msgstr "About logging back in on startup"
@@ -8297,6 +8301,10 @@ msgstr "About replay tracks"
 msgid "About replay unit lists"
 msgstr "About replay unit lists"
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "About resetting the database"
+msgstr "About resetting the database"
+
 #: src/lego/pages/BuilderPage.tsx
 msgid "About roles"
 msgstr "About roles"
@@ -8304,6 +8312,10 @@ msgstr "About roles"
 #: src/lego/pages/components/ShapeFields.tsx
 msgid "About round shapes"
 msgstr "About round shapes"
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "About run defaults"
+msgstr "About run defaults"
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 msgid "About saved copies"
@@ -8336,6 +8348,10 @@ msgstr "About the collision volume"
 #: src/lego/pages/components/TextureBuilderPanel.tsx
 msgid "About the colour texture"
 msgstr "About the colour texture"
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "About the duration"
+msgstr "About the duration"
 
 #: src/play/pages/EngineLogSection.tsx
 msgid "About the engine log"
@@ -8372,6 +8388,14 @@ msgstr "About the notification sound"
 #: src/lego/pages/BuilderPage.tsx
 msgid "About the pivot point"
 msgstr "About the pivot point"
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "About the Python path"
+msgstr "About the Python path"
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "About the ramp"
+msgstr "About the ramp"
 
 #: src/lego/pages/components/TextureBuilderPanel.tsx
 msgid "About the shading map"
@@ -10444,6 +10468,7 @@ msgid "Autohost vote"
 msgstr "Autohost vote"
 
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/uberstress/pages/SettingsSection.tsx
 msgid "Automatic"
 msgstr "Automatic"
 
@@ -11136,8 +11161,8 @@ msgid "bench"
 msgstr "bench"
 
 #: src/uberstress/pages/SettingsSection.tsx
-msgid "Bench & database"
-msgstr "Bench & database"
+msgid "Bench"
+msgstr "Bench"
 
 #: src/content/pages/components/MissingContentNotice.tsx
 msgid "Best effort — an exact version match isn't guaranteed."
@@ -16004,6 +16029,14 @@ msgstr "Data is not JSON: {reason}"
 msgid "Data table"
 msgstr "Data table"
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "Database"
+msgstr "Database"
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "Database name"
+msgstr "Database name"
+
 #: src/multiplayer/battles/OaPorts.tsx
 msgid "Datagrams"
 msgstr "Datagrams"
@@ -16020,30 +16053,6 @@ msgstr "Date created"
 #: src/multiplayer/DaysField.tsx
 msgid "Days"
 msgstr "Days"
-
-#: src/uberstress/pages/SettingsSection.tsx
-msgid "DB driver"
-msgstr "DB driver"
-
-#: src/uberstress/pages/SettingsSection.tsx
-msgid "DB host"
-msgstr "DB host"
-
-#: src/uberstress/pages/SettingsSection.tsx
-msgid "DB name"
-msgstr "DB name"
-
-#: src/uberstress/pages/SettingsSection.tsx
-msgid "DB password"
-msgstr "DB password"
-
-#: src/uberstress/pages/SettingsSection.tsx
-msgid "DB port"
-msgstr "DB port"
-
-#: src/uberstress/pages/SettingsSection.tsx
-msgid "DB user"
-msgstr "DB user"
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 msgid "DDS is a format the engine reads and no browser engine does, so coilbox cannot show it here. The mission still gets it."
@@ -16202,10 +16211,6 @@ msgstr "Default: {defaultText}"
 #: src/multiplayer/battle/BattleOptionsDrawer.tsx
 msgid "defaults"
 msgstr "defaults"
-
-#: src/uberstress/pages/SettingsSection.tsx
-msgid "defaults to <server-dir>/venv/bin/python3"
-msgstr "defaults to <server-dir>/venv/bin/python3"
 
 #: src/content/unitFieldNotes.ts
 msgid "Defaults to on for anything with no ground movement, and the game's transport settings can force it on for a whole move class."
@@ -17500,6 +17505,10 @@ msgstr "Draws the projectile even outside sight."
 msgid "Drive a scenario against a lobby server (load) or launch one locally and benchmark it (bench)."
 msgstr "Drive a scenario against a lobby server (load) or launch one locally and benchmark it (bench)."
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "Driver"
+msgstr "Driver"
+
 #: src/lego/scriptPlayback.ts
 msgid "Drives along a path while its weapon keeps aiming at a target that keeps moving, from where the unit is and which way it faces."
 msgstr "Drives along a path while its weapon keeps aiming at a target that keeps moving, from where the unit is and which way it faces."
@@ -17545,8 +17554,8 @@ msgid "Drops a point on a team's map, labelled if you give it text."
 msgstr "Drops a point on a team's map, labelled if you give it text."
 
 #: src/uberstress/pages/SettingsSection.tsx
-msgid "Drops and recreates the database. Required for register-storm; leave on for clean A/B runs."
-msgstr "Drops and recreates the database. Required for register-storm; leave on for clean A/B runs."
+msgid "Drops and recreates the database. The register-storm scenario needs this, and it keeps A/B runs comparable."
+msgstr "Drops and recreates the database. The register-storm scenario needs this, and it keeps A/B runs comparable."
 
 #: src/content/unitFieldNotes.ts
 msgid "Drops flares"
@@ -17631,7 +17640,6 @@ msgid "e.g. 10m, 2h, 3d"
 msgstr "e.g. 10m, 2h, 3d"
 
 #: src/uberstress/pages/RunPage.tsx
-#: src/uberstress/pages/SettingsSection.tsx
 msgid "e.g. 10s"
 msgstr "e.g. 10s"
 
@@ -20753,10 +20761,6 @@ msgstr "Glow into red, reflectivity into green. Blue is not read by the engine. 
 msgid "glTF Binary"
 msgstr "glTF Binary"
 
-#: src/uberstress/pages/SettingsSection.tsx
-msgid "Go duration, e.g. 30s"
-msgstr "Go duration, e.g. 30s"
-
 #: src/multiplayer/pages/ChatPage.tsx
 #: src/multiplayer/RelayIndicator.tsx
 msgid "Go to battle"
@@ -21563,6 +21567,7 @@ msgstr "Horizontal"
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #: src/multiplayer/battle/MemberRow.tsx
 #: src/play/pages/SkirmishPage.tsx
+#: src/uberstress/pages/SettingsSection.tsx
 msgid "Host"
 msgstr "Host"
 
@@ -21745,6 +21750,14 @@ msgstr "How hard this extractor draws on the metal under it. The ground it cover
 #: src/content/pages/components/MapRecords.tsx
 msgid "How long a match runs"
 msgstr "How long a match runs"
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "How long it takes to open every connection, such as 10s."
+msgstr "How long it takes to open every connection, such as 10s."
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "How long the run lasts. A number and a unit, such as 30s, 2m or 1m30s."
+msgstr "How long the run lasts. A number and a unit, such as 30s, 2m or 1m30s."
 
 #: src/content/unitFieldNotes.ts
 msgid "How long the shield waits after being hit before it starts regenerating again."
@@ -23892,6 +23905,10 @@ msgstr "Leave the measure tool"
 msgid "Leave the measure tool ({measureKey})"
 msgstr "Leave the measure tool ({measureKey})"
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "Leave this empty to use venv/bin/python3 in the uberserver folder."
+msgstr "Leave this empty to use venv/bin/python3 in the uberserver folder."
+
 #: src/hub/pages/components/AssetUploadControl.tsx
 msgid "Leave this off unless you are happy to publish pictures made from the games and maps you have installed."
 msgstr "Leave this off unless you are happy to publish pictures made from the games and maps you have installed."
@@ -24457,10 +24474,6 @@ msgstr "Lobby servers"
 #: src/content/pages/components/LibraryMapCard.tsx
 msgid "Local"
 msgstr "Local"
-
-#: src/uberstress/pages/SettingsSection.tsx
-msgid "Local dev"
-msgstr "Local dev"
 
 #: src/multiplayer/admin/ServerAddressSection.tsx
 msgid "Local IP"
@@ -26407,8 +26420,8 @@ msgid "My server"
 msgstr "My server"
 
 #: src/uberstress/pages/SettingsSection.tsx
-msgid "mysql binary"
-msgstr "mysql binary"
+msgid "mysql program"
+msgstr "mysql program"
 
 #: src/blueprint/pages/BlueprintsPage.tsx
 #: src/content/pages/components/MapRecords.tsx
@@ -28309,8 +28322,8 @@ msgid "No server would say what your public address is."
 msgstr "No server would say what your public address is."
 
 #: src/uberstress/pages/SettingsSection.tsx
-msgid "No servers yet. Add one to target it from the Run page."
-msgstr "No servers yet. Add one to target it from the Run page."
+msgid "No servers."
+msgstr "No servers."
 
 #: src/content/pages/components/ReplaySetPicker.tsx
 msgid "No sets yet."
@@ -30058,6 +30071,10 @@ msgstr "Only {activeName}"
 msgid "Only another admin, or a direct change to the database, can give it back."
 msgstr "Only another admin, or a direct change to the database, can give it back."
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "Only bench mode uses these. It starts an uberserver checkout on this machine and can reset its database before each run. It needs the checkout, a Python virtual environment and a MySQL server you can reach."
+msgstr "Only bench mode uses these. It starts an uberserver checkout on this machine and can reset its database before each run. It needs the checkout, a Python virtual environment and a MySQL server you can reach."
+
 #: src/content/pages/components/MissionRuntimeSection.tsx
 msgid "Only coilbox's own files. The game's gadgets, widgets and missions stay where they are. This can't be undone."
 msgstr "Only coilbox's own files. The game's gadgets, widgets and missions stay where they are. This can't be undone."
@@ -31152,6 +31169,7 @@ msgstr "Passengers survive its death"
 #: src/lobby-servers/RegisterForm.tsx
 #: src/uberstress/pages/components/SeedSqlForm.tsx
 #: src/uberstress/pages/RunPage.tsx
+#: src/uberstress/pages/SettingsSection.tsx
 msgid "Password"
 msgstr "Password"
 
@@ -32065,6 +32083,7 @@ msgstr "Poor targets"
 #: src/direct/JoinRoomForm.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/uberstress/pages/SettingsSection.tsx
 msgid "Port"
 msgstr "Port"
 
@@ -33907,6 +33926,7 @@ msgstr "Remixed from"
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/multiplayer/battle/MemberRow.tsx
 #: src/play/ChobbyPresetsView.tsx
+#: src/uberstress/pages/SettingsSection.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 msgid "Remove"
@@ -34613,10 +34633,6 @@ msgstr "Reset again to send the ones that did not land. Options already at their
 msgid "Reset all shortcuts"
 msgstr "Reset all shortcuts"
 
-#: src/uberstress/pages/SettingsSection.tsx
-msgid "Reset database before each bench run"
-msgstr "Reset database before each bench run"
-
 #: src/multiplayer/battles/BattleFilterPopover.tsx
 msgid "Reset filters"
 msgstr "Reset filters"
@@ -34644,6 +34660,10 @@ msgstr "Reset session"
 #: src/workshop/pages/components/ArmorClassPanel.tsx
 msgid "Reset the armour class to {inherited}, the game's own"
 msgstr "Reset the armour class to {inherited}, the game's own"
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "Reset the database before each run"
+msgstr "Reset the database before each run"
 
 #: src/components/ViewControls.tsx
 #: src/lego/pages/components/AxisCompass.tsx
@@ -36725,10 +36745,6 @@ msgstr "Server asked for verification during registration. Try logging in to ent
 #: src/multiplayer/pages/BattlesPage.tsx
 msgid "Server battles are listed here once you log in. This list is empty because coilbox has no lobby connection, not because nobody is playing."
 msgstr "Server battles are listed here once you log in. This list is empty because coilbox has no lobby connection, not because nobody is playing."
-
-#: src/uberstress/pages/SettingsSection.tsx
-msgid "Server dir"
-msgstr "Server dir"
 
 #: src/multiplayer/chat/FriendRow.tsx
 msgid "Server friend"
@@ -41915,6 +41931,14 @@ msgstr "The root piece is missing."
 msgid "The rules are grouped under Coilbox, so you can find and remove them in Windows Defender Firewall whenever you like."
 msgstr "The rules are grouped under Coilbox, so you can find and remove them in Windows Defender Firewall whenever you like."
 
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "The Run page offers these as targets. A server needs an address, such as 127.0.0.1:8200."
+msgstr "The Run page offers these as targets. A server needs an address, such as 127.0.0.1:8200."
+
+#: src/uberstress/pages/SettingsSection.tsx
+msgid "The Run page starts with these. You can still change them there for each run."
+msgstr "The Run page starts with these. You can still change them there for each run."
+
 #: src/scenario/pages/components/TriggerSteps.tsx
 msgid "The runtime that would play this scenario does not implement this type, so the mission is refused at launch until the game's runtime catches up or the step goes."
 msgstr "The runtime that would play this scenario does not implement this type, so the mission is refused at launch until the game's runtime catches up or the step goes."
@@ -44969,8 +44993,8 @@ msgid "Type your message..."
 msgstr "Type your message..."
 
 #: src/uberstress/pages/SettingsSection.tsx
-msgid "uberserver checkout path"
-msgstr "uberserver checkout path"
+msgid "uberserver folder"
+msgstr "uberserver folder"
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 msgid "uberserver generates a fresh password and replaces {username}'s current one, then emails the new one to {email}."
@@ -46001,15 +46025,12 @@ msgstr "Used for any armour class that doesn't have its own entry in damage."
 msgid "Used for collisions and for melee impulse. Defaults to the metal cost."
 msgstr "Used for collisions and for melee impulse. Defaults to the metal cost."
 
-#: src/uberstress/pages/SettingsSection.tsx
-msgid "Used only by bench mode, which launches an uberserver checkout locally and resets the database before each run. Requires a checkout, a Python venv, and a reachable MySQL on this machine."
-msgstr "Used only by bench mode, which launches an uberserver checkout locally and resets the database before each run. Requires a checkout, a Python venv, and a reachable MySQL on this machine."
-
 #: src/content/unitFieldNotes.ts
 msgid "Used when the weapon has no model. EmgCannon defaults to a different colour."
 msgstr "Used when the weapon has no model. EmgCannon defaults to a different colour."
 
 #: src/multiplayer/admin/StaffSection.tsx
+#: src/uberstress/pages/SettingsSection.tsx
 msgid "User"
 msgstr "User"
 
@@ -46059,8 +46080,8 @@ msgid "Username, IP or email to unban"
 msgstr "Username, IP or email to unban"
 
 #: src/uberstress/pages/RunPage.tsx
-msgid "Uses the bench/DB settings on the Servers page. Uncheck to benchmark an external address."
-msgstr "Uses the bench/DB settings on the Servers page. Uncheck to benchmark an external address."
+msgid "Uses the Bench and Database settings for uberstress. Uncheck to benchmark an external address."
+msgstr "Uses the Bench and Database settings for uberstress. Uncheck to benchmark an external address."
 
 #: src/profile/useHealthChecks.ts
 msgid "valid JSON but does not match the campaign schema"
