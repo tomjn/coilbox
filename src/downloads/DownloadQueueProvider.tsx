@@ -21,6 +21,7 @@ import {
   type DownloadProgress,
   dlCancel,
   dlDownload,
+  dlDownloadEngineHub,
   dlDownloadEngineRecoil,
   dlDownloadEngineSpring,
   dlDownloadFile,
@@ -110,6 +111,18 @@ export type EnqueueInput = (
       kind: "engineSpring";
       label: string;
       args: { version: string; writePath?: string };
+    }
+  | {
+      // An engine build the hub lists, from each of its mirrors in turn until
+      // one delivers a copy with the hub's SHA-256. See `hubEngines`.
+      kind: "engineHub";
+      label: string;
+      args: {
+        version: string;
+        sources: string[];
+        sha256: string;
+        writePath: string;
+      };
     }
   | {
       // A distribution's bundled engine copied into the download destination
@@ -221,6 +234,8 @@ export function identityOf(input: EnqueueInput): string {
       return `engine:recoil:${input.args.version}`;
     case "engineSpring":
       return `engine:spring:${input.args.version}`;
+    case "engineHub":
+      return `engine:hub:${input.args.version}`;
     case "engineBundled":
       return `engine:bundled:${input.args.platform ?? ""}:${input.args.version}`;
   }
@@ -539,6 +554,16 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
         case "engineSpring":
           await installEngine(async () => {
             await dlDownloadEngineSpring({
+              ...item.args,
+              opId: item.id,
+              onProgress: progressChannel(onProgress),
+            });
+            libraryChanged(item);
+          });
+          return;
+        case "engineHub":
+          await installEngine(async () => {
+            await dlDownloadEngineHub({
               ...item.args,
               opId: item.id,
               onProgress: progressChannel(onProgress),

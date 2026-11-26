@@ -28,6 +28,23 @@ export async function beginManualSend(subject: SendSubject): Promise<string> {
   return grant;
 }
 
+const hubEngineSendBegin = defineCommand<
+  { subject: { kind: "engine"; filename: string } },
+  { grant: string }
+>("coilbox-hub", "hub_manual_send_begin");
+
+/**
+ * Open a grant for one engine build somebody pressed upload for, named by its
+ * archive's file name. The uploads switch never admits an engine, so this grant
+ * is the only way one is sent.
+ */
+export async function beginEngineSend(filename: string): Promise<string> {
+  const { grant } = await hubEngineSendBegin({
+    subject: { kind: "engine", filename },
+  });
+  return grant;
+}
+
 /** Close a grant, however its send ended. */
 export async function endManualSend(grant: string): Promise<void> {
   await hubManualSendEnd({ grant });

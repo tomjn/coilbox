@@ -7,6 +7,7 @@ const COMMANDS: &[&str] = &[
     "hub_sign_in",
     "hub_sign_out",
     "hub_account",
+    "hub_can_upload_engines",
     "hub_publish",
     "hub_assets_have",
     "hub_upload_assets",

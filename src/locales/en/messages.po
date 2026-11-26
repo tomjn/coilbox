@@ -2342,6 +2342,10 @@ msgstr "{filename} · {mirrorCount}"
 msgid "{fileName} includes {includes}, which could not be found beside it or in a scripts folder above it, so it cannot be converted."
 msgstr "{fileName} includes {includes}, which could not be found beside it or in a scripts folder above it, so it cannot be converted."
 
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "{filename} is listed on the hub."
+msgstr "{filename} is listed on the hub."
+
 #: src/downloads/installArchive.ts
 msgid "{fileName} is not a .sdz or .sd7 archive."
 msgstr "{fileName} is not a .sdz or .sd7 archive."
@@ -8610,6 +8614,7 @@ msgid "Add to or remove from a set"
 msgstr "Add to or remove from a set"
 
 #: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/HubEngineList.tsx
 #: src/downloads/pages/components/RapidBrowser.tsx
 msgid "Add to queue"
 msgstr "Add to queue"
@@ -9332,6 +9337,10 @@ msgstr "An internal name can only use lowercase letters, numbers and underscores
 #: src/scenario/pages/components/ObjectivePanel.tsx
 msgid "An objective is what the player is told to do. A trigger completes or fails it, and the panel in game shows it until then."
 msgstr "An objective is what the player is told to do. A trigger completes or fails it, and the panel in game shows it until then."
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "An official Recoil release already has a {platform} build of {version}, so the hub does not take this one."
+msgstr "An official Recoil release already has a {platform} build of {version}, so the hub does not take this one."
 
 #: src/content/pages/components/StaleRemixNotice.tsx
 msgid "An older coilbox made this remix, and it will play on {playsOn}, not on {gameType}."
@@ -11955,6 +11964,7 @@ msgstr "Can't damage its own unit"
 #: src/direct/HostRoomForm.tsx
 #: src/direct/JoinRoomForm.tsx
 #: src/downloads/pages/ActivityPage.tsx
+#: src/downloads/pages/components/EngineUpload.tsx
 #: src/hub/pages/components/MapArchivesControl.tsx
 #: src/hub/upload/UploadToHubButton.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
@@ -13336,6 +13346,10 @@ msgstr "Coilbox connects to any TASServer-compatible lobby, including one you ru
 #: src/multiplayer/battle/compatBattle.ts
 msgid "Coilbox could not build {baseName} (compat {version}) for this battle: {error}"
 msgstr "Coilbox could not build {baseName} (compat {version}) for this battle: {error}"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Coilbox could not check the official Recoil releases, so it cannot tell whether the hub needs this build. {why}"
+msgstr "Coilbox could not check the official Recoil releases, so it cannot tell whether the hub needs this build. {why}"
 
 #: src/workshop/pages/components/CloneInPlaceNotice.tsx
 msgid "Coilbox could not check whether {unitName} can be written into the game's own files: {error}"
@@ -14946,6 +14960,7 @@ msgstr "Could not reach {where}. You may be on a different network from the host
 msgid "Could not reach the host."
 msgstr "Could not reach the host."
 
+#: src/downloads/hubEngines.ts
 #: src/hub/assets/pictures.ts
 #: src/hub/maps/lookup.ts
 msgid "Could not reach the hub at {host}."
@@ -16701,7 +16716,6 @@ msgstr "Dominant"
 
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/downloads/pages/ActivityPage.tsx
-#: src/downloads/pages/components/EngineInstaller.tsx
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/i18n/frameStrings.ts
 #: src/lobby-servers/pages/SettingsSection.tsx
@@ -16838,6 +16852,10 @@ msgstr "Download engine"
 #: src/downloads/pages/components/EngineInstaller.tsx
 msgid "Download engine {engineName}"
 msgstr "Download engine {engineName}"
+
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "Download engine {version}"
+msgstr "Download engine {version}"
 
 #: src/downloads/downloadNotify.ts
 msgid "Download failed"
@@ -17836,9 +17854,17 @@ msgstr "Engine {reqLabel}"
 msgid "Engine {version}"
 msgstr "Engine {version}"
 
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "Engine {version} (hub test build)"
+msgstr "Engine {version} (hub test build)"
+
 #: src/play/pages/components/ParticipantsTable.tsx
 msgid "Engine AIs"
 msgstr "Engine AIs"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Engine build"
+msgstr "Engine build"
 
 #: src/content/pages/components/KeyBindingEditor.tsx
 msgid "engine default"
@@ -21483,6 +21509,10 @@ msgstr "Hub on ends"
 msgid "Hub results"
 msgstr "Hub results"
 
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "Hub test builds"
+msgstr "Hub test builds"
+
 #: src/hub/pages/BrowsePage.tsx
 msgid "Hub website"
 msgstr "Hub website"
@@ -22029,6 +22059,7 @@ msgstr "inserted mid-queue"
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/deeplink/DeepLinkHandler.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/HubEngineList.tsx
 #: src/home/zones/SuggestedMap.tsx
 #: src/mapconv/pages/CompilePage.tsx
 msgid "Install"
@@ -22137,6 +22168,9 @@ msgstr "installed"
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
+#: src/content/pages/EnginesSection.tsx
+#: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/HubEngineList.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/home/zones/SuggestedMap.tsx
@@ -22202,13 +22236,14 @@ msgstr "Installing update"
 
 #: src/content/pages/components/SetupCard.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/HubEngineList.tsx
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Installing…"
 msgstr "Installing…"
 
 #: src/downloads/pages/components/EngineInstaller.tsx
-msgid "Installs an engine matching this platform into the configured content folder's <0>engine/</0> directory (set the destination in <1>Content folders settings</1>)."
-msgstr "Installs an engine matching this platform into the configured content folder's <0>engine/</0> directory (set the destination in <1>Content folders settings</1>)."
+msgid "Installs into <0>{writePath}/engine</0>"
+msgstr "Installs into <0>{writePath}/engine</0>"
 
 #: src/runlite/pages/components/ArsenalOverlay.tsx
 msgid "Intelligence"
@@ -23902,8 +23937,8 @@ msgid "Loading content…"
 msgstr "Loading content…"
 
 #: src/downloads/pages/components/EngineInstaller.tsx
-msgid "loading engines…"
-msgstr "loading engines…"
+msgid "Loading engines…"
+msgstr "Loading engines…"
 
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Loading game data…"
@@ -23941,6 +23976,10 @@ msgstr "loading report…"
 #: src/content/pages/GameDetailPage.tsx
 msgid "Loading sides…"
 msgstr "Loading sides…"
+
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "Loading test builds…"
+msgstr "Loading test builds…"
 
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Loading the game's factions…"
@@ -28627,6 +28666,7 @@ msgstr "Not written: {error}"
 msgid "Not yet earned"
 msgstr "Not yet earned"
 
+#: src/downloads/pages/components/EngineUpload.tsx
 #: src/multiplayer/battle/BattleMembersTable.tsx
 msgid "Note"
 msgstr "Note"
@@ -29823,6 +29863,10 @@ msgstr "Open in the Timeline tab"
 msgid "Open it"
 msgstr "Open it"
 
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Open its hub page"
+msgstr "Open its hub page"
+
 #: src/multiplayer/LobbyStatusButton.tsx
 msgid "Open last time"
 msgstr "Open last time"
@@ -29863,6 +29907,14 @@ msgstr "Open the battle list."
 msgid "Open the battle page"
 msgstr "Open the battle page"
 
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Open the build the hub has"
+msgstr "Open the build the hub has"
+
+#: src/content/pages/components/EngineRow.tsx
+msgid "Open the engine's folder"
+msgstr "Open the engine's folder"
+
 #: src/deeplink/actions.ts
 msgid "Open the game \"{id}\"."
 msgstr "Open the game \"{id}\"."
@@ -29874,6 +29926,10 @@ msgstr "Open the game on the hub"
 #: src/onboarding/pages/HubPage.tsx
 msgid "Open the hub"
 msgstr "Open the hub"
+
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "Open the hub page for {version}"
+msgstr "Open the hub page for {version}"
 
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Open the join form"
@@ -32061,6 +32117,7 @@ msgstr "queued"
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/downloads/pages/ActivityPage.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/HubEngineList.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/home/zones/SuggestedMap.tsx
@@ -32629,6 +32686,10 @@ msgstr "Reading the archive…"
 #: src/conquest/pages/components/BattleOverlayParts.tsx
 msgid "Reading the battle report…"
 msgstr "Reading the battle report…"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Reading the build…"
+msgstr "Reading the build…"
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 msgid "Reading the file…"
@@ -33904,6 +33965,10 @@ msgstr "Report JSON"
 msgid "Report the outcome to record your progress."
 msgstr "Report the outcome to record your progress."
 
+#: src/content/pages/components/EngineRow.tsx
+msgid "reports {sync}"
+msgstr "reports {sync}"
+
 #: src/downloads/pages/components/RapidBrowser.tsx
 msgid "Repositories"
 msgstr "Repositories"
@@ -34631,6 +34696,14 @@ msgstr "Run test"
 #: src/lego/pages/components/GameScriptPanel.tsx
 msgid "Run the compiled script"
 msgstr "Run the compiled script"
+
+#: src/content/pages/components/EngineRow.tsx
+msgid "Run the engine again to read its version"
+msgstr "Run the engine again to read its version"
+
+#: src/content/pages/components/EngineRow.tsx
+msgid "Run the engine to read its version"
+msgstr "Run the engine to read its version"
 
 #: src/uberstress/pages/components/SeedSqlForm.tsx
 msgid "Run the output against the server's database, then run a scenario with <0>register</0> unchecked."
@@ -40487,6 +40560,10 @@ msgstr "The hub has a different map under this name, so your copy may not match 
 msgid "The hub has no such item. It may have been taken down."
 msgstr "The hub has no such item. It may have been taken down."
 
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "The hub has no test builds for this computer."
+msgstr "The hub has no test builds for this computer."
+
 #: src/hub/pages/BrowsePage.tsx
 msgid "The hub has nothing for {pinnedGame} yet. This copy of Coilbox lists only that game's things, so there may be other games' things on the hub."
 msgstr "The hub has nothing for {pinnedGame} yet. This copy of Coilbox lists only that game's things, so there may be other games' things on the hub."
@@ -40533,6 +40610,10 @@ msgstr "The hub now has every unit in your games."
 msgid "The hub refused that request (HTTP {status})."
 msgstr "The hub refused that request (HTTP {status})."
 
+#: src/downloads/hubEngines.ts
+msgid "The hub refused the engine list (HTTP {status})."
+msgstr "The hub refused the engine list (HTTP {status})."
+
 #: src/hub/maps/lookup.ts
 msgid "The hub refused the map lookup (HTTP {status})."
 msgstr "The hub refused the map lookup (HTTP {status})."
@@ -40556,6 +40637,10 @@ msgstr "The hub sent a listing with no items in it."
 #: src/hub/api.ts
 msgid "The hub sent a map pack list with no packs in it."
 msgstr "The hub sent a map pack list with no packs in it."
+
+#: src/downloads/hubEngines.ts
+msgid "The hub sent an engine list Coilbox could not read."
+msgstr "The hub sent an engine list Coilbox could not read."
 
 #: src/hub/api.ts
 #: src/hub/assets/pictures.ts
@@ -41842,6 +41927,14 @@ msgstr "The units of this replay's game could not be read, so nothing says what 
 #: src/content/pages/components/ReplayEventLayers.tsx
 msgid "The units of this replay's game could not be read, so nothing says which finished units are buildings, so this layer needs the game installed."
 msgstr "The units of this replay's game could not be read, so nothing says which finished units are buildings, so this layer needs the game installed."
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "The upload of {filename} stopped."
+msgstr "The upload of {filename} stopped."
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "The upload of {filename} was cancelled."
+msgstr "The upload of {filename} was cancelled."
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 msgid "The usual reason a playback does not match is that the installed game or engine is not exactly the one the match was played on."
@@ -45180,6 +45273,7 @@ msgstr "Upgrade with STLS"
 msgid "Upgrades into"
 msgstr "Upgrades into"
 
+#: src/downloads/pages/components/EngineUpload.tsx
 #: src/hub/upload/UploadToHubButton.tsx
 msgid "Upload"
 msgstr "Upload"
@@ -45192,9 +45286,17 @@ msgstr "Upload {count, plural, one {# map} other {# maps}} ({size})"
 msgid "Upload {label} to the hub?"
 msgstr "Upload {label} to the hub?"
 
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Upload a test build"
+msgstr "Upload a test build"
+
 #: src/hub/upload/UploadToHubButton.tsx
 msgid "Upload again"
 msgstr "Upload again"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Upload another"
+msgstr "Upload another"
 
 #: src/hub/upload/UploadToHubButton.tsx
 msgid "Upload to hub"
@@ -45473,12 +45575,12 @@ msgid "Verification email sent."
 msgstr "Verification email sent."
 
 #: src/content/pages/components/EngineRow.tsx
+msgid "Verified"
+msgstr "Verified"
+
+#: src/content/pages/components/EngineRow.tsx
 msgid "Verify"
 msgstr "Verify"
-
-#: src/content/pages/EnginesSection.tsx
-msgid "Verify reads the real version from the binary."
-msgstr "Verify reads the real version from the binary."
 
 #: src/content/achievements.ts
 msgid "Versatile"
@@ -45680,6 +45782,10 @@ msgstr "waiting for the battle"
 #: src/lego/pages/components/TestDrawer.tsx
 msgid "Waiting for the engine to start"
 msgstr "Waiting for the engine to start"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Waiting for the hub to list it…"
+msgstr "Waiting for the hub to list it…"
 
 #: src/multiplayer/MatchFoundPanel.tsx
 msgid "Waiting for the other players, {readyCount} so far."

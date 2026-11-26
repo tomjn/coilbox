@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { describeError } from "@/i18n/uiError";
 import { EngineInstaller } from "../../downloads/pages/components/EngineInstaller";
+import { HubEngineList } from "../../downloads/pages/components/HubEngineList";
 import {
   type ContentState,
   contentOpenPath,
@@ -13,14 +14,19 @@ import {
   type Engine,
 } from "../bindings";
 import { useContentState, usePreferredEngine } from "../config";
+import { compareEngineVersions } from "../engineVersion";
 import { useEngineUpdate } from "../useUpdates";
 import { EngineRow } from "./components/EngineRow";
 
 const msg = (e: unknown): string => describeError(e);
 
+const newestFirst = (engines: Engine[]): Engine[] =>
+  [...engines].sort((a, b) => compareEngineVersions(b.version, a.version));
+
 /**
- * Engines settings section: lists engine installs grouped by content root, with
- * a Verify action that executes the binary to read its real sync-version. The
+ * Engines settings section: the engines installed, grouped by content root and
+ * newest first, then the two ways of getting more. Verify runs the binary to
+ * read its real sync-version. The
  * frame renders the section title, so this is the body only.
  */
 export default function EnginesSection() {
@@ -70,80 +76,80 @@ export default function EnginesSection() {
   const total = groups.reduce((n, r) => n + r.engines.length, 0);
 
   return (
-    <div className="space-y-4">
-      {/* What this page is for is the section's description, under the title.
-          This says only the part that description cannot: what Verify does. */}
-      <p className="text-sm text-muted-foreground">
-        <Trans>Verify reads the real version from the binary.</Trans>
-      </p>
+    <div className="flex flex-col gap-10">
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold">
+          <Trans>Installed</Trans>
+        </h2>
+        {actionError && (
+          <Alert variant="destructive">
+            <AlertCircle />
+            <AlertDescription className="select-text whitespace-pre-wrap break-words">
+              {actionError}
+            </AlertDescription>
+          </Alert>
+        )}
 
-      {actionError && (
-        <Alert variant="destructive">
-          <AlertCircle />
-          <AlertDescription className="select-text whitespace-pre-wrap break-words">
-            {actionError}
-          </AlertDescription>
-        </Alert>
-      )}
+        {loading && !state ? (
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-16 rounded-lg border border-border/50 bg-card" />
+            <Skeleton className="h-16 rounded-lg border border-border/50 bg-card" />
+          </div>
+        ) : total === 0 ? (
+          <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-10 text-center">
+            <p className="text-sm text-muted-foreground">
+              <Trans>No engines found in your content folders.</Trans>
+            </p>
+            <p className="text-sm text-muted-foreground">
+              <Trans>
+                Add a folder in{" "}
+                <Link
+                  to="/settings/content-folders"
+                  className="underline underline-offset-4"
+                >
+                  Content folders
+                </Link>{" "}
+                or download an engine.
+              </Trans>
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-5">
+            {groups.map((root) => (
+              <div key={root.id} className="flex flex-col gap-1.5">
+                <h3
+                  className="truncate font-mono text-xs text-muted-foreground"
+                  title={root.path}
+                >
+                  {root.label ?? root.path}
+                </h3>
+                <ul className="divide-y divide-border rounded-md border border-border">
+                  {newestFirst(root.engines).map((engine) => (
+                    <EngineRow
+                      key={engine.id}
+                      engine={engine}
+                      verifying={verifying.has(engine.id)}
+                      isPreferred={engine.id === resolvedId}
+                      onVerify={verify}
+                      onSetPreferred={(e) => setPrefId(e.id)}
+                      onOpen={openEngine}
+                    />
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )}
 
-      {loading && !state ? (
-        <div className="flex flex-col gap-3">
-          <Skeleton className="h-16 rounded-lg border border-border/50 bg-card" />
-          <Skeleton className="h-16 rounded-lg border border-border/50 bg-card" />
-        </div>
-      ) : total === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-10 text-center">
-          <p className="text-sm text-muted-foreground">
-            <Trans>No engines found in your content folders.</Trans>
+        {newerEngine && (
+          <p className="text-sm font-medium">
+            <Trans>Newer engine available: {newerEngine}</Trans>
           </p>
-          <p className="text-sm text-muted-foreground">
-            <Trans>
-              Add a folder in{" "}
-              <Link
-                to="/settings/content-folders"
-                className="underline underline-offset-4"
-              >
-                Content folders
-              </Link>{" "}
-              or download an engine.
-            </Trans>
-          </p>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-6">
-          {groups.map((root) => (
-            <section key={root.id} className="flex flex-col gap-2">
-              <h2
-                className="break-all font-mono text-xs text-muted-foreground"
-                title={root.path}
-              >
-                {root.label ?? root.path}
-              </h2>
-              <ul className="flex flex-col gap-2">
-                {root.engines.map((engine) => (
-                  <EngineRow
-                    key={engine.id}
-                    engine={engine}
-                    verifying={verifying.has(engine.id)}
-                    isPreferred={engine.id === resolvedId}
-                    onVerify={verify}
-                    onSetPreferred={(e) => setPrefId(e.id)}
-                    onOpen={openEngine}
-                  />
-                ))}
-              </ul>
-            </section>
-          ))}
-        </div>
-      )}
-
-      {newerEngine && (
-        <p className="text-sm font-medium">
-          <Trans>Newer engine available: {newerEngine}</Trans>
-        </p>
-      )}
+        )}
+      </section>
 
       <EngineInstaller />
+      <HubEngineList />
     </div>
   );
 }

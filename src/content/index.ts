@@ -3,7 +3,6 @@ import type { FramePlugin } from "@picoframe/plugin-sdk";
 import {
   Archive as ArchiveIcon,
   Blocks,
-  Boxes,
   FolderTree,
   Gamepad2,
   HardDrive,
@@ -18,6 +17,7 @@ import {
   Sparkles,
   Volume2,
 } from "lucide-react";
+import { RecoilGlyph } from "@/components/RecoilGlyph";
 import { cachedBlueprint } from "../blueprint/store";
 import { featureVisible, gateFeature } from "../general/features";
 import { lazyText } from "../i18n/pluginText";
@@ -294,6 +294,18 @@ const contentPlugin: FramePlugin = {
     },
   ],
   settings: [
+    // Engines: the engine versions installed and getting more. Top level, just
+    // above Engine settings, since a player needs an engine before either.
+    {
+      id: "engines",
+      title: lazyText(msg`Engines`),
+      description: lazyText(
+        msg`The engine versions you have, and getting more.`,
+      ),
+      order: 19,
+      icon: RecoilGlyph,
+      Component: EnginesSection,
+    },
     // Engine settings: what a player came to settings for, so it sits third,
     // under the two the frame pins. A group with no Component of its own, which
     // makes the frame render an index of the pages below it. The id is
@@ -403,17 +415,6 @@ const contentPlugin: FramePlugin = {
       order: 10,
       icon: FolderTree,
       Component: FoldersSection,
-    },
-    {
-      id: "engines",
-      title: lazyText(msg`Engines`),
-      description: lazyText(
-        msg`The engine versions you have, and getting more.`,
-      ),
-      parent: "library",
-      order: 20,
-      icon: Boxes,
-      Component: EnginesSection,
     },
     {
       id: "storage",

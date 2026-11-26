@@ -1,5 +1,9 @@
 import { shareInFlight } from "../content/inFlight";
-import { dlRecoilEngines, dlSpringfilesEngines } from "./bindings";
+import {
+  dlRecoilEngines,
+  dlRecoilOfficialBuilds,
+  dlSpringfilesEngines,
+} from "./bindings";
 
 type Recoil = Awaited<ReturnType<typeof dlRecoilEngines>>;
 type Springfiles = Awaited<ReturnType<typeof dlSpringfilesEngines>>;
@@ -51,6 +55,14 @@ export function loadRecoilEngines(refresh = false): Promise<Recoil> {
 /** The Recoil list if it is already held, so a caller can use it at once. */
 export function heldRecoilEngines(): Recoil | undefined {
   return cache.get("recoil") as Recoil | undefined;
+}
+
+/** Every build the official Recoil releases publish, for every platform. Same
+ *  rules as {@link loadRecoilEngines}. */
+export function loadOfficialBuilds(
+  refresh = false,
+): Promise<Awaited<ReturnType<typeof dlRecoilOfficialBuilds>>> {
+  return load("official", () => dlRecoilOfficialBuilds(undefined), refresh);
 }
 
 /** The springfiles engine list. Same rules as {@link loadRecoilEngines}. */

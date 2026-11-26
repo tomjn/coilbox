@@ -31,6 +31,8 @@ fn facts_for(sha256: &str, size: u64) -> ArchiveFacts {
         shortname: None,
         author: Some("Someone".into()),
         description: None,
+        platform: None,
+        note: None,
     }
 }
 
@@ -180,6 +182,33 @@ async fn the_hub_is_sent_the_facts_and_the_signed_in_token() {
     assert_eq!(sent["internal_name"], "Persepolis 1");
     assert_eq!(sent["author"], "Someone");
     assert_eq!(sent["shortname"], Value::Null);
+}
+
+#[test]
+fn a_map_s_request_has_no_engine_fields_and_an_engine_s_has_both() {
+    let map = serde_json::to_value(facts_for(&"a".repeat(64), 3)).unwrap();
+    assert!(map.get("platform").is_none());
+    assert!(map.get("note").is_none());
+
+    let engine: ArchiveFacts = serde_json::from_value(json!({
+        "sha256": "b".repeat(64),
+        "size": 12,
+        "filename": "recoil_2026.09.03_arm64-macos.7z",
+        "kind": "engine",
+        "internal_name": "recoil",
+        "version": "2026.09.03",
+        "shortname": null,
+        "author": null,
+        "description": null,
+        "platform": "arm64-macos",
+        "note": "Built from main for Apple silicon.",
+    }))
+    .unwrap();
+    assert_eq!(engine.kind, ArchiveKind::Engine);
+    let sent = serde_json::to_value(&engine).unwrap();
+    assert_eq!(sent["kind"], "engine");
+    assert_eq!(sent["platform"], "arm64-macos");
+    assert_eq!(sent["note"], "Built from main for Apple silicon.");
 }
 
 #[tokio::test]

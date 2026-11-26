@@ -36,6 +36,18 @@ export interface ArchiveFacts {
   description: string | null;
 }
 
+/** An engine build's facts: what `dl_engine_upload_facts` answers with, the
+ *  fields a map or game has and an engine does not, and the uploader's note. */
+export interface EngineArchiveFacts extends Omit<ArchiveFacts, "kind"> {
+  kind: "engine";
+  /** Such as `arm64-macos`. */
+  platform: string;
+  /** What the uploader says about the build, 1 to 1,000 characters. */
+  note: string;
+}
+
+export type ArchiveKind = "map" | "game" | "engine";
+
 /** Where an upload has got to. `waiting` is the mirror holding every byte and
  *  the hub not having listed the archive yet. */
 export type ArchiveUploadPhase = "reserving" | "sending" | "waiting" | "done";
@@ -56,7 +68,8 @@ export interface ArchiveDuplicate {
  * hub or mirror sent, and `said` has its words.
  *
  * - hub: `bad_request`, `unauthorised`, `not_owner`, `duplicate`,
- *   `unknown_game`, `unknown_map`, `no_mirror`, `not_configured`, `unavailable`, `failed`,
+ *   `unknown_game`, `unknown_map`, `no_mirror`, `not_engine_uploader`,
+ *   `no_engine_mirror`, `not_configured`, `unavailable`, `failed`,
  *   `removed`, `not_found`
  * - mirror: `exists`, `hash_mismatch`, `removed`, `expired`, `bad_token`,
  *   `wrong_mirror`, `too_large`, `bad_request`, `write_failed`,
@@ -87,7 +100,7 @@ export interface ArchiveUploadState {
   opId: string;
   hubUrl: string;
   filename: string;
-  kind: "map" | "game";
+  kind: ArchiveKind;
   /** The archive's hash, which is how a page finds the upload for the archive
    *  it is showing. */
   sha256: string;
@@ -105,7 +118,12 @@ export interface ArchiveUploadState {
 export const ARCHIVE_UPLOAD_EVENT = "coilbox-hub://archive-upload";
 
 const hubArchiveUploadStart = defineCommand<
-  { hubUrl: string; path: string; facts: ArchiveFacts; grant?: string },
+  {
+    hubUrl: string;
+    path: string;
+    facts: ArchiveFacts | EngineArchiveFacts;
+    grant?: string;
+  },
   { upload: ArchiveUploadState }
 >("coilbox-hub", "hub_archive_upload_start");
 
@@ -133,7 +151,7 @@ const hubArchiveUploadCancel = defineCommand<
 export async function startArchiveUpload(
   hubUrl: string,
   path: string,
-  facts: ArchiveFacts,
+  facts: ArchiveFacts | EngineArchiveFacts,
   grant?: string,
 ): Promise<ArchiveUploadState> {
   const { upload } = await hubArchiveUploadStart({
@@ -165,4 +183,19 @@ export function onArchiveUploadChanged(
   return listen<ArchiveUploadState>(ARCHIVE_UPLOAD_EVENT, (event) =>
     handler(event.payload),
   );
+}
+
+const hubCanUploadEngines = defineCommand<
+  { hubUrl: string },
+  { allowed: boolean }
+>("coilbox-hub", "hub_can_upload_engines");
+
+/**
+ * Whether whoever is signed in to this hub may upload engine builds: a
+ * moderator granted it, or they are a moderator. False when nobody is signed
+ * in. Asked fresh each time.
+ */
+export async function canUploadEngines(hubUrl: string): Promise<boolean> {
+  const { allowed } = await hubCanUploadEngines({ hubUrl });
+  return allowed;
 }

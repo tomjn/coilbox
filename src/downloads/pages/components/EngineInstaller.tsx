@@ -13,6 +13,7 @@ import { OptionSelect } from "@/components/OptionSelect";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { formatBytes } from "@/lib/format";
 import { errorText } from "@/lib/helpers";
+import { useInstalledEngines } from "../../../content/replayAnalysisOffer";
 import { useWriteRoot } from "../../config";
 import {
   type EnqueueInput,
@@ -24,6 +25,7 @@ import {
   emptyEngineListMessage,
 } from "../../emptyEngineList";
 import { loadRecoilEngines, loadSpringfilesEngines } from "../../engineLists";
+import { isEngineInstalled } from "../../hubEngines";
 import { QueueProgress } from "./ProgressBar";
 
 type Source = EngineSource;
@@ -56,6 +58,7 @@ export function EngineInstaller() {
   // is undefined whatever the user has configured (issue #1104).
   const noWriteRoot = !writeRootLoading && !writePath;
   const { enqueue, itemFor, active } = useDownloadQueue();
+  const installed = useInstalledEngines();
   const [source, setSource] = useState<Source>("recoil");
   const [items, setItems] = useState<EngineItem[] | null>(null);
   const [platform, setPlatform] = useState("");
@@ -147,46 +150,48 @@ export function EngineInstaller() {
   );
 
   return (
-    <section className="space-y-3 border-t border-border pt-5">
-      <h2 className="text-sm font-semibold">
-        <Trans>Download an engine</Trans>
-      </h2>
-      <p className="text-xs text-muted-foreground">
-        <Trans>
-          Installs an engine matching this platform into the configured content
-          folder's <code>engine/</code> directory (set the destination in{" "}
-          <Link
-            className="underline underline-offset-4"
-            to="/settings/content-folders"
-          >
-            Content folders settings
-          </Link>
-          ).
-        </Trans>
-      </p>
-      <div className="flex items-center gap-2">
-        <OptionSelect
-          value={source}
-          onValueChange={(v) => setSource(v as Source)}
-          className="w-56"
-          options={[
-            { value: "recoil", label: t`Recoil (GitHub releases)` },
-            { value: "springfiles", label: "springfiles" },
-          ]}
-        />
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => load(source, true)}
-          disabled={loading}
-        >
-          {loading ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <RefreshCw className="size-4" />
+    <section className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold">
+            <Trans>Download an engine</Trans>
+          </h2>
+          {writePath && (
+            <p
+              className="truncate text-xs text-muted-foreground"
+              title={`${writePath}/engine`}
+            >
+              <Trans>
+                Installs into{" "}
+                <span className="font-mono">{writePath}/engine</span>
+              </Trans>
+            </p>
           )}
-          <Trans>Refresh</Trans>
-        </Button>
+        </div>
+        <div className="flex items-center gap-1">
+          <OptionSelect
+            value={source}
+            onValueChange={(v) => setSource(v as Source)}
+            className="w-60"
+            options={[
+              { value: "recoil", label: t`Recoil (GitHub releases)` },
+              { value: "springfiles", label: "springfiles" },
+            ]}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => load(source, true)}
+            disabled={loading}
+            aria-label={t`Refresh`}
+          >
+            {loading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <RefreshCw className="size-4" />
+            )}
+          </Button>
+        </div>
       </div>
       {noWriteRoot && (
         <p className="text-xs text-muted-foreground">
@@ -206,7 +211,7 @@ export function EngineInstaller() {
       {loading && (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 size={15} className="animate-spin" />{" "}
-          <Trans>loading engines…</Trans>
+          <Trans>Loading engines…</Trans>
         </p>
       )}
       {error && (
@@ -218,7 +223,7 @@ export function EngineInstaller() {
         </Alert>
       )}
       {items && items.length === 0 && (
-        <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+        <p className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
           {emptyEngineListMessage({ source, platform, listsThisPlatform })}
         </p>
       )}
@@ -227,7 +232,10 @@ export function EngineInstaller() {
           {items.map((item) => {
             const input = engineInput(item);
             const queueItem = input ? itemFor(identityOf(input)) : null;
-            const status = queueItem?.status ?? null;
+            // An engine already on disk shows as installed, however it got there.
+            const status =
+              queueItem?.status ??
+              (isEngineInstalled(installed, item.key) ? "done" : null);
             const engineName = item.title;
             return (
               <li key={item.key} className="flex flex-col gap-2 px-4 py-2">
@@ -279,7 +287,7 @@ export function EngineInstaller() {
                       : status === "queued"
                         ? t`Queued`
                         : status === "done"
-                          ? t`Done`
+                          ? t`Installed`
                           : active
                             ? t`Add to queue`
                             : t`Install`}

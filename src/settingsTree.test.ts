@@ -60,6 +60,7 @@ describe("settings declarations", () => {
       .map((s) => s.id);
     expect(top).toEqual([
       "general",
+      "engines",
       "engine-settings",
       "notifications",
       "sound",
@@ -99,7 +100,6 @@ describe("settings declarations", () => {
     ]);
     expect(childrenOf("library")).toEqual([
       "content-folders",
-      "engines",
       "sources",
       "storage",
       "import",

@@ -30,7 +30,7 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use url::Url;
 
-use crate::endpoint::{api_url, json_client, read_capped};
+use crate::endpoint::{api_url, json_client, read_capped, unreachable_message};
 
 /// The hub route that says which account service to use. The one address here that
 /// is not read from somewhere else, and it hangs off the configured hub base rather
@@ -476,26 +476,8 @@ fn read_profile(status: u16, body: &[u8]) -> Option<String> {
 /// request that did not arrive all leave the name from the provider's metadata in
 /// place, because a missing name is not worth failing a sign-in over.
 pub async fn fetch_display_name(hub_url: &str, access_token: &str) {
-    let Ok(url) = api_url(hub_url, PROFILE_PATH, "Reading your hub name") else {
-        return;
-    };
-    let Ok(client) = json_client() else {
-        return;
-    };
-    let Ok(response) = client
-        .get(&url)
-        .header(
-            reqwest::header::AUTHORIZATION,
-            format!("Bearer {access_token}"),
-        )
-        .header(reqwest::header::ACCEPT, "application/json")
-        .send()
-        .await
+    let Ok((status, body)) = fetch_profile(hub_url, access_token, "Reading your hub name").await
     else {
-        return;
-    };
-    let status = response.status().as_u16();
-    let Ok(body) = read_capped(response, PROFILE_LIMIT).await else {
         return;
     };
     if let Some(name) = read_profile(status, &body) {
@@ -504,6 +486,56 @@ pub async fn fetch_display_name(hub_url: &str, access_token: &str) {
             .unwrap()
             .insert(account_key(hub_url), name);
     }
+}
+
+/// Ask the hub whether the signed in person may upload engine builds. They may
+/// when a moderator granted it, or when they are a moderator. Asked fresh each
+/// time, so a grant made since sign-in shows without signing in again.
+pub async fn fetch_engine_grant(hub_url: &str, access_token: &str) -> Result<bool, String> {
+    let (status, body) = fetch_profile(
+        hub_url,
+        access_token,
+        "Checking whether you can upload engines",
+    )
+    .await?;
+    read_engine_grant(status, &body)
+}
+
+/// Read `can_upload_engines` from what `/api/v1/profile` answered. A hub from
+/// before engines leaves it out, which is no.
+fn read_engine_grant(status: u16, body: &[u8]) -> Result<bool, String> {
+    if status != 200 {
+        return Err(format!(
+            "The hub answered HTTP {status} when asked for your profile."
+        ));
+    }
+    let doc: Value = serde_json::from_slice(body)
+        .map_err(|_| "The hub sent a profile Coilbox could not read.".to_string())?;
+    Ok(doc.get("can_upload_engines").and_then(Value::as_bool) == Some(true))
+}
+
+/// One `GET /api/v1/profile` as the signed in person, answering its status and
+/// body. `doing` names the request in an error.
+async fn fetch_profile(
+    hub_url: &str,
+    access_token: &str,
+    doing: &str,
+) -> Result<(u16, Vec<u8>), String> {
+    let url = api_url(hub_url, PROFILE_PATH, doing)?;
+    let client = json_client().map_err(|e| e.to_string())?;
+    let response = client
+        .get(&url)
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {access_token}"),
+        )
+        .header(reqwest::header::ACCEPT, "application/json")
+        .send()
+        .await
+        .map_err(|e| unreachable_message(&url, e.is_timeout()))?;
+    let status = response.status().as_u16();
+    let body = read_capped(response, PROFILE_LIMIT).await?;
+    Ok((status, body))
 }
 
 // ----------------------------------------------------------------- the flow
@@ -1018,6 +1050,24 @@ mod tests {
 
         identities().lock().unwrap().insert(account, from_provider);
         assert_eq!(cached_identity(&base).unwrap().name, "Tom on the hub");
+    }
+
+    #[test]
+    fn the_profile_says_whether_engines_may_be_uploaded() {
+        assert_eq!(
+            read_engine_grant(200, br#"{"display_name":"Tom","can_upload_engines":true}"#),
+            Ok(true)
+        );
+        assert_eq!(
+            read_engine_grant(200, br#"{"can_upload_engines":false}"#),
+            Ok(false)
+        );
+        assert_eq!(
+            read_engine_grant(200, br#"{"display_name":"Tom"}"#),
+            Ok(false)
+        );
+        assert!(read_engine_grant(401, b"{}").is_err());
+        assert!(read_engine_grant(200, b"<html>").is_err());
     }
 
     // --------------------------------------------------- vocabulary (issue #1708)

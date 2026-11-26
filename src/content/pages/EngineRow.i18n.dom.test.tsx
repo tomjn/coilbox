@@ -14,6 +14,7 @@ import { EngineRow } from "./components/EngineRow";
 
 const ENGINE = {
   id: "e1",
+  rootPath: "/engines",
   version: "2025.04.0",
   platform: "linux64",
   syncVersion: null,

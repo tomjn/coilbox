@@ -117,18 +117,23 @@ impl Pacing {
     };
 }
 
-/// Whether an archive is a map or a game.
+/// Whether an archive is a map, a game or an engine build.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ArchiveKind {
     Map,
     Game,
+    /// A `recoil_<version>_<platform>.7z` build only grant holders and
+    /// moderators may send. Its facts come from `dl_engine_upload_facts`.
+    Engine,
 }
 
 /// One archive's facts, as the hub's `POST /api/v1/uploads` takes them.
 ///
-/// The shape `unitsync_upload_facts` answers with in `facts`, field for field.
-/// The hub reads `null` as absent, so the optional fields are sent as `null`.
+/// The shape `unitsync_upload_facts` answers with in `facts`, field for field,
+/// or for an engine `dl_engine_upload_facts` with the note added. The hub reads
+/// `null` as absent, so the optional fields are sent as `null`. `platform` and
+/// `note` are an engine's alone and are left out for a map or game.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ArchiveFacts {
     pub sha256: String,
@@ -140,6 +145,11 @@ pub struct ArchiveFacts {
     pub shortname: Option<String>,
     pub author: Option<String>,
     pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub platform: Option<String>,
+    /// What the uploader says about an engine build, 1 to 1,000 characters.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
 }
 
 /// Where an upload has got to.
@@ -183,7 +193,8 @@ pub struct Duplicate {
 /// The codes a page can meet, by source:
 ///
 /// - hub: `bad_request`, `unauthorised`, `not_owner`, `duplicate`,
-///   `unknown_game`, `unknown_map`, `no_mirror`, `not_configured`, `unavailable`, `failed`
+///   `unknown_game`, `unknown_map`, `no_mirror`, `not_engine_uploader`,
+///   `no_engine_mirror`, `not_configured`, `unavailable`, `failed`
 ///   (the hub gave up on the upload), `removed`, `not_found`
 /// - mirror: `exists` (a file with that name is already there, which is not the
 ///   same as the hub's `duplicate`), `hash_mismatch`, `removed`, `expired`,
@@ -905,6 +916,7 @@ pub fn begin<R: Runtime>(
     match (facts.kind, facts.shortname.as_deref()) {
         (ArchiveKind::Map, _) => consent.admits_maps([facts.internal_name.as_str()])?,
         (ArchiveKind::Game, shortname) => consent.admits_game(shortname.unwrap_or_default())?,
+        (ArchiveKind::Engine, _) => consent.admits_engine(&facts.filename)?,
     }
     let on_disk = std::fs::metadata(&path)
         .map_err(|_| format!("There is no archive at {}.", path.display()))?
