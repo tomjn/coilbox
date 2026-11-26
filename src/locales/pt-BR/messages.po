@@ -9363,15 +9363,14 @@ msgstr "Uma partida é encontrada"
 msgid "A match with no recorded result is in no win or loss. Every figure about wins is a count of the matches that have one, with the number it is out of beside it."
 msgstr "Uma partida sem resultado registrado não conta como vitória nem derrota. Todo dado sobre vitórias é uma contagem das partidas que têm resultado, com o total ao lado."
 
-#: src/multiplayer/pages/HighlightsSettings.tsx
-#, fuzzy
-msgid "A matching message flashes the window and plays a sound. Choose which sound, and how loud, under <0>Sound</0>."
-msgstr "Uma mensagem correspondente faz a janela piscar e toca um som. Escolha qual som e o volume em <0>Som</0>."
-
 #: src/content/pages/MatchupPage.tsx
 #, fuzzy
 msgid "A matchup is the games where you were on opposing teams, from the replays in your content folders."
 msgstr "Um confronto são os jogos em que vocês estavam em equipes opostas, a partir dos replays nas suas pastas de conteúdo."
+
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "A message that names you or a highlight word is outlined in chat, flashes the window, plays a sound and shows a notice. Choose the sound under <0>Sound</0>."
+msgstr ""
 
 #: src/hub/upload/messages.ts
 #, fuzzy
@@ -9956,6 +9955,10 @@ msgstr "Um nome de arma só pode usar letras minúsculas, números e sublinhados
 msgid "A widget that lists the blueprints in this library while you play, places one at the cursor as ghosts and build orders, and saves the buildings you have selected back here. It reads BAR's own blueprints.json too, and never writes it. It opens no network connection."
 msgstr "Um widget que lista as plantas desta biblioteca enquanto você joga, posiciona uma no cursor como fantasmas e ordens de construção, e salva aqui as construções que você selecionou. Ele também lê o blueprints.json do próprio BAR e nunca grava nele. Ele não abre nenhuma conexão de rede."
 
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "A word counts only on its own and in any case, so \"alice\" matches \"Hi Alice!\" but not \"malice\"."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "A yellow circle that grows and fades is an explosion: a projectile landing, or, larger, a unit destroyed. Debris landing makes none. The Explosions switch turns them off."
@@ -10136,6 +10139,14 @@ msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "About going away when idle"
+msgstr ""
+
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "About highlight words"
+msgstr ""
+
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "About highlights"
 msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
@@ -23980,11 +23991,6 @@ msgstr "Posições fixas do mapa"
 msgid "Fixed start positions: team N spawns at the map's start position N."
 msgstr "Posições iniciais fixas: a equipe N surge na posição inicial N do mapa."
 
-#: src/multiplayer/pages/HighlightsSettings.tsx
-#, fuzzy
-msgid "Flag messages that mention your logged-in username."
-msgstr "Destacar mensagens que mencionam seu nome de usuário conectado."
-
 #: src/multiplayer/chat/emoji.ts
 #, fuzzy
 msgid "Flags"
@@ -31365,6 +31371,10 @@ msgstr "Mencionar um usuário"
 msgid "Mentioned in chat"
 msgstr "Mencionado no chat"
 
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "Mentions"
+msgstr ""
+
 #: src/workshop/pages/components/UnitList.tsx
 #, fuzzy
 msgid "menu"
@@ -33954,6 +33964,10 @@ msgstr "Nenhum repositório do GitHub declarado para a origem \"{sourceKey}\"."
 msgid "No hand-made map with the id \"{id}\" is installed, and no installed game carries one. A game update may have removed it."
 msgstr "Nenhum mapa feito à mão com o id \"{id}\" está instalado, e nenhum jogo instalado traz um. Uma atualização do jogo pode tê-lo removido."
 
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "No highlight words."
+msgstr ""
+
 #: src/campaign/pages/components/presentationOpen.ts
 #, fuzzy
 msgid "No icon or background yet"
@@ -35367,11 +35381,6 @@ msgstr "Nada encomendado neste intervalo"
 #, fuzzy
 msgid "none yet"
 msgstr "nenhuma ainda"
-
-#: src/multiplayer/pages/HighlightsSettings.tsx
-#, fuzzy
-msgid "None yet. Add a word to have it flag matching chat messages."
-msgstr "Nada ainda. Adicione uma palavra para destacar as mensagens de chat que a contêm."
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
@@ -41717,6 +41726,7 @@ msgstr "Remixado de"
 #: src/lego/pages/components/BuiltBySection.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/multiplayer/battle/MemberRow.tsx
+#: src/multiplayer/pages/HighlightsSettings.tsx
 #: src/play/ChobbyPresetsView.tsx
 #: src/uberstress/pages/SettingsSection.tsx
 #: src/widgets/pages/WidgetsPage.tsx
@@ -58188,11 +58198,6 @@ msgstr "Modelo inteiro"
 #, fuzzy
 msgid "Whole project"
 msgstr "Projeto inteiro"
-
-#: src/multiplayer/pages/HighlightsSettings.tsx
-#, fuzzy
-msgid "Whole-word, case-insensitive. Messages containing any of these are visually flagged."
-msgstr "Palavra inteira, sem diferenciar maiúsculas. Mensagens que contêm qualquer uma destas são destacadas."
 
 #: src/hub/maps/catalogSweep.ts
 #, fuzzy

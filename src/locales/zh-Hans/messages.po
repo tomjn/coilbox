@@ -9362,15 +9362,14 @@ msgstr "找到对局时"
 msgid "A match with no recorded result is in no win or loss. Every figure about wins is a count of the matches that have one, with the number it is out of beside it."
 msgstr "没有记录结果的对局不计入胜负。所有关于胜利的数据只统计有结果的对局，旁边会显示总数。"
 
-#: src/multiplayer/pages/HighlightsSettings.tsx
-#, fuzzy
-msgid "A matching message flashes the window and plays a sound. Choose which sound, and how loud, under <0>Sound</0>."
-msgstr "匹配的消息会让窗口闪烁并播放音效。可在<0>音效</0>中选择音效和音量。"
-
 #: src/content/pages/MatchupPage.tsx
 #, fuzzy
 msgid "A matchup is the games where you were on opposing teams, from the replays in your content folders."
 msgstr "对阵记录是你在内容文件夹的回放中与其处于对立队伍的对局。"
+
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "A message that names you or a highlight word is outlined in chat, flashes the window, plays a sound and shows a notice. Choose the sound under <0>Sound</0>."
+msgstr ""
 
 #: src/hub/upload/messages.ts
 #, fuzzy
@@ -9955,6 +9954,10 @@ msgstr "武器名称只能使用小写字母、数字和下划线。"
 msgid "A widget that lists the blueprints in this library while you play, places one at the cursor as ghosts and build orders, and saves the buildings you have selected back here. It reads BAR's own blueprints.json too, and never writes it. It opens no network connection."
 msgstr "一个小部件：游戏时列出此库中的蓝图，在光标处以虚影和建造命令放置蓝图，并将你选中的建筑保存回这里。它也会读取 BAR 自己的 blueprints.json，但从不写入。它不会建立任何网络连接。"
 
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "A word counts only on its own and in any case, so \"alice\" matches \"Hi Alice!\" but not \"malice\"."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "A yellow circle that grows and fades is an explosion: a projectile landing, or, larger, a unit destroyed. Debris landing makes none. The Explosions switch turns them off."
@@ -10135,6 +10138,14 @@ msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "About going away when idle"
+msgstr ""
+
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "About highlight words"
+msgstr ""
+
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "About highlights"
 msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
@@ -23973,11 +23984,6 @@ msgstr "固定地图位置"
 msgid "Fixed start positions: team N spawns at the map's start position N."
 msgstr "固定出生点：队伍 N 在地图的出生点 N 出生。"
 
-#: src/multiplayer/pages/HighlightsSettings.tsx
-#, fuzzy
-msgid "Flag messages that mention your logged-in username."
-msgstr "标记提及你登录用户名的消息。"
-
 #: src/multiplayer/chat/emoji.ts
 #, fuzzy
 msgid "Flags"
@@ -31353,6 +31359,10 @@ msgstr "提及用户"
 msgid "Mentioned in chat"
 msgstr "在聊天中被提及"
 
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "Mentions"
+msgstr ""
+
 #: src/workshop/pages/components/UnitList.tsx
 #, fuzzy
 msgid "menu"
@@ -33942,6 +33952,10 @@ msgstr "来源 \"{sourceKey}\" 没有声明 GitHub 仓库。"
 msgid "No hand-made map with the id \"{id}\" is installed, and no installed game carries one. A game update may have removed it."
 msgstr "未安装 id 为 \"{id}\" 的手工地图，已安装的游戏中也没有。游戏更新可能已将其移除。"
 
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "No highlight words."
+msgstr ""
+
 #: src/campaign/pages/components/presentationOpen.ts
 #, fuzzy
 msgid "No icon or background yet"
@@ -35355,11 +35369,6 @@ msgstr "此时间段内未下令"
 #, fuzzy
 msgid "none yet"
 msgstr "还没有"
-
-#: src/multiplayer/pages/HighlightsSettings.tsx
-#, fuzzy
-msgid "None yet. Add a word to have it flag matching chat messages."
-msgstr "还没有。添加一个词，即可标记与之匹配的聊天消息。"
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
@@ -41698,6 +41707,7 @@ msgstr "改编自"
 #: src/lego/pages/components/BuiltBySection.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/multiplayer/battle/MemberRow.tsx
+#: src/multiplayer/pages/HighlightsSettings.tsx
 #: src/play/ChobbyPresetsView.tsx
 #: src/uberstress/pages/SettingsSection.tsx
 #: src/widgets/pages/WidgetsPage.tsx
@@ -58157,11 +58167,6 @@ msgstr "整个模型"
 #, fuzzy
 msgid "Whole project"
 msgstr "整个项目"
-
-#: src/multiplayer/pages/HighlightsSettings.tsx
-#, fuzzy
-msgid "Whole-word, case-insensitive. Messages containing any of these are visually flagged."
-msgstr "全词匹配，不区分大小写。包含其中任何一个词的消息都会被醒目标记。"
 
 #: src/hub/maps/catalogSweep.ts
 #, fuzzy

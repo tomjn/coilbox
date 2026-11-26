@@ -9362,15 +9362,14 @@ msgstr "Матч знайдено"
 msgid "A match with no recorded result is in no win or loss. Every figure about wins is a count of the matches that have one, with the number it is out of beside it."
 msgstr "Матч без записаного результату не входить ні до перемог, ні до поразок. Кожне число про перемоги – це кількість матчів, що мають результат, а поруч – число, з якого їх пораховано."
 
-#: src/multiplayer/pages/HighlightsSettings.tsx
-#, fuzzy
-msgid "A matching message flashes the window and plays a sound. Choose which sound, and how loud, under <0>Sound</0>."
-msgstr "Повідомлення, що збігається, змушує вікно блимати й відтворює звук. Виберіть звук і гучність у розділі <0>Звук</0>."
-
 #: src/content/pages/MatchupPage.tsx
 #, fuzzy
 msgid "A matchup is the games where you were on opposing teams, from the replays in your content folders."
 msgstr "Протистояння – це ігри, де ви були в протилежних командах, з повторів у ваших папках вмісту."
+
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "A message that names you or a highlight word is outlined in chat, flashes the window, plays a sound and shows a notice. Choose the sound under <0>Sound</0>."
+msgstr ""
 
 #: src/hub/upload/messages.ts
 #, fuzzy
@@ -9955,6 +9954,10 @@ msgstr "Назва зброї може містити лише малі літе
 msgid "A widget that lists the blueprints in this library while you play, places one at the cursor as ghosts and build orders, and saves the buildings you have selected back here. It reads BAR's own blueprints.json too, and never writes it. It opens no network connection."
 msgstr "Віджет, який під час гри показує креслення з цієї бібліотеки, розміщує одне біля курсора як примари з наказами будівництва й зберігає сюди будівлі, які ви виділили. Він також читає власний blueprints.json BAR і ніколи не записує в нього. Він не відкриває мережевих з’єднань."
 
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "A word counts only on its own and in any case, so \"alice\" matches \"Hi Alice!\" but not \"malice\"."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "A yellow circle that grows and fades is an explosion: a projectile landing, or, larger, a unit destroyed. Debris landing makes none. The Explosions switch turns them off."
@@ -10135,6 +10138,14 @@ msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "About going away when idle"
+msgstr ""
+
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "About highlight words"
+msgstr ""
+
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "About highlights"
 msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
@@ -23973,11 +23984,6 @@ msgstr "Фіксовані позиції мапи"
 msgid "Fixed start positions: team N spawns at the map's start position N."
 msgstr "Фіксовані стартові позиції: команда N з’являється на стартовій позиції мапи N."
 
-#: src/multiplayer/pages/HighlightsSettings.tsx
-#, fuzzy
-msgid "Flag messages that mention your logged-in username."
-msgstr "Позначати повідомлення, що згадують ваше ім’я користувача."
-
 #: src/multiplayer/chat/emoji.ts
 #, fuzzy
 msgid "Flags"
@@ -31353,6 +31359,10 @@ msgstr "Згадати користувача"
 msgid "Mentioned in chat"
 msgstr "Згадка в чаті"
 
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "Mentions"
+msgstr ""
+
 #: src/workshop/pages/components/UnitList.tsx
 #, fuzzy
 msgid "menu"
@@ -33942,6 +33952,10 @@ msgstr "Для джерела \"{sourceKey}\" не вказано репозит
 msgid "No hand-made map with the id \"{id}\" is installed, and no installed game carries one. A game update may have removed it."
 msgstr "Не встановлено мапи, зробленої вручну, з id \"{id}\", і жодна встановлена гра її не містить. Можливо, її прибрало оновлення гри."
 
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "No highlight words."
+msgstr ""
+
 #: src/campaign/pages/components/presentationOpen.ts
 #, fuzzy
 msgid "No icon or background yet"
@@ -35355,11 +35369,6 @@ msgstr "У цьому проміжку нічого не замовлено"
 #, fuzzy
 msgid "none yet"
 msgstr "ще нічого"
-
-#: src/multiplayer/pages/HighlightsSettings.tsx
-#, fuzzy
-msgid "None yet. Add a word to have it flag matching chat messages."
-msgstr "Ще нічого. Додайте слово, щоб позначати повідомлення чату з ним."
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
@@ -41698,6 +41707,7 @@ msgstr "Ремікс із"
 #: src/lego/pages/components/BuiltBySection.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/multiplayer/battle/MemberRow.tsx
+#: src/multiplayer/pages/HighlightsSettings.tsx
 #: src/play/ChobbyPresetsView.tsx
 #: src/uberstress/pages/SettingsSection.tsx
 #: src/widgets/pages/WidgetsPage.tsx
@@ -58157,11 +58167,6 @@ msgstr "Уся модель"
 #, fuzzy
 msgid "Whole project"
 msgstr "Увесь проєкт"
-
-#: src/multiplayer/pages/HighlightsSettings.tsx
-#, fuzzy
-msgid "Whole-word, case-insensitive. Messages containing any of these are visually flagged."
-msgstr "Цілі слова, без урахування регістру. Повідомлення з будь-яким із них візуально позначаються."
 
 #: src/hub/maps/catalogSweep.ts
 #, fuzzy

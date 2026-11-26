@@ -9362,15 +9362,14 @@ msgstr "マッチが見つかったとき"
 msgid "A match with no recorded result is in no win or loss. Every figure about wins is a count of the matches that have one, with the number it is out of beside it."
 msgstr "結果が記録されていない試合は、勝ちにも負けにも含まれません。勝利に関する数値はすべて結果のある試合の数で、横にその母数を表示しています。"
 
-#: src/multiplayer/pages/HighlightsSettings.tsx
-#, fuzzy
-msgid "A matching message flashes the window and plays a sound. Choose which sound, and how loud, under <0>Sound</0>."
-msgstr "一致するメッセージが届くと、ウィンドウが点滅してサウンドが鳴ります。サウンドの種類と音量は<0>サウンド</0>で選択してください。"
-
 #: src/content/pages/MatchupPage.tsx
 #, fuzzy
 msgid "A matchup is the games where you were on opposing teams, from the replays in your content folders."
 msgstr "対戦カードは、コンテンツフォルダー内のリプレイのうち、敵同士のチームだったゲームです。"
+
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "A message that names you or a highlight word is outlined in chat, flashes the window, plays a sound and shows a notice. Choose the sound under <0>Sound</0>."
+msgstr ""
 
 #: src/hub/upload/messages.ts
 #, fuzzy
@@ -9955,6 +9954,10 @@ msgstr "武器名に使えるのは小文字、数字、アンダースコアだ
 msgid "A widget that lists the blueprints in this library while you play, places one at the cursor as ghosts and build orders, and saves the buildings you have selected back here. It reads BAR's own blueprints.json too, and never writes it. It opens no network connection."
 msgstr "プレイ中にこのライブラリの設計図を一覧表示し、カーソル位置にゴーストと建設命令として配置し、選択した建物をここに保存するウィジェットです。BAR 自身の blueprints.json も読み込みますが、書き込みはしません。ネットワーク接続は行いません。"
 
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "A word counts only on its own and in any case, so \"alice\" matches \"Hi Alice!\" but not \"malice\"."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "A yellow circle that grows and fades is an explosion: a projectile landing, or, larger, a unit destroyed. Debris landing makes none. The Explosions switch turns them off."
@@ -10135,6 +10138,14 @@ msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "About going away when idle"
+msgstr ""
+
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "About highlight words"
+msgstr ""
+
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "About highlights"
 msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
@@ -23973,11 +23984,6 @@ msgstr "マップの固定位置"
 msgid "Fixed start positions: team N spawns at the map's start position N."
 msgstr "固定の開始位置：チーム N はマップの開始位置 N に出現します。"
 
-#: src/multiplayer/pages/HighlightsSettings.tsx
-#, fuzzy
-msgid "Flag messages that mention your logged-in username."
-msgstr "ログイン中のユーザー名に言及したメッセージに印を付けます。"
-
 #: src/multiplayer/chat/emoji.ts
 #, fuzzy
 msgid "Flags"
@@ -31353,6 +31359,10 @@ msgstr "ユーザーをメンション"
 msgid "Mentioned in chat"
 msgstr "チャットでメンションされた"
 
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "Mentions"
+msgstr ""
+
 #: src/workshop/pages/components/UnitList.tsx
 #, fuzzy
 msgid "menu"
@@ -33942,6 +33952,10 @@ msgstr "ソース \"{sourceKey}\" に GitHub リポジトリが宣言されて�
 msgid "No hand-made map with the id \"{id}\" is installed, and no installed game carries one. A game update may have removed it."
 msgstr "ID \"{id}\" の手作りマップはインストールされておらず、それを含むインストール済みのゲームもありません。ゲームのアップデートで削除された可能性があります。"
 
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "No highlight words."
+msgstr ""
+
 #: src/campaign/pages/components/presentationOpen.ts
 #, fuzzy
 msgid "No icon or background yet"
@@ -35355,11 +35369,6 @@ msgstr "この時間帯の命令なし"
 #, fuzzy
 msgid "none yet"
 msgstr "まだなし"
-
-#: src/multiplayer/pages/HighlightsSettings.tsx
-#, fuzzy
-msgid "None yet. Add a word to have it flag matching chat messages."
-msgstr "まだありません。単語を追加すると、一致するチャットメッセージに印が付きます。"
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
@@ -41698,6 +41707,7 @@ msgstr "リミックス元"
 #: src/lego/pages/components/BuiltBySection.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/multiplayer/battle/MemberRow.tsx
+#: src/multiplayer/pages/HighlightsSettings.tsx
 #: src/play/ChobbyPresetsView.tsx
 #: src/uberstress/pages/SettingsSection.tsx
 #: src/widgets/pages/WidgetsPage.tsx
@@ -58157,11 +58167,6 @@ msgstr "モデル全体"
 #, fuzzy
 msgid "Whole project"
 msgstr "プロジェクト全体"
-
-#: src/multiplayer/pages/HighlightsSettings.tsx
-#, fuzzy
-msgid "Whole-word, case-insensitive. Messages containing any of these are visually flagged."
-msgstr "単語単位、大文字小文字を区別しません。いずれかを含むメッセージは強調表示されます。"
 
 #: src/hub/maps/catalogSweep.ts
 #, fuzzy
