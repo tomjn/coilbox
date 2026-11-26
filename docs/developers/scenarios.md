@@ -96,6 +96,8 @@ An actor is one named unit: the commander to defend, the base the mission is abo
 
 Triggers refer to actors by id, and so do orders. That is what `unit_dead`, `unit_health_below` and `unit_captured` are asking about.
 
+An actor that upgrades is still the same actor. Beyond All Reason's evolving commanders and Splinter Faction's morphs replace the unit with a new one, and from mission runtime 18 the actor is the new unit, so it is not dead and keeps its invulnerability. A game with an older runtime counts the actor dead from the moment it upgrades.
+
 ### Groups
 
 A group is a block of units spawned and ordered as one: a raiding party, a reinforcement wave, a garrison. You say what is in it (counts per unit type), where it lands, what its orders are, and whether it is there from the start.
