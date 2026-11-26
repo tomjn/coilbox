@@ -50,6 +50,7 @@ vi.mock("./widgets", () => ({ PageWidget: () => null }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl }));
 
 import { MarkdownPage } from "./CustomPage";
+import { buildProfilePages } from "./pages";
 
 function Where() {
   return <span data-testid="where">{useLocation().pathname}</span>;
@@ -125,6 +126,31 @@ describe("a link on a distribution's markdown page", () => {
     const { followed } = clickLink("[our guide](docs/guide.pdf)");
     expect(followed).toBe(false);
     expect(profileOpen).toHaveBeenCalledWith({ path: "docs/guide.pdf" });
+  });
+
+  it.each([
+    "[Guide](<docs/my guide é.pdf>)",
+    "[Guide](<@.coilbox/docs/my guide é.pdf>)",
+  ])("opens the file the author named in %s", (markdown) => {
+    const { link } = clickLink(markdown);
+    expect(profileOpen).toHaveBeenCalledWith({ path: "docs/my guide é.pdf" });
+    // Encoded once, so the address names the same file.
+    expect(link.getAttribute("href")).toMatch(
+      /\/portable\/docs\/my%20guide%20%C3%A9\.pdf$/,
+    );
+  });
+
+  it.each([
+    "[Setup](<getting started é.md>)",
+    "[Setup](<@.coilbox/pages/getting started é.md>)",
+    "[Setup](</getting started é.md>)",
+  ])("goes to the page the author named in %s", (markdown) => {
+    // The route a page file of that name is given.
+    const [page] = buildProfilePages([
+      { path: "pages/getting started é.md", content: "" },
+    ]);
+    expect(clickLink(markdown).at).toBe(`/${page.route}`);
+    expect(profileOpen).not.toHaveBeenCalled();
   });
 
   it("is still not followed when the file cannot be opened or shown", async () => {
