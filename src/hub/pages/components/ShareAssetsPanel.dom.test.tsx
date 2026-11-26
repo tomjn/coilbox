@@ -90,7 +90,7 @@ afterEach(cleanup);
 it("signs in before offering the switch", () => {
   render(<ShareAssetsPanel hubUrl="https://hub.example" />);
 
-  expect(screen.getByText("Signed in as Someone.")).toBeTruthy();
+  expect(screen.getByText("Signed in as Someone")).toBeTruthy();
 });
 
 it("hides the four controls until sharing is agreed to", () => {

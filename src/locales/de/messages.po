@@ -1450,14 +1450,6 @@ msgstr "{0} an einer Position ohne Namen."
 msgid "{0} called a vote: {1}"
 msgstr "{0} hat eine Abstimmung gestartet: {1}"
 
-#. placeholder {0}: found.candidates.length
-#. placeholder {1}: found.skipped.length
-#. placeholder {2}: found.listed
-#: src/hub/pages/components/MapArchivesControl.tsx
-#, fuzzy
-msgid "{0} can be uploaded, {1} cannot, and {2} are already on the hub."
-msgstr "{0} können hochgeladen werden, {1} nicht, und {2} sind bereits im Hub."
-
 #. placeholder {0}: d.asset
 #: src/content/gameSourceRows.ts
 #, fuzzy
@@ -10260,10 +10252,34 @@ msgstr ""
 msgid "About scanning on startup"
 msgstr ""
 
+#: src/hub/pages/components/AssetUploadControl.tsx
+msgid "About sending pictures"
+msgstr ""
+
+#: src/hub/pages/components/GamePicturesControl.tsx
+msgid "About sending pictures of your games"
+msgstr ""
+
+#: src/hub/pages/components/MapPicturesControl.tsx
+msgid "About sending pictures of your maps"
+msgstr ""
+
+#: src/hub/pages/components/GameFactsControl.tsx
+msgid "About sending what your games say"
+msgstr ""
+
+#: src/hub/pages/components/MapCatalogControl.tsx
+msgid "About sending what your maps say"
+msgstr ""
+
 #: src/lego/pages/components/CollisionPanel.tsx
 #, fuzzy
 msgid "About shooting at each piece"
 msgstr "Über das Beschießen jedes Teils"
+
+#: src/hub/pages/components/AccountControl.tsx
+msgid "About signing out"
+msgstr ""
 
 #: src/sound/SoundSettings.tsx
 msgid "About sounds"
@@ -10357,6 +10373,10 @@ msgstr "Über dieses Szenario"
 msgid "About unit values"
 msgstr "Über Einheitenwerte"
 
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "About uploading map files"
+msgstr ""
+
 #: src/lego/pages/components/CollisionPanel.tsx
 #, fuzzy
 msgid "About using each piece"
@@ -10449,6 +10469,7 @@ msgstr "Zugriffsstufe"
 
 #: src/account/index.ts
 #: src/account/pages/SettingsSection.tsx
+#: src/hub/pages/components/AccountControl.tsx
 #: src/multiplayer/AccountPicker.tsx
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
@@ -15071,6 +15092,10 @@ msgstr "Kann auf Boden zielen"
 msgid "Can travel underwater"
 msgstr "Kann unter Wasser fahren"
 
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Can upload: {can}. Cannot upload: {cannot}. Already on the hub: {listed}."
+msgstr ""
+
 #: src/multiplayer/battle/contentBlock.ts
 #, fuzzy
 msgid "Can't check content"
@@ -15858,6 +15883,9 @@ msgid "Checking what can be deleted..."
 msgstr "Prüfe, was gelöscht werden kann…"
 
 #: src/hub/pages/components/AccountControl.tsx
+msgid "Checking whether you are signed in"
+msgstr ""
+
 #: src/hub/PublishSection.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -16811,6 +16839,10 @@ msgstr ""
 #, fuzzy
 msgid "Coilbox could not build {baseName} (compat {version}) for this battle: {error}"
 msgstr "Coilbox konnte {baseName} (compat {version}) für diese Partie nicht erstellen: {error}"
+
+#: src/hub/pages/components/AccountControl.tsx
+msgid "Coilbox could not check the name this time."
+msgstr ""
 
 #: src/downloads/pages/components/EngineUpload.tsx
 msgid "Coilbox could not check the official Recoil releases, so it cannot tell whether the hub needs this build. {why}"
@@ -21415,11 +21447,6 @@ msgstr "Zeichne {at} von {total}: {game}"
 
 #: src/hub/pages/components/GamePicturesControl.tsx
 #, fuzzy
-msgid "Drawing your units…"
-msgstr "Ihre Einheiten werden gezeichnet…"
-
-#: src/hub/pages/components/GamePicturesControl.tsx
-#, fuzzy
 msgid "Drawing: {game}"
 msgstr "Zeichne: {game}"
 
@@ -23627,6 +23654,7 @@ msgstr "Filter und Sortierung"
 msgid "Filters: {filters}"
 msgstr "Filter: {filters}"
 
+#: src/hub/pages/components/MapArchivesControl.tsx
 #: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 #, fuzzy
 msgid "Find"
@@ -23694,9 +23722,8 @@ msgid "Find other accounts on this IP"
 msgstr "Andere Konten mit dieser IP finden"
 
 #: src/hub/pages/components/MapArchivesControl.tsx
-#, fuzzy
-msgid "Finding maps…"
-msgstr "Karten werden gesucht …"
+msgid "Finds the map files on this computer that the hub does not have yet, so you can choose which to upload. Reading each one takes a while on a large library."
+msgstr ""
 
 #: src/content/pages/StorageSection.tsx
 msgid "Finish or cancel downloads first"
@@ -30691,6 +30718,10 @@ msgstr "Karte und Spiel fehlen"
 msgid "Map compiler"
 msgstr ""
 
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Map files"
+msgstr ""
+
 #: src/conquest/pages/ConquestListPage.tsx
 #, fuzzy
 msgid "Map folder \"{folder}\""
@@ -30933,6 +30964,10 @@ msgstr "Karten konnten nicht gelesen werden"
 #, fuzzy
 msgid "Maps that could not be listed"
 msgstr "Karten, die nicht aufgelistet werden konnten"
+
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Maps the hub is missing"
+msgstr ""
 
 #: src/mapconv/pages/ProjectsPage.tsx
 #, fuzzy
@@ -35761,6 +35796,10 @@ msgstr "Nicht gesetzt, die Engine nutzt 0.5"
 msgid "Not set, the unit never backs up"
 msgstr "Nicht gesetzt, die Einheit fährt nie rückwärts"
 
+#: src/hub/pages/components/AccountControl.tsx
+msgid "Not signed in"
+msgstr ""
+
 #: src/account/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Not signed in. Connect as {lastUsername} to manage that account."
@@ -38750,6 +38789,14 @@ msgstr "Bild exportiert."
 msgid "Picture uploads stopped early"
 msgstr "Bild-Uploads vorzeitig beendet"
 
+#: src/hub/pages/components/GamePicturesControl.tsx
+msgid "Pictures of your games"
+msgstr ""
+
+#: src/hub/pages/components/MapPicturesControl.tsx
+msgid "Pictures of your maps"
+msgstr ""
+
 #: src/content/pages/components/ReplayBaseCrops.tsx
 #, fuzzy
 msgid "Pictures show orders given from {from} to {to}."
@@ -40973,7 +41020,6 @@ msgid "Reading which routes {gameName} supports…"
 msgstr "Es wird gelesen, welche Wege {gameName} unterstützt…"
 
 #: src/blueprint/pages/BlueprintsPage.tsx
-#: src/hub/pages/components/GameFactsControl.tsx
 #: src/play/pages/components/GamePickerGrid.tsx
 #, fuzzy
 msgid "Reading your games…"
@@ -40990,12 +41036,6 @@ msgstr "Ihre installierten Spiele werden gelesen"
 #, fuzzy
 msgid "Reading your maps"
 msgstr "Ihre Karten werden gelesen"
-
-#: src/hub/pages/components/MapCatalogControl.tsx
-#: src/hub/pages/components/MapPicturesControl.tsx
-#, fuzzy
-msgid "Reading your maps…"
-msgstr "Ihre Karten werden gelesen…"
 
 #: src/lego/pages/ProjectsPage.tsx
 #, fuzzy
@@ -44824,6 +44864,7 @@ msgstr "Selbstzerstörungsexplosion"
 msgid "Self-destructs"
 msgstr "Zerstört sich selbst"
 
+#: src/hub/pages/components/SendButton.tsx
 #: src/multiplayer/admin/AnnouncementsSection.tsx
 #: src/multiplayer/battle/BonusButton.tsx
 #: src/multiplayer/chat/ChatPane.tsx
@@ -44958,21 +44999,6 @@ msgstr "Bilder werden gesendet"
 msgid "Sending pictures for the hub. Open to stop."
 msgstr "Bilder werden an den Hub gesendet. Öffnen zum Stoppen."
 
-#: src/hub/pages/components/GamePicturesControl.tsx
-#, fuzzy
-msgid "Sending pictures of your games"
-msgstr "Bilder Ihrer Spiele werden gesendet"
-
-#: src/hub/pages/components/MapPicturesControl.tsx
-#, fuzzy
-msgid "Sending pictures of your maps"
-msgstr "Bilder Ihrer Karten werden gesendet"
-
-#: src/hub/pages/components/AssetUploadControl.tsx
-#, fuzzy
-msgid "Sending pictures to the hub"
-msgstr "Bilder werden an den Hub gesendet"
-
 #: src/hub/assets/UploadRunBadge.tsx
 #, fuzzy
 msgid "Sending to hub"
@@ -44982,16 +45008,6 @@ msgstr "Senden an den Hub"
 #, fuzzy
 msgid "Sending to the hub. Open to stop."
 msgstr "Senden an den Hub. Öffnen zum Stoppen."
-
-#: src/hub/pages/components/GameFactsControl.tsx
-#, fuzzy
-msgid "Sending what your games say"
-msgstr "Angaben Ihrer Spiele werden gesendet"
-
-#: src/hub/pages/components/MapCatalogControl.tsx
-#, fuzzy
-msgid "Sending what your maps say"
-msgstr "Angaben Ihrer Karten werden gesendet"
 
 #: src/hub/pages/components/GameFactsControl.tsx
 #, fuzzy
@@ -45630,6 +45646,10 @@ msgstr "Teilt ein Team mit {leaderName} – Teameinstellungen kommen vom ersten 
 #, fuzzy
 msgid "Shares a team with {sharedName} — team settings come from the first member"
 msgstr "Teilt ein Team mit {sharedName} – Teameinstellungen kommen vom ersten Mitglied"
+
+#: src/hub/pages/components/ShareAssetsPanel.tsx
+msgid "Sharing"
+msgstr ""
 
 #: src/workshop/weaponSlots.ts
 #, fuzzy
@@ -46411,6 +46431,7 @@ msgstr "Abmelden"
 msgid "Sign-in"
 msgstr "Anmeldung"
 
+#: src/hub/pages/components/AccountControl.tsx
 #: src/hub/pages/components/HeaderAccount.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -46418,14 +46439,8 @@ msgid "Signed in"
 msgstr "Angemeldet"
 
 #: src/hub/pages/components/AccountControl.tsx
-#, fuzzy
-msgid "Signed in as {accountName}."
-msgstr "Angemeldet als {accountName}."
-
-#: src/hub/pages/components/AccountControl.tsx
-#, fuzzy
-msgid "Signed in. Coilbox could not check the name this time."
-msgstr "Angemeldet. Coilbox konnte den Namen diesmal nicht prüfen."
+msgid "Signed in as {accountName}"
+msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -56427,11 +56442,6 @@ msgstr "Hochladen in den Hub"
 msgid "Uploading to the hub. Open to stop."
 msgstr "Hochladen in den Hub. Öffnen zum Stoppen."
 
-#: src/hub/pages/components/MapArchivesControl.tsx
-#, fuzzy
-msgid "Uploading your map files"
-msgstr "Ihre Kartendateien werden hochgeladen"
-
 #: src/hub/upload/UploadToHubButton.tsx
 #, fuzzy
 msgid "Uploading…"
@@ -57700,14 +57710,25 @@ msgid "What uberserver cleans up by itself, and what no client can do"
 msgstr "Was uberserver selbst aufräumt und was kein Client kann"
 
 #: src/hub/pages/components/AssetUploadControl.tsx
-#, fuzzy
-msgid "What you send is public and hard to take back. It goes into a public repository and stays in its history, so it is not like deleting a file you uploaded by mistake. The pictures are made from other people's game and map archives, and not every archive is clear about what you may do with what is inside it. Every upload also spends storage the whole community shares."
-msgstr "Was Sie senden, ist öffentlich und schwer zurückzunehmen. Es landet in einem öffentlichen Repository und bleibt in dessen Verlauf, es ist also nicht wie das Löschen einer versehentlich hochgeladenen Datei. Die Bilder entstehen aus Spiel- und Kartenarchiven anderer Leute, und nicht jedes Archiv sagt klar, was Sie mit seinem Inhalt tun dürfen. Jeder Upload verbraucht außerdem Speicher, den die ganze Community teilt."
+msgid "What you send goes into a public repository and stays in its history, so it is not like deleting a file you uploaded by mistake. The pictures are made from other people's game and map archives, and not every archive is clear about what you may do with what is inside it. Every upload also spends storage the whole community shares."
+msgstr ""
+
+#: src/hub/pages/components/AssetUploadControl.tsx
+msgid "What you send is public and hard to take back."
+msgstr ""
+
+#: src/hub/pages/components/GameFactsControl.tsx
+msgid "What your games say"
+msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
 msgid "What your library knows about it"
 msgstr "Was Ihre Bibliothek darüber weiß"
+
+#: src/hub/pages/components/MapCatalogControl.tsx
+msgid "What your maps say"
+msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
@@ -59341,11 +59362,6 @@ msgstr "Ihre Spiele konnten nicht gelesen werden, also wurde hier nichts damit a
 #, fuzzy
 msgid "Your games could not be read: {scanError}"
 msgstr "Ihre Spiele konnten nicht gelesen werden: {scanError}"
-
-#: src/hub/pages/components/AccountControl.tsx
-#, fuzzy
-msgid "Your hub account"
-msgstr "Ihr Hub-Konto"
 
 #: src/direct/ReachablePorts.tsx
 #, fuzzy

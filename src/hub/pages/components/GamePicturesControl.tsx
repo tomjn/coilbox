@@ -1,9 +1,9 @@
 import type { MessageDescriptor } from "@lingui/core";
 import { msg, plural } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Button } from "@picoframe/frame";
 import { useMemo, useState } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
+import { SettingRow } from "@/components/SettingRow";
 import type { GameItem } from "@/content/bindings";
 import { useUnitsyncScan } from "@/content/config";
 import { describeError } from "@/i18n/uiError";
@@ -19,6 +19,7 @@ import {
   sweepGamePictures,
 } from "../../assets/pictureSweep";
 import { RENDER_ANGLES } from "../../assets/vocabulary";
+import { SendButton } from "./SendButton";
 
 /**
  * Sending the hub pictures of the units in the installed games, in Settings >
@@ -99,87 +100,82 @@ export function GamePicturesControl({
   const lastRun = swept === null ? null : formatDateTime(new Date(swept));
 
   return (
-    <section className="space-y-2">
-      <h3 className="text-sm font-medium leading-none">
-        <Trans>Sending pictures of your games</Trans>
-      </h3>
-      <p className="text-sm text-muted-foreground">
-        <Trans>
-          Coilbox can draw every unit in the games on this computer and send the
-          pictures to the hub: the icon the game ships, and {angleCount} views
-          of the model drawn here. It asks the hub what it already has first, so
-          a game somebody else has covered costs one question.
-        </Trans>
-      </p>
-      <p className="text-sm text-muted-foreground">
-        <Trans>
-          A big game takes several goes. Every upload spends part of an hourly
-          allowance the whole community shares, so one press covers what is left
-          of this hour and picks up where it stopped the next time you press it.
-        </Trans>
-      </p>
-      <div className="flex items-center gap-3 pt-1">
+    <SettingRow
+      label={t`Pictures of your games`}
+      description={
+        progress ? (
+          i18n._(phaseWords(progress))
+        ) : !target?.enginePath ? (
+          t`Coilbox needs an engine installed before it can draw your units.`
+        ) : report || lastRun ? (
+          <>
+            {report && (
+              <span className="block">{pictureSweepSummary(report)}</span>
+            )}
+            {report?.games.map((one) => (
+              <span className="block" key={one.shortname}>
+                {i18n._(gameWords(one))}
+              </span>
+            ))}
+            {report?.failed.map((one) => {
+              const { game, said } = one;
+              return (
+                <span className="block text-destructive" key={game}>
+                  <Trans>
+                    Coilbox could not read {game}: {said}
+                  </Trans>
+                </span>
+              );
+            })}
+            {lastRun && (
+              <span className="block">
+                <Trans>Last run {lastRun}.</Trans>
+              </span>
+            )}
+          </>
+        ) : undefined
+      }
+      error={failed}
+      help={
+        <>
+          <p>
+            <Trans>
+              Coilbox can draw every unit in the games on this computer and send
+              the pictures to the hub: the icon the game ships, and {angleCount}{" "}
+              views of the model drawn here. It asks the hub what it already has
+              first, so a game somebody else has covered costs one question.
+            </Trans>
+          </p>
+          <p>
+            <Trans>
+              A big game takes several goes. Every upload spends part of an
+              hourly allowance the whole community shares, so one press covers
+              what is left of this hour and picks up where it stopped the next
+              time you press it.
+            </Trans>
+          </p>
+        </>
+      }
+      helpLabel={t`About sending pictures of your games`}
+    >
+      <div className="flex items-center gap-2">
         <OptionSelect
           value={only}
           onValueChange={setOnly}
           options={[{ value: ALL_GAMES, label: t`All games` }, ...games]}
           disabled={running}
           size="sm"
-          className="w-56"
+          className="w-40"
           ariaLabel={t`Which game to send pictures of`}
         />
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={run}
-          disabled={running || !target?.enginePath}
-        >
-          {running ? t`Drawing your units…` : t`Send pictures of your games`}
-        </Button>
-        {progress && (
-          <span className="text-sm text-muted-foreground">
-            {i18n._(phaseWords(progress))}
-          </span>
-        )}
+        <SendButton
+          label={t`Send pictures of your games`}
+          running={running}
+          disabled={!target?.enginePath}
+          onClick={() => void run()}
+        />
       </div>
-      {!target?.enginePath && (
-        <p className="text-sm text-muted-foreground">
-          <Trans>
-            Coilbox needs an engine installed before it can draw your units.
-          </Trans>
-        </p>
-      )}
-      {swept !== null && !running && (
-        <p className="text-sm text-muted-foreground">
-          <Trans>Last run {lastRun}.</Trans>
-        </p>
-      )}
-      {report && (
-        <>
-          <p className="text-sm text-muted-foreground">
-            {pictureSweepSummary(report)}
-          </p>
-          {report.games.length > 0 && (
-            <ul className="text-sm text-muted-foreground">
-              {report.games.map((one) => (
-                <li key={one.shortname}>{i18n._(gameWords(one))}</li>
-              ))}
-            </ul>
-          )}
-          {report.failed.map((one) => {
-            const { game, said } = one;
-            return (
-              <p className="text-sm text-destructive" key={game}>
-                <Trans>
-                  Coilbox could not read {game}: {said}
-                </Trans>
-              </p>
-            );
-          })}
-        </>
-      )}
-      {failed && <p className="text-sm text-destructive">{failed}</p>}
-    </section>
+    </SettingRow>
   );
 }
 

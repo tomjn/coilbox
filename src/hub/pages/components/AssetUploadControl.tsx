@@ -1,15 +1,19 @@
-import { Trans } from "@lingui/react/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
+import { useState } from "react";
+import { SettingRow } from "@/components/SettingRow";
 import { Switch } from "@/components/ui/switch";
+import { describeError } from "@/i18n/uiError";
 
 /**
- * Agreeing to send pictures to the hub, in Settings > Coilbox hub (issue #1635).
+ * Agreeing to send pictures to the hub, in Settings > Coilbox hub (issue #1635),
+ * as one row of the sharing list.
  *
- * The words are the point of this control. Somebody reading it has not read the
- * issue, has probably never thought about where a picture of a unit comes from,
- * and is being asked to publish things derived from files they did not make. So
- * it says what happens in the order it happens - reads local files, makes
- * pictures, sends them under your name - and then why it is worth a moment's
- * thought, before offering the switch.
+ * Somebody reading it has probably never thought about where a picture of a
+ * unit comes from, and is being asked to publish things derived from files they
+ * did not make. The warning that matters before pressing, that it is public and
+ * hard to take back, stays under the name. The help button says what happens in
+ * the order it happens - reads local files, makes pictures, sends them under
+ * your name - and why it is worth a moment's thought.
  *
  * Presentational on purpose: the setting is read and written by the caller, and
  * nothing here enforces anything. The gate is in the Rust plugin, at
@@ -33,14 +37,42 @@ export function AssetUploadControl({
    *  frame's own state, and there is nothing to say while a file is written. */
   onChange: (next: boolean) => void | Promise<void>;
 }) {
+  const { t } = useLingui();
+  const [failed, setFailed] = useState<string | null>(null);
+  const label = t`Send pictures of your games and maps to the hub`;
+
+  if (!offered) {
+    return (
+      <SettingRow
+        label={label}
+        description={t`Your distribution has switched off sending pictures to the hub, so Coilbox will not upload any.`}
+      >
+        {null}
+      </SettingRow>
+    );
+  }
+
+  // The answer is written to disk, where the Rust side reads it before any
+  // upload, so a write that failed leaves the switch saying one thing and the
+  // gate another. Say so rather than leave an unhandled rejection.
+  const change = async (next: boolean) => {
+    setFailed(null);
+    try {
+      await onChange(next);
+    } catch (e) {
+      setFailed(describeError(e));
+    }
+  };
+
   return (
-    <section className="space-y-2">
-      <h3 className="text-sm font-medium leading-none">
-        <Trans>Sending pictures to the hub</Trans>
-      </h3>
-      {offered ? (
+    <SettingRow
+      id="hub-asset-uploads"
+      label={label}
+      description={t`What you send is public and hard to take back.`}
+      error={failed}
+      help={
         <>
-          <p className="text-sm text-muted-foreground">
+          <p>
             <Trans>
               Off unless you turn it on. When it is on, Coilbox reads the game
               and map files on this computer, makes pictures of the units and
@@ -50,44 +82,32 @@ export function AssetUploadControl({
               start.
             </Trans>
           </p>
-          <p className="text-sm text-muted-foreground">
+          <p>
             <Trans>
-              What you send is public and hard to take back. It goes into a
-              public repository and stays in its history, so it is not like
-              deleting a file you uploaded by mistake. The pictures are made
-              from other people's game and map archives, and not every archive
-              is clear about what you may do with what is inside it. Every
-              upload also spends storage the whole community shares.
+              What you send goes into a public repository and stays in its
+              history, so it is not like deleting a file you uploaded by
+              mistake. The pictures are made from other people's game and map
+              archives, and not every archive is clear about what you may do
+              with what is inside it. Every upload also spends storage the whole
+              community shares.
             </Trans>
           </p>
-          <p className="text-sm text-muted-foreground">
+          <p>
             <Trans>
               Leave this off unless you are happy to publish pictures made from
               the games and maps you have installed.
             </Trans>
           </p>
-          <label
-            htmlFor="hub-asset-uploads"
-            className="flex items-center justify-between gap-4 pt-1"
-          >
-            <span className="text-sm font-medium">
-              <Trans>Send pictures of your games and maps to the hub</Trans>
-            </span>
-            <Switch
-              id="hub-asset-uploads"
-              checked={agreed}
-              onCheckedChange={onChange}
-            />
-          </label>
         </>
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          <Trans>
-            Your distribution has switched off sending pictures to the hub, so
-            Coilbox will not upload any.
-          </Trans>
-        </p>
-      )}
-    </section>
+      }
+      helpLabel={t`About sending pictures`}
+    >
+      <Switch
+        id="hub-asset-uploads"
+        checked={agreed}
+        onCheckedChange={(next) => void change(next)}
+        aria-describedby="hub-asset-uploads-description"
+      />
+    </SettingRow>
   );
 }

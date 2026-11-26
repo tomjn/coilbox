@@ -1,7 +1,9 @@
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
+import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { CheckField } from "@/components/Field";
+import { SettingList, SettingRow } from "@/components/SettingRow";
 import { Progress } from "@/components/ui/progress";
 import { describeError } from "@/i18n/uiError";
 import { formatBytes } from "@/lib/format";
@@ -92,59 +94,79 @@ export function MapArchivesControl({ hubUrl }: { hubUrl: string }) {
     chosen.reduce((sum, one) => sum + one.facts.size, 0),
   );
   const count = chosen.length;
+  // Counts as labels rather than a sentence, which read "1 are already on
+  // the hub" for a single map.
+  const foundSummary = (result: BulkFindResult) => {
+    const can = result.candidates.length;
+    const cannot = result.skipped.length;
+    const listed = result.listed;
+    return t`Can upload: ${can}. Cannot upload: ${cannot}. Already on the hub: ${listed}.`;
+  };
 
   return (
-    <section className="space-y-2">
-      <h3 className="text-sm font-medium leading-none">
-        <Trans>Uploading your map files</Trans>
-      </h3>
-      <div className="flex items-center gap-3 pt-1">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => void find()}
-          disabled={!!progress || !!run?.running || !target?.enginePath}
-        >
-          {progress ? t`Finding maps…` : t`Find maps the hub is missing`}
-        </Button>
-        {progress && (
-          <span className="text-sm text-muted-foreground">
-            {progress.phase === "asking"
-              ? t`Asking the hub about your maps`
-              : t`Read ${progress.done} of ${progress.total}`}
-          </span>
-        )}
-      </div>
-      {progress?.phase === "reading" && (
-        <Progress
-          value={
-            progress.total > 0
-              ? Math.round((progress.done / progress.total) * 100)
-              : 0
+    <section className="flex flex-col gap-3">
+      <h2 className="text-sm font-semibold">
+        <Trans>Map files</Trans>
+      </h2>
+      <SettingList>
+        <SettingRow
+          label={t`Maps the hub is missing`}
+          description={
+            progress?.phase === "asking" ? (
+              t`Asking the hub about your maps`
+            ) : progress ? (
+              <>
+                <span className="block">
+                  {t`Read ${progress.done} of ${progress.total}`}
+                </span>
+                <Progress
+                  value={
+                    progress.total > 0
+                      ? Math.round((progress.done / progress.total) * 100)
+                      : 0
+                  }
+                  className="mt-1.5 h-1.5 bg-muted"
+                  aria-label={t`Reading your maps`}
+                />
+              </>
+            ) : !target?.enginePath ? (
+              t`Coilbox needs an engine installed before it can read your maps.`
+            ) : found ? (
+              foundSummary(found)
+            ) : undefined
           }
-          className="h-1.5 bg-muted"
-          aria-label={t`Reading your maps`}
-        />
-      )}
-      {!target?.enginePath && (
-        <p className="text-sm text-muted-foreground">
-          <Trans>
-            Coilbox needs an engine installed before it can read your maps.
-          </Trans>
-        </p>
-      )}
-      {failed && <p className="text-sm text-destructive">{failed}</p>}
+          error={failed}
+          help={
+            <p>
+              <Trans>
+                Finds the map files on this computer that the hub does not have
+                yet, so you can choose which to upload. Reading each one takes a
+                while on a large library.
+              </Trans>
+            </p>
+          }
+          helpLabel={t`About uploading map files`}
+        >
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => void find()}
+            disabled={!!progress || !!run?.running || !target?.enginePath}
+            aria-busy={!!progress || undefined}
+            aria-label={t`Find maps the hub is missing`}
+          >
+            {progress && (
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+            )}
+            <Trans>Find</Trans>
+          </Button>
+        </SettingRow>
+      </SettingList>
 
       {found && (
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            <Trans>
-              {found.candidates.length} can be uploaded, {found.skipped.length}{" "}
-              cannot, and {found.listed} are already on the hub.
-            </Trans>
-          </p>
           {found.candidates.length > 0 && (
-            <ul className="max-h-72 space-y-2 overflow-auto rounded-md border p-3">
+            <ul className="max-h-72 space-y-2 overflow-auto rounded-md border border-border p-3">
               {found.candidates.map((one) => (
                 <li key={one.mapName}>
                   <CheckField
@@ -211,7 +233,7 @@ export function MapArchivesControl({ hubUrl }: { hubUrl: string }) {
               </Button>
             )}
           </div>
-          <ul className="max-h-72 space-y-1 overflow-auto rounded-md border p-3 text-sm">
+          <ul className="max-h-72 space-y-1 overflow-auto rounded-md border border-border p-3 text-sm">
             {run.items.map((item) => (
               <li key={item.mapName}>
                 <span className="font-medium">{item.mapName}</span>{" "}

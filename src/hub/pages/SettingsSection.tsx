@@ -29,7 +29,7 @@ import { ShareAssetsPanel } from "./components/ShareAssetsPanel";
 export default function HubSettings() {
   const hubUrl = useHubUrl();
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-10">
       <ShareAssetsPanel hubUrl={hubUrl} />
       <MapArchivesControl hubUrl={hubUrl} />
     </div>

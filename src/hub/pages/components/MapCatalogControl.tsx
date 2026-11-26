@@ -1,8 +1,8 @@
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Button } from "@picoframe/frame";
 import { useState } from "react";
+import { SettingRow } from "@/components/SettingRow";
 import { Progress } from "@/components/ui/progress";
 import { describeError } from "@/i18n/uiError";
 import { usePreferredTarget } from "@/play/config";
@@ -12,6 +12,7 @@ import {
   sweepMapCatalog,
   sweepSummary,
 } from "../../maps/catalogSweep";
+import { SendButton } from "./SendButton";
 
 /**
  * Sending the hub what coilbox read out of the installed maps, in Settings >
@@ -72,59 +73,54 @@ export function MapCatalogControl({
   if (!agreed) return null;
 
   return (
-    <section className="space-y-2">
-      <h3 className="text-sm font-medium leading-none">
-        <Trans>Sending what your maps say</Trans>
-      </h3>
-      <p className="text-sm text-muted-foreground">
-        <Trans>
-          Coilbox can read the maps on this computer and tell the hub what is in
-          them: how big each one is, how high its ground goes, how much of it is
-          under water, how much wind and tidal power it has, and where players
-          start. It sends no pictures and no files, only those measurements.
-        </Trans>
-      </p>
-      <p className="text-sm text-muted-foreground">
-        <Trans>
-          It asks the hub what it already knows first, so most of a library
-          costs nothing to check. Reading the rest takes a while on a large
-          collection.
-        </Trans>
-      </p>
-      <div className="flex items-center gap-3 pt-1">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={run}
-          disabled={running || !target?.enginePath}
-        >
-          {running ? t`Reading your maps…` : t`Send what your maps say`}
-        </Button>
-        {progress && (
-          <span className="text-sm text-muted-foreground">
-            {i18n._(phaseWords(progress))}
-          </span>
-        )}
-      </div>
-      {progress && (
-        <Progress
-          value={progressPercent(progress)}
-          className="h-1.5 bg-muted"
-          aria-label={t`Reading and sending your maps`}
-        />
-      )}
-      {!target?.enginePath && (
-        <p className="text-sm text-muted-foreground">
-          <Trans>
-            Coilbox needs an engine installed before it can read your maps.
-          </Trans>
-        </p>
-      )}
-      {report && (
-        <p className="text-sm text-muted-foreground">{sweepSummary(report)}</p>
-      )}
-      {failed && <p className="text-sm text-destructive">{failed}</p>}
-    </section>
+    <SettingRow
+      label={t`What your maps say`}
+      description={
+        progress ? (
+          <>
+            <span className="block">{i18n._(phaseWords(progress))}</span>
+            <Progress
+              value={progressPercent(progress)}
+              className="mt-1.5 h-1.5 bg-muted"
+              aria-label={t`Reading and sending your maps`}
+            />
+          </>
+        ) : !target?.enginePath ? (
+          t`Coilbox needs an engine installed before it can read your maps.`
+        ) : report ? (
+          sweepSummary(report)
+        ) : undefined
+      }
+      error={failed}
+      help={
+        <>
+          <p>
+            <Trans>
+              Coilbox can read the maps on this computer and tell the hub what
+              is in them: how big each one is, how high its ground goes, how
+              much of it is under water, how much wind and tidal power it has,
+              and where players start. It sends no pictures and no files, only
+              those measurements.
+            </Trans>
+          </p>
+          <p>
+            <Trans>
+              It asks the hub what it already knows first, so most of a library
+              costs nothing to check. Reading the rest takes a while on a large
+              collection.
+            </Trans>
+          </p>
+        </>
+      }
+      helpLabel={t`About sending what your maps say`}
+    >
+      <SendButton
+        label={t`Send what your maps say`}
+        running={running}
+        disabled={!target?.enginePath}
+        onClick={() => void run()}
+      />
+    </SettingRow>
   );
 }
 
