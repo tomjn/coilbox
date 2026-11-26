@@ -18820,6 +18820,10 @@ msgstr "Impossible de quitter la partie que {name} a quittée"
 msgid "Could not list this archive's contents."
 msgstr "Impossible de lister le contenu de cette archive."
 
+#: src/campaign/pages/components/Briefing.tsx
+msgid "Could not load {file} from the game"
+msgstr ""
+
 #: src/lego/moduleFileIo.ts
 #, fuzzy
 msgid "Could not load the module"
@@ -29957,6 +29961,10 @@ msgstr ""
 #, fuzzy
 msgid "Loaded the preset \"{loadedName}\"."
 msgstr "Préréglage « {loadedName} » chargé."
+
+#: src/campaign/pages/components/Briefing.tsx
+msgid "Loading {file}…"
+msgstr ""
 
 #: src/lego/scriptPlayback.ts
 #, fuzzy

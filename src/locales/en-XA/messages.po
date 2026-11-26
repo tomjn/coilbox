@@ -15335,6 +15335,10 @@ msgstr ""
 msgid "Could not list this archive's contents."
 msgstr ""
 
+#: src/campaign/pages/components/Briefing.tsx
+msgid "Could not load {file} from the game"
+msgstr ""
+
 #: src/lego/moduleFileIo.ts
 msgid "Could not load the module"
 msgstr ""
@@ -24419,6 +24423,10 @@ msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
 msgid "Loaded the preset \"{loadedName}\"."
+msgstr ""
+
+#: src/campaign/pages/components/Briefing.tsx
+msgid "Loading {file}…"
 msgstr ""
 
 #: src/lego/scriptPlayback.ts

@@ -18820,6 +18820,10 @@ msgstr "{name} が退出した試合から退出できませんでした"
 msgid "Could not list this archive's contents."
 msgstr "このアーカイブの内容を一覧表示できませんでした。"
 
+#: src/campaign/pages/components/Briefing.tsx
+msgid "Could not load {file} from the game"
+msgstr ""
+
 #: src/lego/moduleFileIo.ts
 #, fuzzy
 msgid "Could not load the module"
@@ -29957,6 +29961,10 @@ msgstr ""
 #, fuzzy
 msgid "Loaded the preset \"{loadedName}\"."
 msgstr "プリセット「{loadedName}」を読み込みました。"
+
+#: src/campaign/pages/components/Briefing.tsx
+msgid "Loading {file}…"
+msgstr ""
 
 #: src/lego/scriptPlayback.ts
 #, fuzzy

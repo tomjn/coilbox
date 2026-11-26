@@ -20,6 +20,7 @@ import {
 } from "../../content/pages/components/states";
 import { usePreferredTarget } from "../../play/config";
 import { useCampaigns } from "../campaigns";
+import type { CampaignGameOrigin } from "../gameCampaigns";
 import type { MissionNeed } from "../missionNeeds";
 import type { Campaign, CampaignMission } from "../model";
 import { useMissionRun } from "../run";
@@ -93,14 +94,22 @@ function MissionBriefing({
     );
   }
 
-  return <MissionStage campaign={loaded.campaign} mission={mission} />;
+  return (
+    <MissionStage
+      campaign={loaded.campaign}
+      gameOrigin={loaded.origin}
+      mission={mission}
+    />
+  );
 }
 
 function MissionStage({
   campaign,
+  gameOrigin,
   mission,
 }: {
   campaign: Campaign;
+  gameOrigin?: CampaignGameOrigin;
   mission: CampaignMission;
 }) {
   const run = useMissionRun(campaign, mission);
@@ -194,7 +203,12 @@ function MissionStage({
           ) : (
             <>
               {run.phase === "briefing" && (
-                <Briefing campaign={campaign} mission={mission} run={run} />
+                <Briefing
+                  campaign={campaign}
+                  gameOrigin={gameOrigin}
+                  mission={mission}
+                  run={run}
+                />
               )}
               {run.phase === "checking" && <Checking />}
               {run.phase === "result" && <ResultPrompt run={run} />}
@@ -216,10 +230,12 @@ function MissionStage({
 
 function Briefing({
   campaign,
+  gameOrigin,
   mission,
   run,
 }: {
   campaign: Campaign;
+  gameOrigin?: CampaignGameOrigin;
   mission: CampaignMission;
   run: ReturnType<typeof useMissionRun>;
 }) {
@@ -246,7 +262,10 @@ function Briefing({
         </div>
 
         {mission.briefing && (
-          <BriefingProse className="max-h-40 overflow-auto">
+          <BriefingProse
+            className="max-h-40 overflow-auto"
+            gameOrigin={gameOrigin}
+          >
             {mission.briefing}
           </BriefingProse>
         )}

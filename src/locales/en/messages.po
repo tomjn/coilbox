@@ -15336,6 +15336,10 @@ msgstr "Could not leave the battle {name} left"
 msgid "Could not list this archive's contents."
 msgstr "Could not list this archive's contents."
 
+#: src/campaign/pages/components/Briefing.tsx
+msgid "Could not load {file} from the game"
+msgstr "Could not load {file} from the game"
+
 #: src/lego/moduleFileIo.ts
 msgid "Could not load the module"
 msgstr "Could not load the module"
@@ -24421,6 +24425,10 @@ msgstr "Loaded from"
 #: src/play/pages/SkirmishPage.tsx
 msgid "Loaded the preset \"{loadedName}\"."
 msgstr "Loaded the preset \"{loadedName}\"."
+
+#: src/campaign/pages/components/Briefing.tsx
+msgid "Loading {file}…"
+msgstr "Loading {file}…"
 
 #: src/lego/scriptPlayback.ts
 msgid "Loading and unloading a ship or hover transport"

@@ -18820,6 +18820,10 @@ msgstr "No se pudo salir de la partida de la que salió {name}"
 msgid "Could not list this archive's contents."
 msgstr "No se pudo mostrar el contenido de este archivo comprimido."
 
+#: src/campaign/pages/components/Briefing.tsx
+msgid "Could not load {file} from the game"
+msgstr ""
+
 #: src/lego/moduleFileIo.ts
 #, fuzzy
 msgid "Could not load the module"
@@ -29957,6 +29961,10 @@ msgstr ""
 #, fuzzy
 msgid "Loaded the preset \"{loadedName}\"."
 msgstr "Se cargó la plantilla “{loadedName}”."
+
+#: src/campaign/pages/components/Briefing.tsx
+msgid "Loading {file}…"
+msgstr ""
 
 #: src/lego/scriptPlayback.ts
 #, fuzzy

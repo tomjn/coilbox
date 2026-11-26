@@ -18820,6 +18820,10 @@ msgstr "Nie udało się opuścić meczu, z którego wychodzi {name}"
 msgid "Could not list this archive's contents."
 msgstr "Nie udało się wyświetlić zawartości tego archiwum."
 
+#: src/campaign/pages/components/Briefing.tsx
+msgid "Could not load {file} from the game"
+msgstr ""
+
 #: src/lego/moduleFileIo.ts
 #, fuzzy
 msgid "Could not load the module"
@@ -29957,6 +29961,10 @@ msgstr ""
 #, fuzzy
 msgid "Loaded the preset \"{loadedName}\"."
 msgstr "Wczytano szablon „{loadedName}”."
+
+#: src/campaign/pages/components/Briefing.tsx
+msgid "Loading {file}…"
+msgstr ""
 
 #: src/lego/scriptPlayback.ts
 #, fuzzy
