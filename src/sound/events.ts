@@ -121,24 +121,15 @@ export const VISIBLE_EVENT_IDS = EVENT_IDS.filter(
   (id) => !("hidden" in EVENTS[id]),
 );
 
-/** The groups the Sounds table splits its rows under, in group order. */
+/**
+ * The groups the Sounds lists split their rows under, in group order. A group
+ * whose events are all hidden, or that has none yet, would be a slider
+ * controlling nothing, so it is left out. Music has no events and gets a row
+ * of its own.
+ */
 export const EVENT_GROUP_IDS = GROUP_IDS.filter((group) =>
   VISIBLE_EVENT_IDS.some((id) => EVENTS[id].group === group),
 );
-
-/**
- * The groups worth showing a player. A group whose events are all hidden, or
- * that has none yet, would be a slider controlling nothing.
- *
- * Music is the exception: it has no events, and whether it controls anything
- * depends on whether this build ships tracks, which only the profile knows.
- * Passed in rather than imported so this file stays a plain registry.
- */
-export function visibleGroupIds(hasMusic: boolean): GroupId[] {
-  return GROUP_IDS.filter((group) =>
-    group === "music" ? hasMusic : EVENT_GROUP_IDS.includes(group),
-  );
-}
 
 /** Settings keys. Unset means "the default", which is why none are written eagerly. */
 export const eventVolumeKey = (id: EventId) => `sound.events.${id}.volume`;

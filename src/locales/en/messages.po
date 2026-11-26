@@ -7883,6 +7883,10 @@ msgstr "A slow turn back and forth while the unit stands still: a gentle body sw
 msgid "A sound set to zero volume is dropped rather than played quietly."
 msgstr "A sound set to zero volume is dropped rather than played quietly."
 
+#: src/sound/SoundSettings.tsx
+msgid "A sound's final volume is the master, times its group, times its own. Play lets you hear one whether or not it is muted."
+msgstr "A sound's final volume is the master, times its group, times its own. Play lets you hear one whether or not it is muted."
+
 #: src/lego/pages/components/CollisionPanel.tsx
 msgid "A sphere cannot be stretched, so the engine takes the largest of the three sizes and uses it on every axis."
 msgstr "A sphere cannot be stretched, so the engine takes the largest of the three sizes and uses it on every axis."
@@ -8315,6 +8319,10 @@ msgstr "About scanning on startup"
 msgid "About shooting at each piece"
 msgstr "About shooting at each piece"
 
+#: src/sound/SoundSettings.tsx
+msgid "About sounds"
+msgstr "About sounds"
+
 #: src/lego/pages/components/AimPointPanel.tsx
 msgid "About the aim point"
 msgstr "About the aim point"
@@ -8338,6 +8346,14 @@ msgstr "About the game's bindings"
 #: src/hub/pages/components/HubAddressField.tsx
 msgid "About the hub address"
 msgstr "About the hub address"
+
+#: src/sound/SoundSettings.tsx
+msgid "About the master volume"
+msgstr "About the master volume"
+
+#: src/sound/MusicSource.tsx
+msgid "About the music source"
+msgstr "About the music source"
 
 #: src/lego/pages/BuilderPage.tsx
 msgid "About the pivot point"
@@ -17639,10 +17655,6 @@ msgstr "Each match is scaled so its own busiest spot is one, then the matches ar
 msgid "Each match's busiest spot"
 msgstr "Each match's busiest spot"
 
-#: src/sound/SoundSettings.tsx
-msgid "Each of these plays a sound you can change. A sound's final volume is the master, times the group it sits under, times its own. Play lets you hear one whether or not it is muted."
-msgstr "Each of these plays a sound you can change. A sound's final volume is the master, times the group it sits under, times its own. Play lets you hear one whether or not it is muted."
-
 #: src/content/pages/components/ReplayBuildOrders.tsx
 msgid "Each player's opening is their orders folded into a sequence, with repeats shown as a count."
 msgstr "Each player's opening is their orders folded into a sequence, with repeats shown as a count."
@@ -20245,6 +20257,7 @@ msgstr "game"
 #: src/play/presetParts.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/components/RunSetupForm.tsx
+#: src/sound/MusicSource.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
@@ -20895,7 +20908,6 @@ msgid "group unit {number}"
 msgstr "group unit {number}"
 
 #: src/scenario/pages/components/modes.tsx
-#: src/sound/SoundSettings.tsx
 msgid "Groups"
 msgstr "Groups"
 
@@ -25202,6 +25214,10 @@ msgstr "mass"
 msgid "Mass"
 msgstr "Mass"
 
+#: src/sound/SoundSettings.tsx
+msgid "Master"
+msgstr "Master"
+
 #: src/downloads/pages/SettingsSection.tsx
 msgid "Master URL"
 msgstr "Master URL"
@@ -26279,6 +26295,7 @@ msgid "Music source"
 msgstr "Music source"
 
 #: src/content/engineSettingText.ts
+#: src/sound/SoundSettings.tsx
 msgid "Music volume"
 msgstr "Music volume"
 
@@ -35649,8 +35666,8 @@ msgid "Scale the selection"
 msgstr "Scale the selection"
 
 #: src/sound/SoundSettings.tsx
-msgid "Scales every sound Coilbox makes. Audio played by a campaign briefing or a profile page has its own controls and is not affected."
-msgstr "Scales every sound Coilbox makes. Audio played by a campaign briefing or a profile page has its own controls and is not affected."
+msgid "Scales every sound Coilbox makes. Audio played by a campaign briefing or a profile page has its own controls and is not affected. Muting keeps your volume setting."
+msgstr "Scales every sound Coilbox makes. Audio played by a campaign briefing or a profile page has its own controls and is not affected. Muting keeps your volume setting."
 
 #: src/general/pages/SettingsSection.tsx
 msgid "Scales text, spacing and the 3D views. Cmd or Ctrl with plus or minus changes it, and with zero sets it back to 100%."
@@ -37772,10 +37789,6 @@ msgstr "Signing out only affects this computer. It does not remove anything you 
 msgid "Signs in with your browser"
 msgstr "Signs in with your browser"
 
-#: src/sound/SoundSettings.tsx
-msgid "Silence everything without losing your volume setting."
-msgstr "Silence everything without losing your volume setting."
-
 #: src/lego/pages/components/GameFitSection.tsx
 msgid "Similar units use {suggestions}."
 msgstr "Similar units use {suggestions}."
@@ -38201,7 +38214,6 @@ msgstr "Sort projects"
 
 #: src/content/index.ts
 #: src/sound/index.ts
-#: src/sound/SoundSettings.tsx
 msgid "Sound"
 msgstr "Sound"
 
@@ -46896,10 +46908,6 @@ msgstr "Wheels"
 #: src/lego/animPresets.ts
 msgid "Wheels turning"
 msgstr "Wheels turning"
-
-#: src/sound/SoundSettings.tsx
-msgid "When"
-msgstr "When"
 
 #: src/content/pages/components/ReplayTracksStorage.tsx
 msgid "When a new track is stored and the tracks take more than the limit, the least recently watched are removed until they fit. Tracks that are out of date go first. The new track is never removed, so a track larger than the limit is kept and every other one goes."

@@ -1,6 +1,8 @@
-import { Plural, Trans, useLingui } from "@lingui/react/macro";
+import { t as coreT, plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { useSetting } from "@picoframe/frame";
 import { OptionSelect } from "@/components/OptionSelect";
+import { SettingRow } from "@/components/SettingRow";
 import { useUnitsyncGameHeaders } from "@/content/config";
 import { useHostContent } from "@/multiplayer/battles/useHostContent";
 import { GamePickerField } from "@/play/pages/components/GamePickerButton";
@@ -14,7 +16,7 @@ import { useGameMusic } from "./useGameMusic";
 
 /**
  * Where the soundtrack comes from: the tracks this build ships, or the music
- * inside a game's own archive.
+ * inside a game's own archive. Rows for a `<SettingList>`.
  *
  * The game option is never the default. A game's music is written for its own
  * runtime, and borrowing it for a lobby is a player's call to make.
@@ -35,14 +37,26 @@ export function MusicSource() {
   const { tracks, loading } = useGameMusic();
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-start gap-3">
-        <div className="w-40 shrink-0">
+    <>
+      <SettingRow
+        id="sound-music-source"
+        label={t`Music source`}
+        helpLabel={t`About the music source`}
+        help={
+          <p>
+            <Trans>
+              Games often ship their own soundtrack. Coilbox can play it in the
+              lobby, though it was written to score a battle rather than a menu.
+            </Trans>
+          </p>
+        }
+      >
+        <div className="w-40">
           <OptionSelect
+            id="sound-music-source"
             value={source}
             onValueChange={setSource}
             size="sm"
-            ariaLabel={t`Music source`}
             options={[
               { value: "off", label: t`No music` },
               { value: "nostalgia", label: t`Nostalgia` },
@@ -60,22 +74,14 @@ export function MusicSource() {
             ]}
           />
         </div>
-        <span className="space-y-1">
-          <span className="block text-sm font-medium">
-            <Trans>Music source</Trans>
-          </span>
-          <span className="block text-xs text-muted-foreground">
-            <Trans>
-              Games often ship their own soundtrack. Coilbox can play it in the
-              lobby, though it was written to score a battle rather than a menu.
-            </Trans>
-          </span>
-        </span>
-      </div>
+      </SettingRow>
 
       {source === "game" && (
-        <div className="flex items-start gap-3">
-          <div className="w-64 shrink-0">
+        <SettingRow
+          label={t`Game`}
+          description={trackCount(game, loading, tracks.length)}
+        >
+          <div className="w-64">
             <GamePickerField
               value={game}
               onValueChange={setGame}
@@ -87,12 +93,9 @@ export function MusicSource() {
               scanError={content.scanError}
             />
           </div>
-          <span className="block text-xs text-muted-foreground">
-            <TrackCount game={game} loading={loading} count={tracks.length} />
-          </span>
-        </div>
+        </SettingRow>
       )}
-    </div>
+    </>
   );
 }
 
@@ -101,20 +104,10 @@ export function MusicSource() {
  * say so. Showing "no music found" while the answer is not in yet reads as a
  * verdict, and the player goes off believing their game ships none.
  */
-function TrackCount({
-  game,
-  loading,
-  count,
-}: {
-  game: string;
-  loading: boolean;
-  count: number;
-}) {
-  if (game === "") return <Trans>Pick a game to see what it ships.</Trans>;
-  if (loading) return <Trans>Reading the archive…</Trans>;
+function trackCount(game: string, loading: boolean, count: number): string {
+  if (game === "") return coreT`Pick a game to see what it ships.`;
+  if (loading) return coreT`Reading the archive…`;
   if (count === 0)
-    return (
-      <Trans>No music found in this game. Most ship sound effects only.</Trans>
-    );
-  return <Plural value={count} one="# track found." other="# tracks found." />;
+    return coreT`No music found in this game. Most ship sound effects only.`;
+  return plural(count, { one: "# track found.", other: "# tracks found." });
 }

@@ -9740,6 +9740,10 @@ msgstr "Powolny obrót tam i z powrotem, gdy jednostka stoi: delikatne kołysani
 msgid "A sound set to zero volume is dropped rather than played quietly."
 msgstr "Dźwięk o zerowej głośności jest pomijany, a nie odtwarzany cicho."
 
+#: src/sound/SoundSettings.tsx
+msgid "A sound's final volume is the master, times its group, times its own. Play lets you hear one whether or not it is muted."
+msgstr ""
+
 #: src/lego/pages/components/CollisionPanel.tsx
 #, fuzzy
 msgid "A sphere cannot be stretched, so the engine takes the largest of the three sizes and uses it on every axis."
@@ -10250,6 +10254,10 @@ msgstr ""
 msgid "About shooting at each piece"
 msgstr "Informacje: strzelanie w każdy element"
 
+#: src/sound/SoundSettings.tsx
+msgid "About sounds"
+msgstr ""
+
 #: src/lego/pages/components/AimPointPanel.tsx
 #, fuzzy
 msgid "About the aim point"
@@ -10275,6 +10283,14 @@ msgstr ""
 
 #: src/hub/pages/components/HubAddressField.tsx
 msgid "About the hub address"
+msgstr ""
+
+#: src/sound/SoundSettings.tsx
+msgid "About the master volume"
+msgstr ""
+
+#: src/sound/MusicSource.tsx
+msgid "About the music source"
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
@@ -21679,11 +21695,6 @@ msgstr "Każdy mecz jest skalowany tak, aby jego najbardziej intensywne miejsce 
 msgid "Each match's busiest spot"
 msgstr "Najbardziej intensywne miejsce każdego meczu"
 
-#: src/sound/SoundSettings.tsx
-#, fuzzy
-msgid "Each of these plays a sound you can change. A sound's final volume is the master, times the group it sits under, times its own. Play lets you hear one whether or not it is muted."
-msgstr "Każdy z nich odtwarza dźwięk, który możesz zmienić. Końcowa głośność dźwięku to głośność główna razy głośność grupy razy jego własna. Przycisk odtwarzania pozwala go usłyszeć, nawet jeśli jest wyciszony."
-
 #: src/content/pages/components/ReplayBuildOrders.tsx
 #, fuzzy
 msgid "Each player's opening is their orders folded into a sequence, with repeats shown as a count."
@@ -24880,6 +24891,7 @@ msgstr "gra"
 #: src/play/presetParts.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/components/RunSetupForm.tsx
+#: src/sound/MusicSource.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
@@ -25676,7 +25688,6 @@ msgid "group unit {number}"
 msgstr "jednostka grupy {number}"
 
 #: src/scenario/pages/components/modes.tsx
-#: src/sound/SoundSettings.tsx
 #, fuzzy
 msgid "Groups"
 msgstr "Grupy"
@@ -30975,6 +30986,10 @@ msgstr "masa"
 msgid "Mass"
 msgstr "Masa"
 
+#: src/sound/SoundSettings.tsx
+msgid "Master"
+msgstr ""
+
 #: src/downloads/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Master URL"
@@ -32298,6 +32313,7 @@ msgid "Music source"
 msgstr "Źródło muzyki"
 
 #: src/content/engineSettingText.ts
+#: src/sound/SoundSettings.tsx
 msgid "Music volume"
 msgstr ""
 
@@ -43819,9 +43835,8 @@ msgid "Scale the selection"
 msgstr "Skaluj zaznaczenie"
 
 #: src/sound/SoundSettings.tsx
-#, fuzzy
-msgid "Scales every sound Coilbox makes. Audio played by a campaign briefing or a profile page has its own controls and is not affected."
-msgstr "Skaluje każdy dźwięk Coilbox. Dźwięk odtwarzany przez odprawę kampanii lub stronę profilu ma własne ustawienia i nie podlega tej zmianie."
+msgid "Scales every sound Coilbox makes. Audio played by a campaign briefing or a profile page has its own controls and is not affected. Muting keeps your volume setting."
+msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
 msgid "Scales text, spacing and the 3D views. Cmd or Ctrl with plus or minus changes it, and with zero sets it back to 100%."
@@ -46430,11 +46445,6 @@ msgstr "Wylogowanie dotyczy tylko tego komputera. Nie usuwa niczego, co już udo
 msgid "Signs in with your browser"
 msgstr "Logowanie przez przeglądarkę"
 
-#: src/sound/SoundSettings.tsx
-#, fuzzy
-msgid "Silence everything without losing your volume setting."
-msgstr "Wycisz wszystko bez utraty ustawienia głośności."
-
 #: src/lego/pages/components/GameFitSection.tsx
 #, fuzzy
 msgid "Similar units use {suggestions}."
@@ -46957,7 +46967,6 @@ msgstr "Sortuj projekty"
 
 #: src/content/index.ts
 #: src/sound/index.ts
-#: src/sound/SoundSettings.tsx
 #, fuzzy
 msgid "Sound"
 msgstr "Dźwięk"
@@ -57713,11 +57722,6 @@ msgstr "Koła"
 #, fuzzy
 msgid "Wheels turning"
 msgstr "Obracające się koła"
-
-#: src/sound/SoundSettings.tsx
-#, fuzzy
-msgid "When"
-msgstr "Kiedy"
 
 #: src/content/pages/components/ReplayTracksStorage.tsx
 #, fuzzy

@@ -9741,6 +9741,10 @@ msgstr "Μια αργή περιστροφή μπρος πίσω ενώ η μο�
 msgid "A sound set to zero volume is dropped rather than played quietly."
 msgstr "Ένας ήχος με ένταση μηδέν παραλείπεται αντί να παίζει σιγανά."
 
+#: src/sound/SoundSettings.tsx
+msgid "A sound's final volume is the master, times its group, times its own. Play lets you hear one whether or not it is muted."
+msgstr ""
+
 #: src/lego/pages/components/CollisionPanel.tsx
 #, fuzzy
 msgid "A sphere cannot be stretched, so the engine takes the largest of the three sizes and uses it on every axis."
@@ -10251,6 +10255,10 @@ msgstr ""
 msgid "About shooting at each piece"
 msgstr "Σχετικά με τη βολή σε κάθε τμήμα"
 
+#: src/sound/SoundSettings.tsx
+msgid "About sounds"
+msgstr ""
+
 #: src/lego/pages/components/AimPointPanel.tsx
 #, fuzzy
 msgid "About the aim point"
@@ -10276,6 +10284,14 @@ msgstr ""
 
 #: src/hub/pages/components/HubAddressField.tsx
 msgid "About the hub address"
+msgstr ""
+
+#: src/sound/SoundSettings.tsx
+msgid "About the master volume"
+msgstr ""
+
+#: src/sound/MusicSource.tsx
+msgid "About the music source"
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
@@ -21684,11 +21700,6 @@ msgstr "Κάθε αγώνας κλιμακώνεται ώστε το πιο πο
 msgid "Each match's busiest spot"
 msgstr "Το πιο πολυάσχολο σημείο κάθε αγώνα"
 
-#: src/sound/SoundSettings.tsx
-#, fuzzy
-msgid "Each of these plays a sound you can change. A sound's final volume is the master, times the group it sits under, times its own. Play lets you hear one whether or not it is muted."
-msgstr "Καθένα από αυτά παίζει έναν ήχο που μπορείτε να αλλάξετε. Η τελική ένταση ενός ήχου είναι η κύρια, επί την ομάδα στην οποία ανήκει, επί τη δική του. Η Αναπαραγωγή σας αφήνει να ακούσετε έναν είτε είναι σε σίγαση είτε όχι."
-
 #: src/content/pages/components/ReplayBuildOrders.tsx
 #, fuzzy
 msgid "Each player's opening is their orders folded into a sequence, with repeats shown as a count."
@@ -24887,6 +24898,7 @@ msgstr "παιχνίδι"
 #: src/play/presetParts.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/components/RunSetupForm.tsx
+#: src/sound/MusicSource.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
@@ -25684,7 +25696,6 @@ msgid "group unit {number}"
 msgstr "μονάδα ομάδας {number}"
 
 #: src/scenario/pages/components/modes.tsx
-#: src/sound/SoundSettings.tsx
 #, fuzzy
 msgid "Groups"
 msgstr "Ομάδες μονάδων"
@@ -30986,6 +30997,10 @@ msgstr "μάζα"
 msgid "Mass"
 msgstr "Μάζα"
 
+#: src/sound/SoundSettings.tsx
+msgid "Master"
+msgstr ""
+
 #: src/downloads/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Master URL"
@@ -32310,6 +32325,7 @@ msgid "Music source"
 msgstr "Πηγή μουσικής"
 
 #: src/content/engineSettingText.ts
+#: src/sound/SoundSettings.tsx
 msgid "Music volume"
 msgstr ""
 
@@ -43841,9 +43857,8 @@ msgid "Scale the selection"
 msgstr "Αλλαγή κλίμακας της επιλογής"
 
 #: src/sound/SoundSettings.tsx
-#, fuzzy
-msgid "Scales every sound Coilbox makes. Audio played by a campaign briefing or a profile page has its own controls and is not affected."
-msgstr "Ρυθμίζει την ένταση κάθε ήχου του Coilbox. Ο ήχος που παίζει μια ενημέρωση αποστολής εκστρατείας ή μια σελίδα προφίλ έχει δικά του χειριστήρια και δεν επηρεάζεται."
+msgid "Scales every sound Coilbox makes. Audio played by a campaign briefing or a profile page has its own controls and is not affected. Muting keeps your volume setting."
+msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
 msgid "Scales text, spacing and the 3D views. Cmd or Ctrl with plus or minus changes it, and with zero sets it back to 100%."
@@ -46456,11 +46471,6 @@ msgstr "Η αποσύνδεση επηρεάζει μόνο αυτόν τον υ
 msgid "Signs in with your browser"
 msgstr "Σύνδεση μέσω του προγράμματος περιήγησης"
 
-#: src/sound/SoundSettings.tsx
-#, fuzzy
-msgid "Silence everything without losing your volume setting."
-msgstr "Σίγαση των πάντων χωρίς απώλεια της ρύθμισης έντασης."
-
 #: src/lego/pages/components/GameFitSection.tsx
 #, fuzzy
 msgid "Similar units use {suggestions}."
@@ -46986,7 +46996,6 @@ msgstr "Ταξινόμηση έργων"
 
 #: src/content/index.ts
 #: src/sound/index.ts
-#: src/sound/SoundSettings.tsx
 #, fuzzy
 msgid "Sound"
 msgstr "Ήχος"
@@ -57744,11 +57753,6 @@ msgstr "Τροχοί"
 #, fuzzy
 msgid "Wheels turning"
 msgstr "Περιστροφή τροχών"
-
-#: src/sound/SoundSettings.tsx
-#, fuzzy
-msgid "When"
-msgstr "Πότε"
 
 #: src/content/pages/components/ReplayTracksStorage.tsx
 #, fuzzy
