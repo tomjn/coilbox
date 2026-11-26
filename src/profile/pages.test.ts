@@ -68,6 +68,18 @@ describe("buildProfilePages", () => {
     });
   });
 
+  it("gives a name the same route however its accents are stored", () => {
+    // A file system may hold "é" as one character or as an "e" and a combining
+    // mark, while a link to the file is typed either way.
+    const [composed, decomposed] = (["NFC", "NFD"] as const).map(
+      (form) =>
+        buildProfilePages([
+          file(`pages/${"Café menu.md".normalize(form)}`, ""),
+        ])[0].route,
+    );
+    expect(decomposed).toBe(composed);
+  });
+
   it("uses frontmatter path/title/icon/background/group/order", () => {
     const raw = [
       "---",

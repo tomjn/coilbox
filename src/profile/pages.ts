@@ -144,6 +144,7 @@ const SLUG = /^[a-z0-9]+(?:[/-][a-z0-9]+)*$/;
 export function slugFromPath(path: string): string {
   const file = path.split("/").pop() ?? path;
   return file
+    .normalize("NFC")
     .replace(/\.md$/i, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")

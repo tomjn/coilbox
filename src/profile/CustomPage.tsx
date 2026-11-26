@@ -57,7 +57,7 @@ function MarkdownLink({
   children?: ReactNode;
 }) {
   const navigate = useNavigate();
-  const target = classifyMarkdownLink(href);
+  const target = classifyMarkdownLink(href, markdownFilePath);
   if (target.kind === "inert") {
     return <span title={href}>{children}</span>;
   }

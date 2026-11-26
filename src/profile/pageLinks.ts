@@ -29,16 +29,30 @@ export type LinkTarget =
  *   and a raw `<a href="/x">` would blow away the app).
  * - `@.coilbox/<other>` or a plain local ref → a `coilbox://` asset URL.
  * - a `@widget/...`/malformed ref, or anything else → inert (rendered without a link).
+ *
+ * `fileName` turns a target that names a file into that file's name. A link that came
+ * through Markdown needs `markdownFilePath`. One read straight from HTML is already
+ * spelled as written. Routes and URLs never go through it.
  */
-export function classifyMarkdownLink(href: string | undefined): LinkTarget {
+export function classifyMarkdownLink(
+  href: string | undefined,
+  fileName: (written: string) => string = (written) => written,
+): LinkTarget {
   const h = href?.trim();
   if (!h) return { kind: "inert" };
   if (/^(https?:|mailto:|tel:)/i.test(h)) return { kind: "external", url: h };
   if (h.startsWith("#")) return { kind: "anchor", href: h };
 
+  const name = fileName(h);
   if (h.startsWith("@")) {
-    const ref = parseRef(h);
-    if (ref?.kind === "route") return { kind: "route", to: ref.to };
+    if (h.startsWith("@route/")) {
+      const route = parseRef(h);
+      return route?.kind === "route"
+        ? { kind: "route", to: route.to }
+        : { kind: "inert" };
+    }
+    // Parsed after decoding, so the safety check sees the path that gets used.
+    const ref = parseRef(name);
     if (ref?.kind === "file") {
       return /\.md$/i.test(ref.path)
         ? { kind: "route", to: `/pages/${slugFromPath(ref.path)}` }
@@ -47,9 +61,10 @@ export function classifyMarkdownLink(href: string | undefined): LinkTarget {
     return { kind: "inert" };
   }
 
-  if (/\.md$/i.test(h))
-    return { kind: "route", to: `/pages/${slugFromPath(h)}` };
+  if (/\.md$/i.test(name))
+    return { kind: "route", to: `/pages/${slugFromPath(name)}` };
   if (h.startsWith("/")) return { kind: "route", to: h };
-  if (isLocalRef(h)) return { kind: "asset", url: assetUrl(h), path: h };
+  if (isLocalRef(name))
+    return { kind: "asset", url: assetUrl(name), path: name };
   return { kind: "inert" };
 }
