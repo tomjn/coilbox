@@ -1148,26 +1148,27 @@ if gadgetHandler:IsSyncedCode() then
 		end
 	end
 
-	--- Following an actor through an upgrade (issue #5297).
+	--- Following an actor, or a group's unit, through an upgrade (issues #5297 and
+	-- #5475).
 	--
 	-- Beyond All Reason's evolving commanders and Splinter Faction's morphs both
 	-- upgrade a unit by creating the new one where the old one stands and then
 	-- destroying the old one. The engine ties the two together nowhere, so the
-	-- actor would die with the old unit. The rule is the replay logger's (issue
-	-- #3898), and it names no game and no unit. A unit created by no builder, for
-	-- the actor's team, in the actor's place while the actor is alive, replaces
-	-- the actor when a Lua script destroys the actor with no attacker on the same
+	-- actor would die with the old unit and a group would lose it. The rule is the
+	-- replay logger's (issue #3898), and it names no game and no unit. A unit
+	-- created by no builder, for the old unit's team, in its place while it is
+	-- alive, replaces it when a Lua script destroys it with no attacker on the same
 	-- frame or the next. A handler that passes no weapon id is taken at its word
 	-- that there was no attacker. In its place means exactly the same x and z. For a
 	-- building, which a game snaps to the build grid, it means no further on each
 	-- axis than half the new building's footprint or one build square, whichever
 	-- is less. Two units that could each be the successor are one too many, and
-	-- the actor dies.
+	-- the old unit just dies.
 
 	-- The weapon id the engine reports for a unit Spring.DestroyUnit removed:
 	-- minus CSolidObject::DAMAGE_KILLED_LUA in rts/Sim/Objects/SolidObject.h.
 	local KILLED_BY_SCRIPT = -21
-	-- How many frames after its successor was created an actor may still be
+	-- How many frames after its successor was created a unit may still be
 	-- destroyed and count as replaced by it. Beyond All Reason destroys the old
 	-- unit in the same call, so none. Splinter Faction destroys it from GameFrame
 	-- on the next frame, so one.
@@ -1176,10 +1177,11 @@ if gadgetHandler:IsSyncedCode() then
 	-- One square of the build grid. Engines from before April 2023 do not report
 	-- it, and it was already 16 there (BUILD_SQUARE_SIZE in GlobalConstants.h).
 	local BUILD_SQUARE_SIZE = Game.buildSquareSize or 16
-	-- An actor's unit -> the units that could replace it, each { unit, frame }.
+	-- An actor's or group's unit -> the units that could replace it, each
+	-- { unit, frame }.
 	local successors = {}
 
-	--- How far from an actor's place a new unit may stand on each axis and still
+	--- How far from an old unit's place a new unit may stand on each axis and still
 	-- be in that place. A unit that is not a building is not snapped, so it has
 	-- to be exactly there.
 	local function reach(unitID, unitDefID)
@@ -1196,8 +1198,8 @@ if gadgetHandler:IsSyncedCode() then
 			math.min(zsize * SQUARE_SIZE / 2, BUILD_SQUARE_SIZE)
 	end
 
-	--- Remember a unit made by no builder as the successor of the one actor of
-	-- its team standing in its place, if there is exactly one.
+	--- Remember a unit made by no builder as the successor of the one actor or
+	-- group unit of its team standing in its place, if there is exactly one.
 	local function claim(unitID, unitDefID, unitTeam)
 		local x, _, z = Spring.GetUnitPosition(unitID)
 		if not x then
@@ -1205,11 +1207,13 @@ if gadgetHandler:IsSyncedCode() then
 		end
 		local reachX, reachZ = reach(unitID, unitDefID)
 		local old, matches = nil, 0
-		for actorUnit in pairs(actorOfUnit) do
-			if Spring.GetUnitTeam(actorUnit) == unitTeam then
-				local ax, _, az = Spring.GetUnitPosition(actorUnit)
-				if ax and math.abs(ax - x) <= reachX and math.abs(az - z) <= reachZ then
-					old, matches = actorUnit, matches + 1
+		for _, followed in ipairs({ actorOfUnit, groups.grouped() }) do
+			for candidate in pairs(followed) do
+				if Spring.GetUnitTeam(candidate) == unitTeam then
+					local cx, _, cz = Spring.GetUnitPosition(candidate)
+					if cx and math.abs(cx - x) <= reachX and math.abs(cz - z) <= reachZ then
+						old, matches = candidate, matches + 1
+					end
 				end
 			end
 		end
@@ -1227,12 +1231,14 @@ if gadgetHandler:IsSyncedCode() then
 		successors[old] = recent
 	end
 
-	--- The unit that replaces an actor's unit as a script destroys it, or nil.
+	--- The unit that replaces an actor's or group's unit as a script destroys it,
+	-- or nil.
 	local function successorOf(unitID)
 		local frame = Spring.GetGameFrame()
 		local found
 		for _, held in ipairs(successors[unitID] or {}) do
 			if frame - held.frame <= SUCCESSOR_FRAMES and not actorOfUnit[held.unit]
+				and not groups.of(held.unit)
 				and Spring.ValidUnitID(held.unit) and not Spring.GetUnitIsDead(held.unit) then
 				if found then
 					return nil
@@ -1349,12 +1355,16 @@ if gadgetHandler:IsSyncedCode() then
 		-- A gadget handler as old as Balanced Annihilation's passes UnitDestroyed
 		-- no weapon id at all, and then the successor rule alone decides.
 		local byScript = weaponDefID == KILLED_BY_SCRIPT or weaponDefID == nil
-		local successor = actor and not attackerID and byScript and successorOf(unitID)
+		local group = groups.of(unitID)
+		local successor = (actor or group) and not attackerID and byScript and successorOf(unitID)
 		successors[unitID] = nil
-		if successor then
+		if successor and actor then
 			follow(actor, unitID, successor)
 			-- Upgraded, not dead, so a trigger asking about the actor hears nothing.
 			actor = nil
+		elseif successor then
+			groups.replaced(unitID, successor)
+			log("info", string.format("group %s's unit %d was upgraded to unit %d", group, unitID, successor))
 		end
 		invulnerable[unitID] = nil
 		groups.removed(unitID)

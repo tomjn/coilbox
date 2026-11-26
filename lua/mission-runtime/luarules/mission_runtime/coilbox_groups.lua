@@ -408,6 +408,12 @@ function M.register(engine, state, hooks)
 		return groupOf[unitID]
 	end
 
+	--- Every living unit that is some group's, as unitID -> group id. The table is
+	-- the runtime's own, so read it and do not keep it.
+	function handle.grouped()
+		return groupOf
+	end
+
 	--- Whether a group has ever had units on the map. A group waiting for its
 	-- spawn has not, and is not dead for it.
 	function handle.hasBeenPlaced(id)
@@ -642,6 +648,35 @@ function M.register(engine, state, hooks)
 					break
 				end
 			end
+		end
+	end
+
+	--- A game upgraded a group's unit, so the new unit takes the old one's place
+	-- in the group (issue #5475). Fed from the gadget's UnitDestroyed, ahead of
+	-- `handle.removed`.
+	--
+	-- It is given no orders: its queue is the one the game left it. A unit of a
+	-- sleeping group is the exception and is held, keeping the move state waking
+	-- has to give back.
+	function handle.replaced(old, new)
+		local id = groupOf[old]
+		groupOf[old] = nil
+		groupOf[new] = id
+
+		for _, list in ipairs({ members[id], roster[id] }) do
+			for index, member in ipairs(list) do
+				if member == old then
+					list[index] = new
+					break
+				end
+			end
+		end
+
+		local was = resting[old]
+		if was ~= nil then
+			resting[old] = nil
+			resting[new] = was
+			Spring.GiveOrderToUnit(new, CMD.MOVE_STATE, { CMD.MOVESTATE_HOLDPOS }, 0)
 		end
 	end
 

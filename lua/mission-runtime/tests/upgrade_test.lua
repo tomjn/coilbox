@@ -249,4 +249,131 @@ after.env:Initialize()
 check("a reload keeps an actor that was upgraded", after.GG.CoilboxMission.units.hero == new,
 	tostring(after.GG.CoilboxMission.units.hero) .. " wanted " .. tostring(new))
 
+--------------------------------------------------------------------------------
+-- A group's unit (issue #5475).
+--------------------------------------------------------------------------------
+
+local SQUADS = compiled({
+	teams = {
+		player = { team = 0, noCommander = true },
+		enemy = { team = 1, noCommander = true },
+	},
+	groups = {
+		{ id = "squad", team = "player", pos = { x = 1000, z = 1000 }, units = { { def = "com", count = 2 } } },
+		{ id = "guards", team = "player", pos = { x = 3000, z = 3000 }, units = { { def = "com", count = 1 } },
+			startsAsleep = true },
+	},
+	triggers = {
+		watching("squadDead", { { type = "group_dead", params = { group = "squad" } } }),
+		{ id = "both", enabled = true, ["repeat"] = true,
+			conditions = { op = "all", conditions = { { type = "unit_count", params = { group = "squad", min = 2 } } } },
+			actions = { { type = "probe", params = { mark = "both" } } } },
+		watching("hit", { { type = "unit_attacked", params = { group = "squad" } } }),
+	},
+})
+
+local function grouped()
+	local options = { defList = DEFS }
+	local run = load({ coilbox_mission = "demo" }, missionFiles(SQUADS), options)
+	run.options = options
+	run.env:Initialize()
+	run.fired = {}
+	run.GG.CoilboxMission.triggers:addAction("probe", function(params)
+		run.fired[params.mark] = (run.fired[params.mark] or 0) + 1
+	end)
+	run.env:GameStart()
+	frame(run, 1)
+	return run, run.GG.CoilboxMission.groups
+end
+
+local function listed(units, wanted)
+	return table.concat(units, ",") == table.concat(wanted, ","),
+		table.concat(units, ",") .. " wanted " .. table.concat(wanted, ",")
+end
+
+local function orderedTo(run, unitID, cmd)
+	for _, order in ipairs(run.orders) do
+		if order[1] == unitID and order[2] == cmd then
+			return order
+		end
+	end
+end
+
+local run, groups = grouped()
+local first, second = unpack(groups.living("squad"))
+frame(run, 10)
+local firstNew = successor(run, first, "comlvl2")
+destroy(run, first)
+check("a group's unit upgraded in one frame is in the roster, in its old place",
+	listed(groups.living("squad"), { firstNew, second }))
+check("and is that group's", groups.of(firstNew) == "squad" and groups.of(first) == nil)
+local secondNew = successor(run, second, "comlvl2")
+frame(run, 11)
+destroy(run, second)
+check("and one whose old unit goes on the next frame is too",
+	listed(groups.living("squad"), { firstNew, secondNew }))
+run.fired.both = nil
+for f = 12, 60 do
+	frame(run, f)
+end
+check("a group upgraded whole is not dead", not fired(run, "squadDead"))
+check("unit_count counts the new units", fired(run, "both"))
+run.env:UnitDamaged(firstNew, run.units[firstNew].defID, 0, 5, 1, 1, 1, 99, run.units[firstNew].defID, 1)
+frame(run, 90)
+check("unit_attacked hears a hit on the new unit", fired(run, "hit"))
+run.orders = {}
+groups.orders("squad", { { kind = "move", waypoints = { { x = 10, z = 10 } } } })
+check("an order to the group reaches the new units",
+	orderedTo(run, firstNew, run.env.CMD.MOVE) and orderedTo(run, secondNew, run.env.CMD.MOVE))
+destroy(run, firstNew)
+destroy(run, secondNew)
+for f = 91, 120 do
+	frame(run, f)
+end
+check("upgraded units that die with nothing in their place leave the group dead",
+	#groups.living("squad") == 0 and fired(run, "squadDead"))
+
+run, groups = grouped()
+local guard = groups.living("guards")[1]
+run.units[guard].movestate = nil
+frame(run, 10)
+local fresh = successor(run, guard, "comlvl2")
+run.orders = {}
+destroy(run, guard)
+local held = orderedTo(run, fresh, run.env.CMD.MOVE_STATE)
+check("a sleeping group's new unit is told to hold position",
+	held and held[3][1] == run.env.CMD.MOVESTATE_HOLDPOS)
+run.orders = {}
+groups.wake("guards")
+local woken = orderedTo(run, fresh, run.env.CMD.MOVE_STATE)
+check("and waking gives it the move state the old unit came with",
+	woken and woken[3][1] == run.env.CMD.MOVESTATE_MANEUVER, woken and tostring(woken[3][1]))
+
+run, groups = grouped()
+first, second = unpack(groups.living("squad"))
+groups.release("squad")
+frame(run, 10)
+firstNew = successor(run, first, "comlvl2")
+run.orders = {}
+destroy(run, first)
+check("a released group keeps its upgraded unit", listed(groups.living("squad"), { firstNew, second }))
+check("and still does not command it", #groups.units("squad") == 0 and #run.orders == 0)
+
+run, groups = grouped()
+first, second = unpack(groups.living("squad"))
+groups.gift("squad", "enemy")
+frame(run, 10)
+firstNew = successor(run, first, "comlvl2")
+destroy(run, first)
+check("a gifted group's unit is followed on the team that has it now",
+	listed(groups.living("squad", 1), { firstNew, second }))
+
+run, groups = grouped()
+first, second = unpack(groups.living("squad"))
+successor(run, first, "comlvl2")
+successor(run, first, "com")
+destroy(run, first)
+check("with two units that could replace it, a group's unit just leaves",
+	listed(groups.living("squad"), { second }))
+
 support.report()
