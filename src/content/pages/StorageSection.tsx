@@ -1,19 +1,25 @@
-import { Plural, Trans, useLingui } from "@lingui/react/macro";
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
-import { AlertCircle, FolderOpen, Loader2, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import {
+  AlertCircle,
+  FolderOpen,
+  Loader2,
+  RefreshCw,
+  Star,
+} from "lucide-react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { Link } from "react-router";
+import { HelpPopover } from "@/components/HelpPopover";
+import { SettingList, SettingRow } from "@/components/SettingRow";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { describeError } from "@/i18n/uiError";
 import { formatBytes } from "@/lib/format";
 import { useDownloadQueue } from "../../downloads/DownloadQueueProvider";
@@ -24,10 +30,13 @@ import {
   contentScanRoot,
   contentStorageOverview,
   contentUnitDefSetsUsage,
+  type EngineUsage,
+  type StorageCategory,
   type StorageOverview,
 } from "../bindings";
 import { useContentState, usePreferredEngine } from "../config";
 import { canPrune } from "../rapidPool";
+import { categoryLabel } from "../storageLabels";
 import { BulkDeleteReplaysPanel } from "./components/BulkDeleteReplaysPanel";
 import { DeleteEngineButton } from "./components/DeleteEngineButton";
 import {
@@ -54,20 +63,35 @@ type RootState =
   | { status: "ready"; overview: StorageOverview }
   | { status: "error"; message: string };
 
+/** One category's figures, when the breakdown has them. */
+function category(state: RootState | undefined, id: string) {
+  return state?.status === "ready"
+    ? state.overview.categories.find((c) => c.id === id)
+    : undefined;
+}
+
+/** `path` without the `root` it sits in, which the list's heading names. */
+function pathInRoot(path: string, root: string): string {
+  const base = root.replace(/[\\/]+$/, "");
+  if (base && path.startsWith(base) && /[\\/]/.test(path[base.length] ?? "")) {
+    return path.slice(base.length + 1);
+  }
+  return path;
+}
+
 /**
  * Storage settings section (issue #386): where each content folder's disk has
  * gone, and every cleanup action in one place.
  *
  * Nothing else totals a root, so a player with a full disk had no way to see
  * that most of it is engines they upgraded past and replays they watched once.
- * The four cleanup actions the issue asks for all live here rather than beside
- * whatever screen happened to own them: the rapid pool prune (#329) and the
- * cache reclaim moved out of Content Folders, and the replay and engine
- * removals are new.
+ * The rapid pool prune (#329), the cache clear, and the replay and engine
+ * removals all live here rather than beside whatever screen owns the content.
  *
  * The frame renders the section title, so this is the body only.
  */
 export default function StorageSection() {
+  const { t } = useLingui();
   const { state, setState, loading } = useContentState();
   const { active, queued } = useDownloadQueue();
   const pruneAllowed = canPrune(active, queued.length);
@@ -78,6 +102,7 @@ export default function StorageSection() {
   const roots = (state?.roots ?? []).filter((r) => r.exists);
   const rootKey = roots.map((r) => r.path).join("\n");
   const [sizes, setSizes] = useState<Record<string, RootState>>({});
+  const [openError, setOpenError] = useState<string | null>(null);
 
   /** Size one root, from the cache unless `force`. */
   const size = useCallback(async (root: string, force: boolean) => {
@@ -121,7 +146,8 @@ export default function StorageSection() {
   };
 
   const openPath = (path: string) => {
-    contentOpenPath({ path }).catch(() => {});
+    setOpenError(null);
+    contentOpenPath({ path }).catch((e) => setOpenError(msg(e)));
   };
 
   /**
@@ -159,81 +185,219 @@ export default function StorageSection() {
 
   if (roots.length === 0) {
     return (
-      <div className="space-y-8">
+      <div className="flex flex-col gap-10">
         <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-10 text-center">
           <p className="text-sm text-muted-foreground">
             <Trans>
-              No content folders to measure yet. Add one in Content folders.
+              No content folders to measure yet. Add one in{" "}
+              <Link
+                to="/settings/content-folders"
+                className="underline underline-offset-4"
+              >
+                Content folders
+              </Link>
+              .
             </Trans>
           </p>
         </div>
-        <ReplayTracksStorage />
+        <AppDataSection />
       </div>
     );
   }
 
+  // A root is left out of the engine and replay lists once its breakdown shows
+  // it has none, so a second folder holding only maps adds no empty block.
+  const engineRoots = roots.filter((r) => {
+    const s = sizes[r.path];
+    return s?.status === "ready" && s.overview.engines.length > 0;
+  });
+  const replayRoots = roots.filter((r) => {
+    const s = sizes[r.path];
+    return s?.status !== "ready" || (category(s, "replays")?.files ?? 0) > 0;
+  });
+  const titled = roots.length > 1;
+
   return (
-    <div className="space-y-8">
-      <section className="space-y-3">
-        {/* No intro line. The section's description says this already, and it
-            sits directly above. */}
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button
-            type="button"
-            size="sm"
-            disabled={refreshing}
-            onClick={refresh}
-          >
-            {refreshing ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <RefreshCw className="size-4" />
-            )}
-            <Trans>Refresh</Trans>
-          </Button>
-        </div>
-
-        <div className="flex flex-col gap-4">
-          {roots.map((root) => (
-            <RootStorageCard
-              key={root.id}
-              root={root}
-              state={sizes[root.path] ?? { status: "loading" }}
-              canPrune={pruneAllowed}
-              preferredEnginePath={preferredPath}
-              onOpen={openPath}
-              onChanged={() => refreshRoot(root.path)}
-            />
-          ))}
-        </div>
-      </section>
-
-      <DuplicateContent
-        roots={roots.map((r) => r.path)}
-        version={reportVersion}
-      />
-
-      <section className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-col gap-0.5">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              <Trans>Caches</Trans>
+    <TooltipProvider>
+      <div className="flex flex-col gap-10">
+        <section className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold">
+              <Trans>Content folders</Trans>
             </h2>
-            <p className="text-xs text-muted-foreground">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={refreshing}
+                  onClick={refresh}
+                  aria-label={t`Refresh`}
+                >
+                  {refreshing ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="size-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <Trans>Measure the folders again</Trans>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+          {openError && (
+            <Alert variant="destructive">
+              <AlertCircle />
+              <AlertDescription className="select-text break-words">
+                {openError}
+              </AlertDescription>
+            </Alert>
+          )}
+          <div className="flex flex-col gap-5">
+            {roots.map((root) => (
+              <RootUsage
+                key={root.id}
+                root={root}
+                state={sizes[root.path] ?? { status: "loading" }}
+                canPrune={pruneAllowed}
+                onOpen={openPath}
+                onChanged={() => refreshRoot(root.path)}
+              />
+            ))}
+          </div>
+        </section>
+
+        {engineRoots.length > 0 && (
+          <section className="flex flex-col gap-3">
+            <h2 className="text-sm font-semibold">
+              <Trans>Engines</Trans>
+            </h2>
+            <div className="flex flex-col gap-5">
+              {engineRoots.map((root) => {
+                const s = sizes[root.path];
+                if (s?.status !== "ready") return null;
+                return (
+                  <RootGroup key={root.id} root={root} titled={titled}>
+                    <ul className="divide-y divide-border rounded-md border border-border">
+                      {s.overview.engines.map((engine) => (
+                        <EngineUsageRow
+                          key={engine.path}
+                          engine={engine}
+                          rootPath={root.path}
+                          preferred={engine.path === preferredPath}
+                          onOpen={openPath}
+                          onDeleted={() => refreshRoot(root.path)}
+                        />
+                      ))}
+                    </ul>
+                  </RootGroup>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        <section className="flex flex-col gap-3">
+          <div className="flex items-center gap-1">
+            <h2 className="text-sm font-semibold">
+              <Trans>Delete replays</Trans>
+            </h2>
+            <HelpPopover label={t`About deleting replays`}>
+              <p>
+                <Trans>
+                  Pick an age or tick a box to choose replays, then delete them
+                  in one go. Each filter narrows the choice further. Coilbox
+                  shows the total before anything is deleted.
+                </Trans>
+              </p>
+            </HelpPopover>
+          </div>
+          {replayRoots.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              <Trans>No replays in your content folders.</Trans>
+            </p>
+          ) : (
+            <div className="flex flex-col gap-5">
+              {replayRoots.map((root) => (
+                <RootGroup key={root.id} root={root} titled={titled}>
+                  <div className="rounded-md border border-border px-4 py-3">
+                    <BulkDeleteReplaysPanel
+                      rootPath={root.path}
+                      onDeleted={() => refreshRoot(root.path)}
+                    />
+                  </div>
+                </RootGroup>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <DuplicateContent
+          roots={roots.map((r) => r.path)}
+          version={reportVersion}
+          onOpen={openPath}
+        />
+
+        <AppDataSection />
+      </div>
+    </TooltipProvider>
+  );
+}
+
+/** A content folder's name above its part of a list, when there are several. */
+function RootGroup({
+  root,
+  titled,
+  children,
+}: {
+  root: ContentRoot;
+  titled: boolean;
+  children: ReactNode;
+}) {
+  if (!titled) return children;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <h3
+        className="truncate font-mono text-xs text-muted-foreground"
+        title={root.path}
+      >
+        {root.label ?? root.path}
+      </h3>
+      {children}
+    </div>
+  );
+}
+
+/** What coilbox itself keeps: caches, replay tracks and replay unit lists. */
+function AppDataSection() {
+  const { t } = useLingui();
+  return (
+    <section className="flex flex-col gap-3">
+      <h2 className="text-sm font-semibold">
+        <Trans>Coilbox data</Trans>
+      </h2>
+      <SettingList>
+        <SettingRow
+          label={t`Caches`}
+          help={
+            <p>
               <Trans>
-                Generated thumbnails, headers, icons and branding art. All
-                regenerate on demand, so clearing them only frees disk space.
+                Map thumbnails, game headers, unit icons and branding art.
+                Coilbox makes them again when it needs them, so clearing them
+                only frees disk space.
               </Trans>
             </p>
-          </div>
+          }
+          helpLabel={t`About caches`}
+        >
           <ReclaimCachesButton />
-        </div>
-      </section>
-
-      <ReplayTracksStorage />
-
-      <ReplayUnitLists />
-    </div>
+        </SettingRow>
+        <ReplayTracksStorage />
+        <ReplayUnitLists />
+      </SettingList>
+    </section>
   );
 }
 
@@ -244,6 +408,7 @@ export default function StorageSection() {
  * last replay that uses it is deleted.
  */
 function ReplayUnitLists() {
+  const { t } = useLingui();
   const [usage, setUsage] = useState<{
     sets: number;
     replays: number;
@@ -256,7 +421,7 @@ function ReplayUnitLists() {
       .then((found) => {
         if (live) setUsage(found);
       })
-      // The line is left out. Nothing else on the screen depends on it.
+      // The row is left out. Nothing else on the screen depends on it.
       .catch(() => {});
     return () => {
       live = false;
@@ -264,44 +429,48 @@ function ReplayUnitLists() {
   }, []);
 
   if (!usage) return null;
-  const { sets, replays } = usage;
-  const size = formatBytes(usage.bytes);
+  const lists = plural(usage.sets, { one: "# list", other: "# lists" });
+  const replays = plural(usage.replays, {
+    one: "# replay",
+    other: "# replays",
+  });
   return (
-    <section className="space-y-1">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        <Trans>Replay unit lists</Trans>
-      </h2>
-      <p className="text-xs text-muted-foreground">
-        {usage.sets === 0 ? (
-          <Trans>
-            No unit lists are kept yet. One is kept the first time a replay's
-            build orders are read against its installed game, or when a replay
-            is analysed.
-          </Trans>
-        ) : (
-          <Trans>
-            <Plural
-              value={sets}
-              one="# unit list is"
-              other="# unit lists are"
-            />{" "}
-            kept for <Plural value={replays} one="# replay" other="# replays" />
-            , using {size}. They let a replay name its units after its game is
-            updated or removed, and each goes when the last replay that uses it
-            is deleted.
-          </Trans>
-        )}
-      </p>
-    </section>
+    <SettingRow
+      label={t`Replay unit lists`}
+      description={
+        usage.sets === 0 ? t`None kept yet` : t`${lists} for ${replays}`
+      }
+      help={
+        <>
+          <p>
+            <Trans>
+              A unit list lets a replay name its units after its game is updated
+              or removed. One is kept the first time a replay's build orders are
+              read, or when a replay is analysed.
+            </Trans>
+          </p>
+          <p>
+            <Trans>
+              They are not a cache. Each goes when the last replay that uses it
+              is deleted.
+            </Trans>
+          </p>
+        </>
+      }
+      helpLabel={t`About replay unit lists`}
+    >
+      {usage.sets > 0 && (
+        <span className="text-sm tabular-nums">{formatBytes(usage.bytes)}</span>
+      )}
+    </SettingRow>
   );
 }
 
-/** One content folder: its breakdown, its engines, and its cleanup actions. */
-function RootStorageCard({
+/** One content folder: what each kind of content takes, and the total. */
+function RootUsage({
   root,
   state,
   canPrune,
-  preferredEnginePath,
   onOpen,
   onChanged,
 }: {
@@ -309,27 +478,29 @@ function RootStorageCard({
   state: RootState;
   /** Whether the rapid pool prune is allowed (no in-flight downloads). */
   canPrune: boolean;
-  /** The engine every launch uses, which must not be deletable. */
-  preferredEnginePath?: string;
   onOpen: (path: string) => void;
-  /** Re-size this root after something was deleted from it. */
+  /** Re-size this root after something was removed from it. */
   onChanged: () => void;
 }) {
   const { t } = useLingui();
+  const hasPool = (category(state, "rapidPool")?.files ?? 0) > 0;
   return (
-    <Card className="gap-4 rounded-lg border-border/50 p-4 shadow-none">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <p className="break-all font-mono text-sm" title={root.path}>
-          {root.label ? (
-            <span className="mr-2 font-sans font-medium">{root.label}</span>
-          ) : null}
-          {root.path}
-        </p>
-        <ReclaimSpaceButton
-          rootPath={root.path}
-          canPrune={canPrune}
-          blockReason={t`Finish or cancel downloads before reclaiming space`}
-        />
+    <div className="flex flex-col gap-1.5">
+      <div className="flex min-h-8 items-center justify-between gap-2">
+        <h3
+          className="truncate font-mono text-xs text-muted-foreground"
+          title={root.path}
+        >
+          {root.label ?? root.path}
+        </h3>
+        {hasPool && (
+          <ReclaimSpaceButton
+            rootPath={root.path}
+            canPrune={canPrune}
+            blockReason={t`Finish or cancel downloads first`}
+            onReclaimed={onChanged}
+          />
+        )}
       </div>
 
       {state.status === "loading" ? (
@@ -342,138 +513,137 @@ function RootStorageCard({
           </AlertDescription>
         </Alert>
       ) : (
-        <>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>
-                  <Trans>Content</Trans>
-                </TableHead>
-                <TableHead className="text-right">
-                  <Trans>Files</Trans>
-                </TableHead>
-                <TableHead className="text-right">
-                  <Trans>Size</Trans>
-                </TableHead>
-                <TableHead className="w-24">
-                  <span className="sr-only">
-                    <Trans>Reveal in file manager</Trans>
-                  </span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {state.overview.categories.map((c) => {
-                const firstPath = c.paths[0];
-                const categoryLabel = c.label;
-                return (
-                  <TableRow key={c.id}>
-                    <TableCell>{c.label}</TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {c.files}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatBytes(c.bytes)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {c.paths.length > 0 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onOpen(c.paths[0])}
-                          title={t`Reveal ${firstPath}`}
-                        >
-                          <FolderOpen className="size-4" />
-                          <span className="sr-only">
-                            <Trans>Reveal {categoryLabel} folder</Trans>
-                          </span>
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-            <TableFooter>
-              <TableRow>
-                <TableCell className="font-medium">
-                  <Trans>Total</Trans>
-                </TableCell>
-                <TableCell />
-                <TableCell className="text-right font-medium tabular-nums">
-                  {formatBytes(state.overview.totalBytes)}
-                </TableCell>
-                <TableCell />
-              </TableRow>
-            </TableFooter>
-          </Table>
-
-          <div className="flex flex-col gap-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              <Trans>Replay cleanup</Trans>
-            </h3>
-            <BulkDeleteReplaysPanel
-              rootPath={root.path}
-              onDeleted={onChanged}
-            />
-          </div>
-
-          {state.overview.engines.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                <Trans>Engines</Trans>
-              </h3>
-              <ul className="flex flex-col gap-2">
-                {state.overview.engines.map((engine) => {
-                  const enginePath = engine.path;
-                  const engineVersion = engine.version;
-                  return (
-                    <li
-                      key={engine.path}
-                      className="relative flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-border/50 p-3"
-                    >
-                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span className="font-medium">{engine.version}</span>
-                        <span
-                          className="break-all font-mono text-xs text-muted-foreground"
-                          title={engine.path}
-                        >
-                          {engine.path}
-                        </span>
-                      </div>
-                      <span className="tabular-nums">
-                        {formatBytes(engine.bytes)}
-                      </span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onOpen(engine.path)}
-                        title={t`Reveal ${enginePath}`}
-                      >
-                        <FolderOpen className="size-4" />
-                        <span className="sr-only">
-                          <Trans>Reveal the {engineVersion} folder</Trans>
-                        </span>
-                      </Button>
-                      <DeleteEngineButton
-                        engine={engine}
-                        blockReason={
-                          engine.path === preferredEnginePath
-                            ? t`This is your preferred engine, the one every launch uses. Set another as preferred first.`
-                            : undefined
-                        }
-                        onDeleted={onChanged}
-                      />
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
-        </>
+        <ul className="divide-y divide-border rounded-md border border-border">
+          {state.overview.categories
+            // An empty kind says nothing, and the total still covers it.
+            .filter((c) => c.files > 0 || c.bytes > 0)
+            .map((c) => (
+              <CategoryRow key={c.id} category={c} onOpen={onOpen} />
+            ))}
+          <li className="flex items-center gap-4 bg-muted/30 px-4 py-2.5 text-sm font-medium">
+            <span className="flex-1">
+              <Trans>Total</Trans>
+            </span>
+            <span className="tabular-nums">
+              {formatBytes(state.overview.totalBytes)}
+            </span>
+            <span className="w-8" />
+          </li>
+        </ul>
       )}
-    </Card>
+    </div>
+  );
+}
+
+function CategoryRow({
+  category: c,
+  onOpen,
+}: {
+  category: StorageCategory;
+  onOpen: (path: string) => void;
+}) {
+  const { t } = useLingui();
+  const name = categoryLabel(t, c);
+  const firstPath = c.paths[0];
+  return (
+    <li className="flex items-center gap-4 px-4 py-1.5 text-sm">
+      <span className="min-w-0 flex-1">{name}</span>
+      <span className="text-xs tabular-nums text-muted-foreground">
+        {plural(c.files, { one: "# file", other: "# files" })}
+      </span>
+      <span className="w-20 text-right tabular-nums">
+        {formatBytes(c.bytes)}
+      </span>
+      {firstPath ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="w-8"
+              onClick={() => onOpen(firstPath)}
+              aria-label={t`Open the ${name} folder`}
+            >
+              <FolderOpen className="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <Trans>Open the folder</Trans>
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        <span className="h-8 w-8" />
+      )}
+    </li>
+  );
+}
+
+/** One installed engine, what it takes, and its delete. */
+function EngineUsageRow({
+  engine,
+  rootPath,
+  preferred,
+  onOpen,
+  onDeleted,
+}: {
+  engine: EngineUsage;
+  rootPath: string;
+  /** The engine every launch uses, which cannot be deleted. */
+  preferred: boolean;
+  onOpen: (path: string) => void;
+  onDeleted: () => void;
+}) {
+  const { t } = useLingui();
+  const version = engine.version;
+  return (
+    <li className="flex items-center gap-4 px-4 py-3">
+      <div className="min-w-0 flex-1">
+        <p className="flex items-center gap-2 text-sm font-medium">
+          {version}
+          {preferred && (
+            <span
+              className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400"
+              title={t`Every launch uses this engine. Set another as preferred on the Engines page to delete it.`}
+            >
+              <Star className="size-3 fill-current" />
+              <Trans>Preferred</Trans>
+            </span>
+          )}
+        </p>
+        <p
+          className="truncate font-mono text-xs text-muted-foreground"
+          title={engine.path}
+        >
+          {pathInRoot(engine.path, rootPath)}
+        </p>
+      </div>
+      <span className="text-sm tabular-nums">{formatBytes(engine.bytes)}</span>
+      <div className="flex shrink-0 items-center gap-1">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="w-8"
+              onClick={() => onOpen(engine.path)}
+              aria-label={t`Open the ${version} folder`}
+            >
+              <FolderOpen className="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <Trans>Open the engine's folder</Trans>
+          </TooltipContent>
+        </Tooltip>
+        {preferred ? (
+          // Keeps the sizes lined up with the rows that have a delete.
+          <span className="w-8" />
+        ) : (
+          <DeleteEngineButton engine={engine} onDeleted={onDeleted} />
+        )}
+      </div>
+    </li>
   );
 }

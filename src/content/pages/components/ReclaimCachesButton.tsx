@@ -12,6 +12,7 @@ import { formatBytes } from "@/lib/format";
 import { notify } from "@/notify/notify";
 import { type CacheReclaimSummary, contentReclaimCaches } from "../../bindings";
 import { isEmpty, nonEmptyCaches, summarizeCaches } from "../../caches";
+import { cacheLabel } from "../../storageLabels";
 
 const msg = (e: unknown): string => describeError(e);
 
@@ -64,14 +65,9 @@ export function ReclaimCachesButton() {
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          title={t`Size and clear the generated-image and info caches`}
-        >
+        <Button type="button" variant="outline" size="sm">
           <Trash2 className="size-4" />
-          <Trans>Reclaim caches</Trans>
+          <Trans>Clear caches</Trans>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80">
@@ -89,7 +85,7 @@ export function ReclaimCachesButton() {
               <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
                 {nonEmptyCaches(preview).map((c) => (
                   <li key={c.name} className="flex justify-between gap-2">
-                    <span className="truncate">{c.label}</span>
+                    <span className="truncate">{cacheLabel(t, c)}</span>
                     <span className="tabular-nums">{formatBytes(c.bytes)}</span>
                   </li>
                 ))}
@@ -120,7 +116,7 @@ export function ReclaimCachesButton() {
                   ) : (
                     <Trash2 className="size-4" />
                   )}
-                  <Trans>Reclaim</Trans>
+                  <Trans>Clear</Trans>
                 </Button>
               )}
             </div>

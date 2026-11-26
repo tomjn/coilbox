@@ -734,6 +734,11 @@ msgstr "{0, plural, other {# 个字段}}"
 msgid "{0, plural, one {# file is more than one folder down, which no game loads:} other {# files are more than one folder down, which no game loads:}}"
 msgstr "{0, plural, other {# 个文件位于一级以下的文件夹中，没有游戏会加载：}}"
 
+#. placeholder {0}: c.files
+#: src/content/pages/StorageSection.tsx
+msgid "{0, plural, one {# file} other {# files}}"
+msgstr ""
+
 #. placeholder {0}: finished.unknown
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
@@ -797,6 +802,11 @@ msgstr "{0, plural, other {# 个值按输入原样写入，游戏可能会将其
 #, fuzzy
 msgid "{0, plural, one {# link icon unknown} other {# link icons unknown}}"
 msgstr "{0, plural, other {# 个链接图标未知}}"
+
+#. placeholder {0}: usage.sets
+#: src/content/pages/StorageSection.tsx
+msgid "{0, plural, one {# list} other {# lists}}"
+msgstr ""
 
 #. placeholder {0}: -streak
 #: src/content/pages/StatsPage.tsx
@@ -987,7 +997,9 @@ msgid "{0, plural, one {# replay matches, {matchBytes}.} other {# replays match,
 msgstr "{0, plural, other {# 个回放匹配，共 {matchBytes}。}}"
 
 #. placeholder {0}: set.members.length
+#. placeholder {0}: usage.replays
 #: src/content/pages/components/ReplaySetsManager.tsx
+#: src/content/pages/StorageSection.tsx
 #, fuzzy
 msgid "{0, plural, one {# replay} other {# replays}}"
 msgstr "{0, plural, other {# 个回放}}"
@@ -2868,9 +2880,8 @@ msgid "{file} from {who} did not match its checksum"
 msgstr "来自 {who} 的 {file} 与其校验和不匹配"
 
 #: src/content/caches.ts
-#, fuzzy
-msgid "{fileCount, plural, one {Can reclaim # file ({size}).} other {Can reclaim # files ({size}).}}"
-msgstr "{fileCount, plural, other {可释放 # 个文件（{size}）。}}"
+msgid "{fileCount, plural, one {Can clear # file ({size}).} other {Can clear # files ({size}).}}"
+msgstr ""
 
 #: src/content/caches.ts
 #, fuzzy
@@ -4020,6 +4031,10 @@ msgstr "{lines, plural, other {# 行}}"
 #, fuzzy
 msgid "{list}, because the substitutes cover different ground."
 msgstr "{list}，因为替代单位占用的地面不同。"
+
+#: src/content/pages/StorageSection.tsx
+msgid "{lists} for {replays}"
+msgstr ""
 
 #: src/multiplayer/battle/BattleGameCard.tsx
 #, fuzzy
@@ -6200,9 +6215,8 @@ msgid "{replacedCount, plural, one {replaced # blueprint} other {replaced # blue
 msgstr "{replacedCount, plural, other {替换了 # 个蓝图}}"
 
 #: src/content/pages/components/BulkDeleteReplaysPanel.tsx
-#, fuzzy
-msgid "{replayCount, plural, one {Pick a filter. This root has # replay.} other {Pick a filter. This root has # replays.}}"
-msgstr "{replayCount, plural, other {请选择一个筛选条件。此文件夹有 # 个回放。}}"
+msgid "{replayCount, plural, one {Pick a filter. This folder has # replay.} other {Pick a filter. This folder has # replays.}}"
+msgstr ""
 
 #: src/downloads/downloadGame.ts
 #, fuzzy
@@ -6423,11 +6437,6 @@ msgstr "{serverName} 拒绝了 {username} 的登录"
 #, fuzzy
 msgid "{serverName} refused the password for {username}"
 msgstr "{serverName} 拒绝了 {username} 的密码"
-
-#: src/content/pages/StorageSection.tsx
-#, fuzzy
-msgid "{sets, plural, one {# unit list is} other {# unit lists are}} kept for {replays, plural, one {# replay} other {# replays}}, using {size}. They let a replay name its units after its game is updated or removed, and each goes when the last replay that uses it is deleted."
-msgstr "为 {replays, plural, other {# 个回放}}保留了 {sets, plural, other {# 个单位列表}}，占用 {size}。在游戏更新或移除后，回放可借此为其单位命名。最后一个使用某个列表的回放被删除时，该列表也会删除。"
 
 #: src/animation/pages/Bos2LuaPage.tsx
 #: src/animation/pages/CobPage.tsx
@@ -7764,9 +7773,8 @@ msgid "{used} is already used to: {name}"
 msgstr "{used} 已用于：{name}"
 
 #: src/content/pages/components/ReplayTracksStorage.tsx
-#, fuzzy
-msgid "{usedSize} used of {limitSize}"
-msgstr "已使用 {usedSize} / {limitSize}"
+msgid "{usedSize} used of {limitSize}, {trackCount}"
+msgstr ""
 
 #: src/multiplayer/chat/ConversationSidebar.tsx
 #: src/multiplayer/store.tsx
@@ -9828,6 +9836,10 @@ msgstr "已有一个 coilbox 没有写入记录的单位定义，已保持不变
 msgid "A unit is already called {name} or {unitName}. Choose another roster name."
 msgstr "已有单位叫 {name} 或 {unitName}。请选择另一个编队名称。"
 
+#: src/content/pages/StorageSection.tsx
+msgid "A unit list lets a replay name its units after its game is updated or removed. One is kept the first time a replay's build orders are read, or when a replay is analysed."
+msgstr ""
+
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #, fuzzy
 msgid "A unit render or emblem, for example. Image transparency is kept; a video loops muted."
@@ -10058,6 +10070,10 @@ msgstr ""
 msgid "About banking"
 msgstr "关于倾斜"
 
+#: src/content/pages/StorageSection.tsx
+msgid "About caches"
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
 msgid "About calling a function"
@@ -10072,6 +10088,10 @@ msgstr "关于点击每个部件"
 #, fuzzy
 msgid "About Coilbox"
 msgstr "关于 Coilbox"
+
+#: src/content/pages/StorageSection.tsx
+msgid "About deleting replays"
+msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -10139,6 +10159,10 @@ msgstr ""
 #, fuzzy
 msgid "About replay tracks"
 msgstr "关于回放录制轨道"
+
+#: src/content/pages/StorageSection.tsx
+msgid "About replay unit lists"
+msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -14020,6 +14044,14 @@ msgstr "分支"
 msgid "Branded"
 msgstr "带品牌标识"
 
+#: src/content/storageLabels.ts
+msgid "Branding catalog"
+msgstr ""
+
+#: src/content/storageLabels.ts
+msgid "Branding images"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "Break"
@@ -14716,11 +14748,6 @@ msgstr "按单位"
 #, fuzzy
 msgid "Caches"
 msgstr "缓存"
-
-#: src/content/caches.ts
-#, fuzzy
-msgid "Caches are already empty - nothing to reclaim."
-msgstr "缓存已为空，无可释放的空间。"
 
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
@@ -16131,6 +16158,7 @@ msgstr "清理…"
 #: src/blueprint/pages/components/EquivalentsPanel.tsx
 #: src/blueprint/pages/components/LeavingPack.tsx
 #: src/content/pages/components/DateFilter.tsx
+#: src/content/pages/components/ReclaimCachesButton.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/MeasureReadout.tsx
 #: src/multiplayer/NoteButton.tsx
@@ -16175,6 +16203,10 @@ msgstr "清除所有录制轨道"
 #, fuzzy
 msgid "Clear ally {letter}'s start box"
 msgstr "清除盟友 {letter} 的出生区域"
+
+#: src/content/pages/components/ReclaimCachesButton.tsx
+msgid "Clear caches"
+msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 #: src/hub/pages/BrowsePage.tsx
@@ -16827,6 +16859,10 @@ msgstr "Coilbox 无法判断你是否已登录。"
 #, fuzzy
 msgid "Coilbox could not write your widget settings for {game}"
 msgstr "Coilbox 无法写入你为 {game} 设置的小部件设置"
+
+#: src/content/pages/StorageSection.tsx
+msgid "Coilbox data"
+msgstr ""
 
 #: src/hub/pages/ItemPage.tsx
 #, fuzzy
@@ -17975,12 +18011,12 @@ msgid "Contains a semicolon"
 msgstr "包含分号"
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
-#: src/content/pages/StorageSection.tsx
 #, fuzzy
 msgid "Content"
 msgstr "内容"
 
 #: src/content/index.ts
+#: src/content/pages/StorageSection.tsx
 #, fuzzy
 msgid "Content folders"
 msgstr "内容文件夹"
@@ -20116,6 +20152,10 @@ msgstr "删除点"
 msgid "Delete preset"
 msgstr "删除预设"
 
+#: src/content/pages/StorageSection.tsx
+msgid "Delete replays"
+msgstr ""
+
 #: src/startbox/StartBoxPresetsPopover.tsx
 #, fuzzy
 msgid "Delete saved layout {number}"
@@ -20145,11 +20185,6 @@ msgstr "删除 {description} 的提醒"
 #, fuzzy
 msgid "Delete the empty replays that games left when they did not finish recording"
 msgstr "删除游戏未完成录制时留下的空回放"
-
-#: src/content/pages/components/BulkDeleteReplaysPanel.tsx
-#, fuzzy
-msgid "Delete the matching replays"
-msgstr "删除匹配的回放"
 
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
@@ -20220,6 +20255,10 @@ msgstr "删除此合集。其子项会上移到它的父级。"
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 msgid "Delete this copy? It cannot be undone."
+msgstr ""
+
+#: src/content/pages/components/DeleteEngineButton.tsx
+msgid "Delete this engine"
 msgstr ""
 
 #: src/content/pages/components/DeleteReplayButton.tsx
@@ -22305,6 +22344,7 @@ msgstr "引擎未知"
 
 #: src/content/index.ts
 #: src/content/pages/StorageSection.tsx
+#: src/content/storageLabels.ts
 #, fuzzy
 msgid "Engines"
 msgstr "引擎"
@@ -22542,6 +22582,10 @@ msgstr "所有已安装的引擎都已尝试，均未能重现对局。请选择
 #, fuzzy
 msgid "Every installed game is up to date."
 msgstr "所有已安装的游戏均为最新版本。"
+
+#: src/content/pages/StorageSection.tsx
+msgid "Every launch uses this engine. Set another as preferred on the Engines page to delete it."
+msgstr ""
 
 #: src/content/pages/components/MatchStatsChart.tsx
 #, fuzzy
@@ -23133,6 +23177,10 @@ msgstr "阵营徽记"
 msgid "Faction for the new AI"
 msgstr "新 AI 的阵营"
 
+#: src/content/storageLabels.ts
+msgid "Faction logos"
+msgstr ""
+
 #. placeholder {0}: describeError(e)
 #: src/hub/assets/pictureSweep.ts
 #, fuzzy
@@ -23387,7 +23435,6 @@ msgid "File size"
 msgstr "文件大小"
 
 #: src/content/mapCompatReport.ts
-#: src/content/pages/StorageSection.tsx
 #, fuzzy
 msgid "Files"
 msgstr "文件"
@@ -23579,9 +23626,8 @@ msgid "Finding maps…"
 msgstr "正在查找地图…"
 
 #: src/content/pages/StorageSection.tsx
-#, fuzzy
-msgid "Finish or cancel downloads before reclaiming space"
-msgstr "释放空间前请先完成或取消下载"
+msgid "Finish or cancel downloads first"
+msgstr ""
 
 #: src/hub/pages/components/HeaderAccount.tsx
 #: src/onboarding/pages/HubPage.tsx
@@ -24807,6 +24853,10 @@ msgstr "游戏 AI（Lua）"
 msgid "Game and engine not installed"
 msgstr "游戏和引擎未安装"
 
+#: src/content/storageLabels.ts
+msgid "Game and map info"
+msgstr ""
+
 #: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Game and map not installed"
@@ -24851,6 +24901,10 @@ msgstr "已解码项目的游戏"
 #, fuzzy
 msgid "Game for the new project"
 msgstr "新项目的游戏"
+
+#: src/content/storageLabels.ts
+msgid "Game headers"
+msgstr ""
 
 #: src/content/matchStatsImage.ts
 #, fuzzy
@@ -25059,6 +25113,7 @@ msgstr "游戏"
 #: src/content/pages/MatchupPage.tsx
 #: src/content/pages/PlayerDossierPage.tsx
 #: src/content/pages/StatsPage.tsx
+#: src/content/storageLabels.ts
 #: src/lego/pages/ProjectsPage.tsx
 #: src/packs/pages/components/ExportPackForm.tsx
 #, fuzzy
@@ -25175,11 +25230,6 @@ msgstr "生成的天空"
 #, fuzzy
 msgid "Generated test game"
 msgstr "生成的测试游戏"
-
-#: src/content/pages/StorageSection.tsx
-#, fuzzy
-msgid "Generated thumbnails, headers, icons and branding art. All regenerate on demand, so clearing them only frees disk space."
-msgstr "生成的缩略图、标题图、图标和品牌图片。它们都可按需重新生成，因此清除只会释放磁盘空间。"
 
 #: src/mapconv/pages/components/AssetPreview.tsx
 #, fuzzy
@@ -30698,6 +30748,14 @@ msgstr "地图尺寸"
 msgid "Map style"
 msgstr "地图风格"
 
+#: src/content/storageLabels.ts
+msgid "Map thumbnails"
+msgstr ""
+
+#: src/content/pages/StorageSection.tsx
+msgid "Map thumbnails, game headers, unit icons and branding art. Coilbox makes them again when it needs them, so clearing them only frees disk space."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapCard.tsx
 #, fuzzy
 msgid "Map view"
@@ -30776,6 +30834,7 @@ msgstr "地图"
 #: src/content/pages/components/MapNotInstalled.tsx
 #: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/MapsPage.tsx
+#: src/content/storageLabels.ts
 #: src/packs/pages/components/ExportPackForm.tsx
 #, fuzzy
 msgid "Maps"
@@ -31117,6 +31176,10 @@ msgstr "测量两点之间的距离"
 #, fuzzy
 msgid "Measure between two points ({measureKey})"
 msgstr "测量两点之间的距离（{measureKey}）"
+
+#: src/content/pages/StorageSection.tsx
+msgid "Measure the folders again"
+msgstr ""
 
 #: src/lego/pages/components/AimPointPanel.tsx
 #, fuzzy
@@ -33309,9 +33372,8 @@ msgid "No content folders found yet. Rescan to detect standard locations, or add
 msgstr "尚未找到内容文件夹。重新扫描以检测标准位置，或手动添加。"
 
 #: src/content/pages/StorageSection.tsx
-#, fuzzy
-msgid "No content folders to measure yet. Add one in Content folders."
-msgstr "还没有可测量的内容文件夹。请在“内容文件夹”中添加。"
+msgid "No content folders to measure yet. Add one in <0>Content folders</0>."
+msgstr ""
 
 #: src/content/pages/components/PlayerMatchFigures.tsx
 #, fuzzy
@@ -34426,15 +34488,14 @@ msgstr "未找到回放。观看一场游戏，或将 .sdfz 文件放入你的 d
 msgid "No replays in “{activeSetName}” match the filters."
 msgstr "回放集“{activeSetName}”中没有符合筛选条件的回放。"
 
+#: src/content/pages/StorageSection.tsx
+msgid "No replays in your content folders."
+msgstr ""
+
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "No replays match “{filterText}”."
 msgstr "没有与“{filterText}”匹配的回放。"
-
-#: src/content/pages/components/BulkDeleteReplaysPanel.tsx
-#, fuzzy
-msgid "No replays match the filters"
-msgstr "没有符合筛选条件的回放"
 
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
@@ -34884,11 +34945,6 @@ msgstr "此游戏中没有单位使用此模型绘制，所以它是地图物体
 msgid "No unit limit"
 msgstr "无单位上限"
 
-#: src/content/pages/StorageSection.tsx
-#, fuzzy
-msgid "No unit lists are kept yet. One is kept the first time a replay's build orders are read against its installed game, or when a replay is analysed."
-msgstr "还没有保存单位列表。第一次将回放的建造顺序与其已安装的游戏对照读取时，或分析回放时，会保存一份。"
-
 #: src/workshop/pages/components/UnitList.tsx
 #, fuzzy
 msgid "No unit matches \"\"."
@@ -35098,6 +35154,10 @@ msgstr "未找到"
 
 #: src/play/pages/components/EngineOverrideField.tsx
 msgid "none installed"
+msgstr ""
+
+#: src/content/pages/StorageSection.tsx
+msgid "None kept yet"
 msgstr ""
 
 #: src/lego/pages/components/ImportResult.tsx
@@ -37209,6 +37269,14 @@ msgstr "打开设置"
 msgid "Open slot"
 msgstr "空位"
 
+#: src/content/pages/StorageSection.tsx
+msgid "Open the {name} folder"
+msgstr ""
+
+#: src/content/pages/StorageSection.tsx
+msgid "Open the {version} folder"
+msgstr ""
+
 #: src/deeplink/actions.ts
 #, fuzzy
 msgid "Open the battle list."
@@ -37224,10 +37292,12 @@ msgid "Open the build the hub has"
 msgstr ""
 
 #: src/content/pages/components/EngineRow.tsx
+#: src/content/pages/StorageSection.tsx
 msgid "Open the engine's folder"
 msgstr ""
 
 #: src/content/pages/components/FolderRow.tsx
+#: src/content/pages/StorageSection.tsx
 msgid "Open the folder"
 msgstr ""
 
@@ -37665,6 +37735,7 @@ msgstr "其他"
 #: src/content/pages/components/ArchiveTypeBadge.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/content/storageLabels.ts
 #: src/runlite/pages/components/ArsenalOverlay.tsx
 #, fuzzy
 msgid "Other"
@@ -38510,6 +38581,10 @@ msgstr "为 {label} 选择变量"
 #, fuzzy
 msgid "Pick a weapon"
 msgstr "选择武器"
+
+#: src/content/pages/StorageSection.tsx
+msgid "Pick an age or tick a box to choose replays, then delete them in one go. Each filter narrows the choice further. Coilbox shows the total before anything is deleted."
+msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
 #, fuzzy
@@ -39362,6 +39437,7 @@ msgid "Pre-seed accounts so a load test can run with registration off."
 msgstr "预先创建账号，这样负载测试可以在关闭注册时运行。"
 
 #: src/content/pages/components/EngineRow.tsx
+#: src/content/pages/StorageSection.tsx
 #, fuzzy
 msgid "Preferred"
 msgstr "首选"
@@ -40247,6 +40323,10 @@ msgstr "{hosts} 的 rapid 索引（{refreshed}）"
 msgid "Rapid package"
 msgstr "rapid 包"
 
+#: src/content/storageLabels.ts
+msgid "Rapid pool"
+msgstr ""
+
 #: src/downloads/index.ts
 #: src/downloads/pages/ExplorerPage.tsx
 #: src/downloads/pages/SettingsSection.tsx
@@ -40925,17 +41005,11 @@ msgstr "已接收"
 msgid "Recent"
 msgstr "最近"
 
-#: src/content/pages/components/ReclaimCachesButton.tsx
 #: src/content/pages/components/ReclaimSpaceButton.tsx
 #: src/scenario/pages/components/ReclaimClipsForm.tsx
 #, fuzzy
 msgid "Reclaim"
 msgstr "释放"
-
-#: src/content/pages/components/ReclaimCachesButton.tsx
-#, fuzzy
-msgid "Reclaim caches"
-msgstr "释放缓存"
 
 #: src/scenario/pages/ScenarioBuilderPage.tsx
 #, fuzzy
@@ -40946,16 +41020,6 @@ msgstr "释放片段"
 #, fuzzy
 msgid "Reclaim dialogue clips"
 msgstr "释放对白片段"
-
-#: src/content/pages/components/ReclaimSpaceButton.tsx
-#, fuzzy
-msgid "Reclaim orphaned rapid pool data"
-msgstr "释放孤立的 rapid 池数据"
-
-#: src/content/pages/components/ReclaimSpaceButton.tsx
-#, fuzzy
-msgid "Reclaim space"
-msgstr "释放空间"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -41689,6 +41753,10 @@ msgstr "移除目标 {position}"
 msgid "Remove operator"
 msgstr "取消操作员"
 
+#: src/content/pages/components/ReclaimSpaceButton.tsx
+msgid "Remove pool files no package uses"
+msgstr ""
+
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Remove server"
@@ -42131,11 +42199,6 @@ msgstr "回放时间"
 msgid "Replay analysis is turned off in this distribution."
 msgstr "此分发版本已关闭回放分析。"
 
-#: src/content/pages/StorageSection.tsx
-#, fuzzy
-msgid "Replay cleanup"
-msgstr "回放清理"
-
 #: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
 msgid "Replay deleted"
@@ -42150,6 +42213,10 @@ msgstr "回放信息"
 #, fuzzy
 msgid "Replay map"
 msgstr "回放地图"
+
+#: src/content/storageLabels.ts
+msgid "Replay map pictures"
+msgstr ""
 
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
@@ -42181,6 +42248,10 @@ msgstr "回放录制轨道"
 msgid "Replay unit lists"
 msgstr "回放单位列表"
 
+#: src/content/storageLabels.ts
+msgid "Replay unit totals"
+msgstr ""
+
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "replays"
@@ -42191,6 +42262,7 @@ msgstr "回放"
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/content/pages/ReplaysPage.tsx
 #: src/content/pages/StatsPage.tsx
+#: src/content/storageLabels.ts
 #: src/play/index.ts
 #, fuzzy
 msgid "Replays"
@@ -42722,30 +42794,10 @@ msgstr "返回地图"
 msgid "Return to the running match"
 msgstr "返回进行中的对局"
 
-#: src/content/pages/StorageSection.tsx
-#, fuzzy
-msgid "Reveal {categoryLabel} folder"
-msgstr "在文件夹中显示 {categoryLabel}"
-
-#: src/content/pages/StorageSection.tsx
-#, fuzzy
-msgid "Reveal {enginePath}"
-msgstr "在文件夹中显示 {enginePath}"
-
-#: src/content/pages/StorageSection.tsx
-#, fuzzy
-msgid "Reveal {firstPath}"
-msgstr "在文件夹中显示 {firstPath}"
-
 #: src/content/pages/components/DuplicateContent.tsx
 #, fuzzy
 msgid "Reveal {folder}"
 msgstr "显示 {folder}"
-
-#: src/content/pages/StorageSection.tsx
-#, fuzzy
-msgid "Reveal in file manager"
-msgstr "在文件管理器中显示"
 
 #: src/animation/pages/CobPage.tsx
 #, fuzzy
@@ -42756,11 +42808,6 @@ msgstr "在文件夹中显示"
 #, fuzzy
 msgid "Reveal sidebar"
 msgstr "显示侧边栏"
-
-#: src/content/pages/StorageSection.tsx
-#, fuzzy
-msgid "Reveal the {engineVersion} folder"
-msgstr "在文件夹中显示 {engineVersion} 文件夹"
 
 #. placeholder {0}: copy.path
 #: src/content/pages/components/DuplicateContent.tsx
@@ -43645,6 +43692,10 @@ msgstr "存档"
 #, fuzzy
 msgid "savegames"
 msgstr "存档"
+
+#: src/content/storageLabels.ts
+msgid "Saves"
+msgstr ""
 
 #: src/content/pages/components/MatchStatsImageButton.tsx
 #, fuzzy
@@ -46426,7 +46477,6 @@ msgstr "六条腿"
 #: src/content/pages/components/ArchiveModelPreview.tsx
 #: src/content/pages/components/UnitModelPanel.tsx
 #: src/content/pages/GameUnitPage.tsx
-#: src/content/pages/StorageSection.tsx
 #: src/lego/pages/components/CollisionPanel.tsx
 #: src/lego/pages/components/DetailPanel.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
@@ -46442,11 +46492,6 @@ msgstr "大小"
 #, fuzzy
 msgid "Size {sizeText}"
 msgstr "大小 {sizeText}"
-
-#: src/content/pages/components/ReclaimCachesButton.tsx
-#, fuzzy
-msgid "Size and clear the generated-image and info caches"
-msgstr "统计并清除生成图片和信息缓存"
 
 #: src/lego/pages/components/BuildPictureDrawer.tsx
 #, fuzzy
@@ -49195,6 +49240,10 @@ msgstr "文件的字节，每行十六个。"
 #, fuzzy
 msgid "The bytes that were written, sixteen to a line."
 msgstr "已写入的字节，每行十六个。"
+
+#: src/content/caches.ts
+msgid "The caches are already empty."
+msgstr ""
 
 #: src/conquest/pages/GalaxyPage.tsx
 #, fuzzy
@@ -52378,6 +52427,10 @@ msgstr "这些纹理太大，无法放入代码，或不在 coilbox 的纹理库
 msgid "They are no longer one of your friends."
 msgstr "对方已不再是你的好友。"
 
+#: src/content/pages/StorageSection.tsx
+msgid "They are not a cache. Each goes when the last replay that uses it is deleted."
+msgstr ""
+
 #: src/direct/share.ts
 #, fuzzy
 msgid "They can join this room and chat. They cannot start the game, because the room gives everybody in it {announced}, which nothing outside your network can dial."
@@ -53026,11 +53079,6 @@ msgstr "内容太大，无法分享。Coilbox 会拒绝导入它。"
 #, fuzzy
 msgid "This is your own account"
 msgstr "这是你自己的账号"
-
-#: src/content/pages/StorageSection.tsx
-#, fuzzy
-msgid "This is your preferred engine, the one every launch uses. Set another as preferred first."
-msgstr "这是你的首选引擎，每次启动都会使用它。请先将另一个设为首选。"
 
 #: src/deeplink/parse.ts
 #, fuzzy
@@ -54242,6 +54290,10 @@ msgstr "潮汐发电"
 #, fuzzy
 msgid "Tidal strength"
 msgstr "潮汐强度"
+
+#: src/content/pages/components/ReclaimSpaceButton.tsx
+msgid "Tidy rapid pool"
+msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
 #, fuzzy
@@ -55495,6 +55547,10 @@ msgstr "单位 {def}"
 msgid "unit {place}"
 msgstr "单位 {place}"
 
+#: src/content/storageLabels.ts
+msgid "Unit build icons"
+msgstr ""
+
 #: src/lego/index.ts
 #, fuzzy
 msgid "unit builder"
@@ -55595,6 +55651,10 @@ msgstr "单位放置"
 #, fuzzy
 msgid "Unit reference"
 msgstr "单位参考"
+
+#: src/content/storageLabels.ts
+msgid "Unit renders"
+msgstr ""
 
 #: src/content/engineSettingText.ts
 msgid "Unit reply volume"

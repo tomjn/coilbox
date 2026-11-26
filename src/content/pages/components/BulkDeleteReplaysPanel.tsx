@@ -216,8 +216,8 @@ export function BulkDeleteReplaysPanel({
             ? t`Reading the replay list...`
             : !active
               ? plural(replayCount, {
-                  one: "Pick a filter. This root has # replay.",
-                  other: "Pick a filter. This root has # replays.",
+                  one: "Pick a filter. This folder has # replay.",
+                  other: "Pick a filter. This folder has # replays.",
                 })
               : plural(selection.count, {
                   one: `# replay matches, ${matchBytes}.`,
@@ -232,18 +232,15 @@ export function BulkDeleteReplaysPanel({
               size="sm"
               className="gap-1.5"
               disabled={selection.count === 0}
-              title={
-                selection.count === 0
-                  ? t`No replays match the filters`
-                  : t`Delete the matching replays`
-              }
             >
               <Trash2 className="size-4" />
               <Trans>Delete matching</Trans>
             </Button>
           </PopoverTrigger>
           <PopoverContent align="end" className="flex w-80 flex-col gap-3">
-            {preview === null ? (
+            {preview === null && error ? (
+              <p className="break-words text-sm text-destructive">{error}</p>
+            ) : preview === null ? (
               <p className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="size-4 animate-spin" />
                 <Trans>Sizing the batch...</Trans>
@@ -313,13 +310,20 @@ export function BulkDeleteReplaysPanel({
                     <Trans>Delete</Trans>
                   </Button>
                 </div>
+                {error && (
+                  <p className="break-words text-xs text-destructive">
+                    {error}
+                  </p>
+                )}
               </>
             )}
           </PopoverContent>
         </Popover>
       </div>
 
-      {error && <p className="break-words text-sm text-destructive">{error}</p>}
+      {error && !confirming && (
+        <p className="break-words text-sm text-destructive">{error}</p>
+      )}
     </div>
   );
 }

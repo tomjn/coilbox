@@ -9,6 +9,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { describeError } from "@/i18n/uiError";
 import { formatBytes } from "@/lib/format";
 import { notify } from "@/notify/notify";
@@ -22,8 +27,9 @@ const msg = (e: unknown): string => describeError(e);
  * now nothing in coilbox removed one.
  *
  * The preferred engine is never deletable: it is what every launch uses, so
- * removing it breaks play until another is picked. The caller says so via
- * `blockReason` rather than hiding the button, so the reason is readable.
+ * removing it breaks play until another is picked. The caller shows a
+ * "Preferred" mark in its place, as the Engines page does. Needs a
+ * `<TooltipProvider>` above it.
  *
  * An engine that recorded into its own folder holds replays (see #971), and
  * deleting the folder takes them. When that is the case the confirmation says so
@@ -31,12 +37,9 @@ const msg = (e: unknown): string => describeError(e);
  */
 export function DeleteEngineButton({
   engine,
-  blockReason,
   onDeleted,
 }: {
   engine: EngineUsage;
-  /** Why this engine cannot go, which also disables the button. */
-  blockReason?: string;
   /** Re-read the breakdown, which is now short one engine. */
   onDeleted: () => void;
 }) {
@@ -72,19 +75,24 @@ export function DeleteEngineButton({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="gap-1.5"
-          disabled={!!blockReason}
-          title={blockReason ?? tr`Delete engine ${version}`}
-        >
-          <Trash2 className="size-4" />
-          <Trans>Delete</Trans>
-        </Button>
-      </PopoverTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="w-8"
+              aria-label={tr`Delete engine ${version}`}
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent>
+          <Trans>Delete this engine</Trans>
+        </TooltipContent>
+      </Tooltip>
       <PopoverContent align="end" className="flex w-80 flex-col gap-3">
         <div className="flex flex-col gap-1">
           <h3 className="text-sm font-medium">
