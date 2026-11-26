@@ -46,6 +46,7 @@ import {
   useDownloadComplete,
   useDownloadQueue,
 } from "../../DownloadQueueProvider";
+import { usableRapidRepos } from "../../rapidMasters";
 import { orderRapidVersions } from "../../rapidVersionOrder";
 import { QueueProgress } from "./ProgressBar";
 
@@ -109,8 +110,9 @@ function SidecarWarning() {
 export function RapidBrowser({ writePath }: { writePath?: string }) {
   const { t } = useLingui();
   const [cfg] = useDownloadsConfig();
+  const masters = usableRapidRepos(cfg.rapidRepos);
   const [masterUrl, setMasterUrl] = useState(
-    () => cfg.rapidRepos[0]?.url ?? DEFAULT_MASTER,
+    () => masters[0]?.url ?? DEFAULT_MASTER,
   );
   const [repos, setRepos] = useState<Repo[] | null>(null);
   const [reposLoading, setReposLoading] = useState(false);
@@ -180,10 +182,10 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
   // Auto-load the initial master once on mount so there's no "Load repos" click.
   const autoLoaded = useRef(false);
   useEffect(() => {
-    if (autoLoaded.current || cfg.rapidRepos.length === 0) return;
+    if (autoLoaded.current || masters.length === 0) return;
     autoLoaded.current = true;
     loadRepos(masterUrl);
-  }, [cfg.rapidRepos, masterUrl, loadRepos]);
+  }, [masters.length, masterUrl, loadRepos]);
 
   async function selectRepo(repo: Repo, refresh = false) {
     const request = ++versionsRequest.current;
@@ -281,7 +283,7 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
   return (
     <div className="@container flex h-full flex-col">
       <div className="flex items-center gap-2 border-b border-border px-6 py-4">
-        {cfg.rapidRepos.length === 0 ? (
+        {masters.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             <Trans>
               No rapid repositories configured. Add one in{" "}
@@ -304,7 +306,7 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
               }}
               placeholder={t`Select a rapid repository…`}
               className="max-w-xs"
-              options={cfg.rapidRepos.map((r) => ({
+              options={masters.map((r) => ({
                 value: r.url,
                 label: r.name || r.url,
               }))}

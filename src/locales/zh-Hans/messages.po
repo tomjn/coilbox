@@ -9168,6 +9168,10 @@ msgstr "游戏正在运行。它会在保存或退出时写回小部件设置，
 msgid "A game is running. The engine reads the widget when a match starts, so a change now lands in the next one."
 msgstr "游戏正在运行。引擎在对局开始时读取小部件，因此现在的更改会在下一场对局中生效。"
 
+#: src/downloads/pages/SettingsSection.tsx
+msgid "A game or map archive dropped on the window, or opened with Coilbox, is copied to where new downloads go."
+msgstr ""
+
 #: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "A game saves this under a name that depends on its version."
@@ -9543,6 +9547,10 @@ msgstr "四分之一圈。单位只能朝四个方向之一，没有中间方向
 #, fuzzy
 msgid "A queue belongs to the base rather than to the layout, so it is converted here and nowhere else. A game names its two sides' buildings alike far more often than it names their units alike, so expect to pick most of these yourself."
 msgstr "队列属于基地而不是布局，因此只在这里转换。游戏为两个阵营的建筑起相似名称的情况远多于单位，因此大部分需要你自己选择。"
+
+#: src/downloads/pages/SettingsSection.tsx
+msgid "A rapid repository lists games and their versions. The Rapid repositories page in Library browses and downloads from the ones here, and game updates are looked up in them."
+msgstr ""
 
 #: src/content/pages/components/PlayerMatchFigures.tsx
 #, fuzzy
@@ -10093,6 +10101,14 @@ msgstr "关于 Coilbox"
 msgid "About deleting replays"
 msgstr ""
 
+#: src/downloads/pages/SettingsSection.tsx
+msgid "About downloading when joining"
+msgstr ""
+
+#: src/downloads/pages/SettingsSection.tsx
+msgid "About dropped archives"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "About empty pieces"
@@ -10150,6 +10166,10 @@ msgstr ""
 #, fuzzy
 msgid "About proportions"
 msgstr "关于比例"
+
+#: src/downloads/pages/SettingsSection.tsx
+msgid "About rapid repositories"
+msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
 msgid "About reduce motion"
@@ -10212,6 +10232,10 @@ msgstr ""
 
 #: src/content/pages/KeybindsSection.tsx
 msgid "About the game's bindings"
+msgstr ""
+
+#: src/hub/pages/components/HubAddressField.tsx
+msgid "About the hub address"
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
@@ -10960,6 +10984,7 @@ msgstr "在此添加、移动、旋转、转换或删除建筑会更改所有这
 msgid "Adding, moving, turning, converting or deleting a building here gives this base a copy of its own and leaves the rest where they stand."
 msgstr "在此添加、移动、旋转、转换或删除建筑会为此基地创建自己的副本，其余基地保持不变。"
 
+#: src/hub/pages/components/HubAddressField.tsx
 #: src/uberstress/pages/RunPage.tsx
 #: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
@@ -16214,11 +16239,6 @@ msgstr ""
 msgid "Clear filters"
 msgstr "清除筛选条件"
 
-#: src/hub/pages/components/HubAddressField.tsx
-#, fuzzy
-msgid "Clear override"
-msgstr "清除覆盖"
-
 #: src/challenge/ChallengeRecordLine.tsx
 #: src/play/PresetList.tsx
 #, fuzzy
@@ -17124,21 +17144,6 @@ msgstr "Coilbox 仍在扫描你的内容，因此游戏将以上次使用的小�
 #, fuzzy
 msgid "Coilbox is uploading {name} to the hub's mirror."
 msgstr "Coilbox 正在将 {name} 上传到中心的镜像。"
-
-#: src/hub/pages/components/HubAddressField.tsx
-#, fuzzy
-msgid "Coilbox is using <0>{effective}</0>, the address your distribution set."
-msgstr "Coilbox 正在使用 <0>{effective}</0>，这是你的分发版本设置的地址。"
-
-#: src/hub/pages/components/HubAddressField.tsx
-#, fuzzy
-msgid "Coilbox is using <0>{effective}</0>, the built-in default."
-msgstr "Coilbox 正在使用 <0>{effective}</0>，这是内置默认地址。"
-
-#: src/hub/pages/components/HubAddressField.tsx
-#, fuzzy
-msgid "Coilbox is using <0>{effective}</0>, your own address, set below."
-msgstr "Coilbox 正在使用 <0>{effective}</0>，这是你在下方设置的地址。"
 
 #: src/multiplayer/invite/InviteLinkHost.tsx
 #, fuzzy
@@ -20117,6 +20122,10 @@ msgstr "全部删除（{count} 个）"
 msgid "Delete analysis"
 msgstr "删除分析"
 
+#: src/downloads/pages/SettingsSection.tsx
+msgid "Delete dropped archives once installed"
+msgstr ""
+
 #: src/content/pages/components/DeleteEngineButton.tsx
 #, fuzzy
 msgid "Delete engine {version}"
@@ -20192,7 +20201,6 @@ msgid "Delete the name {name}"
 msgstr "删除名称 {name}"
 
 #: src/deeplink/ArchiveChoices.tsx
-#: src/downloads/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Delete the original after installing"
 msgstr "安装后删除原文件"
@@ -21054,9 +21062,8 @@ msgid "Download map"
 msgstr "下载地图"
 
 #: src/downloads/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Download missing content automatically"
-msgstr "自动下载缺少的内容"
+msgid "Download missing content when joining a battle"
+msgstr ""
 
 #: src/content/pages/components/SetupCard.tsx
 #, fuzzy
@@ -21132,6 +21139,7 @@ msgstr "已下载到 {writePath}，但引擎仍未列出此地图。该文件可
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/downloads/pages/ActivityPage.tsx
+#: src/downloads/pages/SettingsSection.tsx
 #: src/multiplayer/chat/ChatMapCard.tsx
 #, fuzzy
 msgid "Downloading"
@@ -21454,11 +21462,6 @@ msgstr "放下单位 {unit}"
 #, fuzzy
 msgid "Dropped a rank"
 msgstr "等级下降"
-
-#: src/downloads/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Dropped archives"
-msgstr "拖入的压缩包"
 
 #: src/multiplayer/debriefing.ts
 #, fuzzy
@@ -27581,6 +27584,10 @@ msgstr "安装引擎后即可观看回放。"
 msgid "Install at least one map first (<0>Content → Maps</0>)."
 msgstr "请先安装至少一张地图（<0>内容 → 地图</0>）。"
 
+#: src/downloads/pages/SettingsSection.tsx
+msgid "Install dropped archives without asking"
+msgstr ""
+
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
 msgid "Install into game"
@@ -27621,11 +27628,6 @@ msgstr "安装此转换结果？"
 #, fuzzy
 msgid "Install widget"
 msgstr "安装小部件"
-
-#: src/downloads/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Install without asking"
-msgstr "不询问直接安装"
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
@@ -28460,11 +28462,6 @@ msgstr "连接到 {parentName}：{connectorName} 接到 {toName}"
 msgid "Joining {roomTitle}, found on this network."
 msgstr "正在加入在此网络上发现的 {roomTitle}。"
 
-#: src/downloads/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Joining a battle"
-msgstr "加入对局"
-
 #: src/direct/JoinRoomForm.tsx
 #, fuzzy
 msgid "Joining…"
@@ -29232,11 +29229,6 @@ msgstr "留空则创建公开房间"
 msgid "Leave blank for an open room"
 msgstr "留空则创建公开房间"
 
-#: src/hub/pages/components/HubAddressField.tsx
-#, fuzzy
-msgid "Leave blank to use the default, or your distribution's address if it sets one."
-msgstr "留空则使用默认地址，如果你的分发版本设置了地址则使用该地址。"
-
 #: src/multiplayer/pages/ChatPage.tsx
 #, fuzzy
 msgid "Leave channel"
@@ -29256,6 +29248,14 @@ msgstr "保持不变，继续前进"
 #, fuzzy
 msgid "Leave it be"
 msgstr "不管它"
+
+#: src/hub/pages/components/HubAddressField.tsx
+msgid "Leave it blank to use the address your distribution set."
+msgstr ""
+
+#: src/hub/pages/components/HubAddressField.tsx
+msgid "Leave it blank to use the built-in address."
+msgstr ""
 
 #: src/animation/pages/Bos2LuaPage.tsx
 #, fuzzy
@@ -34413,9 +34413,8 @@ msgid "No rapid repositories configured. Add one in <0>Sources settings</0>."
 msgstr "未配置 rapid 仓库。请在<0>来源设置</0>中添加。"
 
 #: src/downloads/pages/SettingsSection.tsx
-#, fuzzy
-msgid "No rapid repositories. Add one to browse and download games from it."
-msgstr "没有 rapid 仓库。添加一个即可从中浏览和下载游戏。"
+msgid "No rapid repositories."
+msgstr ""
 
 #: src/content/pages/components/MatchStatsTable.tsx
 #, fuzzy
@@ -41570,6 +41569,7 @@ msgstr "改编自"
 #: src/content/pages/components/CompatMode.tsx
 #: src/content/pages/components/FolderRow.tsx
 #: src/content/pages/components/MissionRuntimeSection.tsx
+#: src/downloads/pages/SettingsSection.tsx
 #: src/hub/pages/ItemPage.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/BuildMenuSection.tsx
@@ -56403,6 +56403,10 @@ msgstr "使用 {suggestedName}"
 msgid "Use a library weapon"
 msgstr "使用库武器"
 
+#: src/hub/pages/components/HubAddressField.tsx
+msgid "Use default"
+msgstr ""
+
 #: src/lego/pages/components/CollisionPanel.tsx
 #, fuzzy
 msgid "Use each piece instead"
@@ -57712,9 +57716,8 @@ msgid "When the unit dies it comes apart along its joins. A light hit throws off
 msgstr "单位死亡时会沿其连接处解体。轻度受击会抛出几个最大的零件组，重度受击会把每个零件逐个抛出（从最小的开始），残骸取决于受击后剩下的部分。没有连接的单位会沿其部件树解体。"
 
 #: src/downloads/pages/SettingsSection.tsx
-#, fuzzy
-msgid "When you join a battle whose game or map you don't have, start the download straight away instead of waiting for a click. The Download button stays available to pause or retry."
-msgstr "加入一个你没有其游戏或地图的对局时，立即开始下载，而不是等待点击。“下载”按钮仍可用于暂停或重试。"
+msgid "When you join a battle whose game or map you don't have, the download starts straight away instead of waiting for a click. The Download button stays available to pause or retry."
+msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayMapRail.tsx
@@ -59291,11 +59294,6 @@ msgstr "无法读取你的游戏：{scanError}"
 #, fuzzy
 msgid "Your hub account"
 msgstr "你的中心账号"
-
-#: src/hub/pages/components/HubAddressField.tsx
-#, fuzzy
-msgid "Your hub address"
-msgstr "你的中心地址"
 
 #: src/direct/ReachablePorts.tsx
 #, fuzzy

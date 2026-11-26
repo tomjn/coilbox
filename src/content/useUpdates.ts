@@ -11,6 +11,7 @@ import {
   githubRepoForGame,
   mergeGameRepos,
 } from "../downloads/gameRepos";
+import { usableRapidRepos } from "../downloads/rapidMasters";
 import { loadRapidTags, type RapidTag } from "../downloads/rapidTags";
 import type { HubGame } from "../hub/api";
 import { matchHubGame, useHubGames } from "../hub/gameIcons";
@@ -145,7 +146,9 @@ export function useUpdateSources(
       ].sort(),
     [history],
   );
-  const masters = cfg.rapidRepos.map((r) => r.url).join("\n");
+  const masters = usableRapidRepos(cfg.rapidRepos)
+    .map((r) => r.url)
+    .join("\n");
   const [rapidVersions, setRapidVersions] = useState<Record<string, RapidTag>>(
     {},
   );

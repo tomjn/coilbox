@@ -1,14 +1,11 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { useState } from "react";
-import { Field } from "@/components/Field";
+import { HelpPopover } from "@/components/HelpPopover";
+import { SettingList } from "@/components/SettingRow";
+import { Label } from "@/components/ui/label";
 import { getProfile } from "../../../profile/profile";
-import {
-  DEFAULT_HUB_URL,
-  isValidHubUrl,
-  resolveHubUrl,
-  useHubUrlSetting,
-} from "../../config";
+import { isValidHubUrl, resolveHubUrl, useHubUrlSetting } from "../../config";
 
 /**
  * The control for the `hub.url` user setting (issue #1353): lets a player point
@@ -24,6 +21,9 @@ import {
  * hub request. Clearing the field is not enough to fall back on its own, since an
  * empty *draft* is a valid URL fragment, so the button makes the intent explicit
  * rather than relying on the user backspacing everything by hand.
+ *
+ * A blank field shows the address it falls back to as its placeholder, so the
+ * address in use is always on screen without a sentence saying which it is.
  */
 export function HubAddressField() {
   const { t } = useLingui();
@@ -32,7 +32,8 @@ export function HubAddressField() {
   const [error, setError] = useState<string | null>(null);
 
   const profileUrl = getProfile().hubUrl?.trim();
-  const effective = resolveHubUrl(userUrl, profileUrl);
+  // What a blank field means, shown as its placeholder.
+  const fallback = resolveHubUrl("", profileUrl);
 
   const change = (value: string) => {
     setDraft(value);
@@ -53,47 +54,55 @@ export function HubAddressField() {
   };
 
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">
-        {userUrl.trim() ? (
-          <Trans>
-            Coilbox is using{" "}
-            <span className="font-mono text-xs">{effective}</span>, your own
-            address, set below.
-          </Trans>
-        ) : profileUrl ? (
-          <Trans>
-            Coilbox is using{" "}
-            <span className="font-mono text-xs">{effective}</span>, the address
-            your distribution set.
-          </Trans>
-        ) : (
-          <Trans>
-            Coilbox is using{" "}
-            <span className="font-mono text-xs">{effective}</span>, the built-in
-            default.
-          </Trans>
-        )}
-      </p>
-      <Field
-        label={t`Your hub address`}
-        hint={t`Leave blank to use the default, or your distribution's address if it sets one.`}
-      >
-        <div className="flex gap-2">
+    <SettingList>
+      <li className="flex flex-col gap-2 px-4 py-3">
+        <div className="flex items-center gap-1">
+          <Label htmlFor="hub-url" className="text-sm font-medium">
+            <Trans>Address</Trans>
+          </Label>
+          <HelpPopover label={t`About the hub address`}>
+            <p>
+              {profileUrl ? (
+                <Trans>
+                  Leave it blank to use the address your distribution set.
+                </Trans>
+              ) : (
+                <Trans>Leave it blank to use the built-in address.</Trans>
+              )}
+            </p>
+          </HelpPopover>
+        </div>
+        <div className="flex items-center gap-2">
           <Input
+            id="hub-url"
             value={draft}
             onChange={(e) => change(e.target.value)}
-            placeholder={DEFAULT_HUB_URL}
-            className="flex-1 font-mono text-xs"
+            placeholder={fallback}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? "hub-url-error" : undefined}
+            className="min-w-0 flex-1 font-mono text-xs"
           />
           {userUrl.trim() !== "" && (
-            <Button variant="outline" size="sm" onClick={clearOverride}>
-              <Trans>Clear override</Trans>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={clearOverride}
+            >
+              <Trans>Use default</Trans>
             </Button>
           )}
         </div>
-      </Field>
-      {error && <p className="text-sm text-destructive">{error}</p>}
-    </div>
+        {error && (
+          <p
+            id="hub-url-error"
+            role="alert"
+            className="text-xs text-destructive"
+          >
+            {error}
+          </p>
+        )}
+      </li>
+    </SettingList>
   );
 }
