@@ -158,10 +158,13 @@ export function EngineInstaller() {
           </h2>
           {writePath && (
             <p
-              className="truncate font-mono text-xs text-muted-foreground"
+              className="truncate text-xs text-muted-foreground"
               title={`${writePath}/engine`}
             >
-              <Trans>Installs into {writePath}/engine</Trans>
+              <Trans>
+                Installs into{" "}
+                <span className="font-mono">{writePath}/engine</span>
+              </Trans>
             </p>
           )}
         </div>
@@ -169,7 +172,7 @@ export function EngineInstaller() {
           <OptionSelect
             value={source}
             onValueChange={(v) => setSource(v as Source)}
-            className="w-56"
+            className="w-60"
             options={[
               { value: "recoil", label: t`Recoil (GitHub releases)` },
               { value: "springfiles", label: "springfiles" },

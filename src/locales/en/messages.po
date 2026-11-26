@@ -22242,8 +22242,8 @@ msgid "Installing…"
 msgstr "Installing…"
 
 #: src/downloads/pages/components/EngineInstaller.tsx
-msgid "Installs into {writePath}/engine"
-msgstr "Installs into {writePath}/engine"
+msgid "Installs into <0>{writePath}/engine</0>"
+msgstr "Installs into <0>{writePath}/engine</0>"
 
 #: src/runlite/pages/components/ArsenalOverlay.tsx
 msgid "Intelligence"

@@ -129,7 +129,7 @@ export function HubEngineList() {
         <h2 className="text-sm font-semibold">
           <Trans>Hub test builds</Trans>
         </h2>
-        <p className="mt-1 flex max-w-prose gap-2 text-xs text-amber-700 dark:text-amber-400">
+        <p className="mt-1 flex gap-2 text-xs text-amber-700 dark:text-amber-400">
           <AlertTriangle className="mt-px size-3.5 shrink-0" />
           {HUB_ENGINE_WARNING}
         </p>
