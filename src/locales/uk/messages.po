@@ -1230,6 +1230,11 @@ msgstr "{0, plural, one {Використовується в # місці:} few 
 msgid "{0, plural, one {Estimated from # earlier recording of this game on this computer.} other {Estimated from # earlier recordings of this game on this computer.}}"
 msgstr "{0, plural, one {Оцінено за # попереднім записом цієї гри на цьому комп’ютері.} few {Оцінено за # попередніми записами цієї гри на цьому комп’ютері.} many {Оцінено за # попередніми записами цієї гри на цьому комп’ютері.} other {Оцінено за # попереднього запису цієї гри на цьому комп’ютері.}}"
 
+#. placeholder {0}: leftOut.length
+#: src/campaign/pages/CampaignBuilderPage.tsx
+msgid "{0, plural, one {Exported {campaignTitle}, but # file its briefings use is not in the export: {files}. An export cannot carry audio, video or a file that cannot be read.} other {Exported {campaignTitle}, but # files its briefings use are not in the export: {files}. An export cannot carry audio, video or a file that cannot be read.}}"
+msgstr ""
+
 #. placeholder {0}: info.gameVersions.length
 #: src/content/mapImage.ts
 #, fuzzy

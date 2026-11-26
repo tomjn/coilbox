@@ -18,7 +18,8 @@
  *   store (they are keyed by the scenario's own id, see `scenarioMedia.ts`) and a
  *   mission still reads as attached to the scenario it came from.
  * - Every stored image and every stored audio or video file, written afresh under
- *   the new campaign's own id.
+ *   the new campaign's own id. That includes the files a game campaign's
+ *   briefings name (issue #5484).
  * - Nothing from the original's progress. Progress is keyed by campaign id, so a
  *   copy starts unplayed, which is what a copy made to be edited wants.
  */
@@ -27,6 +28,7 @@ import { t } from "@lingui/core/macro";
 import { campaignMediaUrl, mediaKind } from "../lib/assetUrl";
 import { fetchAsDataUrl } from "../lib/dataUrl";
 import { campaignMediaImportData, campaignUnitsCopy } from "./bindings";
+import { withBriefingFileRefs } from "./briefingFiles";
 import { gameCampaignFileUrl, gameCampaignOrigin } from "./gameCampaigns";
 import { inlineCampaignImages, materializeCampaignImages } from "./images";
 import type { Campaign, ImageRef } from "./model";
@@ -72,6 +74,7 @@ function mediaRefs(campaign: Campaign): (ImageRef | undefined)[] {
       m.voiceover,
       m.cutscene,
     ]),
+    ...Object.values(campaign.briefingFiles ?? {}),
   ];
 }
 
@@ -132,9 +135,15 @@ async function copyCampaignMedia(
   const one = (ref: ImageRef | undefined) =>
     copyStoredMedia(sourceId, targetId, ref);
 
-  const [icon, background, missions] = await Promise.all([
+  const [icon, background, briefing, missions] = await Promise.all([
     one(campaign.icon),
     one(campaign.background),
+    Promise.all(
+      Object.entries(campaign.briefingFiles ?? {}).map(async ([name, ref]) => {
+        const copied = await one(ref);
+        return copied ? [[name, copied] as const] : [];
+      }),
+    ),
     Promise.all(
       campaign.missions.map(async (m) => {
         const [panorama, sideGraphic, voiceover, cutscene] = await Promise.all([
@@ -148,7 +157,10 @@ async function copyCampaignMedia(
     ),
   ]);
 
-  return { ...campaign, icon, background, missions };
+  const briefingFiles = briefing.length
+    ? Object.fromEntries(briefing.flat())
+    : undefined;
+  return { ...campaign, icon, background, briefingFiles, missions };
 }
 
 export interface CampaignCopy {
@@ -205,6 +217,6 @@ export async function duplicateCampaign(
 
   return {
     campaign: { ...copied, id, title, createdAt: now, updatedAt: now },
-    droppedMedia: mediaCount(source) - mediaCount(copied),
+    droppedMedia: mediaCount(withBriefingFileRefs(source)) - mediaCount(copied),
   };
 }

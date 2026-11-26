@@ -55,10 +55,10 @@ export function missionMedia(mission: CampaignMission): StoredMedia[] {
 
 /** Every imported file the whole document names, missions and campaign alike. */
 export function campaignMediaFiles(campaign: Campaign): Set<string> {
-  const files = CAMPAIGN_SLOTS.flatMap(([slot]) => {
-    const ref = campaign[slot];
-    return ref?.kind === "file" ? [ref.file] : [];
-  });
+  const files = [
+    ...CAMPAIGN_SLOTS.map(([slot]) => campaign[slot]),
+    ...Object.values(campaign.briefingFiles ?? {}),
+  ].flatMap((ref) => (ref?.kind === "file" ? [ref.file] : []));
   for (const mission of campaign.missions) {
     files.push(...missionMedia(mission).map((m) => m.file));
   }

@@ -30,7 +30,7 @@ import {
 } from "../bindings";
 import { refreshCampaigns, useCampaigns } from "../campaigns";
 import { copyTitle, duplicateCampaign } from "../duplicate";
-import { inlineCampaignImages, materializeCampaignImages } from "../images";
+import { inlineCampaignForExport, materializeCampaignImages } from "../images";
 import {
   campaignIsPlayable,
   campaignSourceBadge,
@@ -249,8 +249,8 @@ export default function CampaignBuilderPage() {
       // clips out of the media store, so the export is one self-contained file
       // that still plays its radio messages elsewhere (#769). The campaign's
       // unit copies travel in it too (#4517).
-      const [inlined, media] = await Promise.all([
-        inlineCampaignImages(campaign, { units: true }),
+      const [{ campaign: inlined, leftOut }, media] = await Promise.all([
+        inlineCampaignForExport(campaign),
         collectCampaignScenarioMedia(campaign),
       ]);
       const file = wrapCampaignForExport(
@@ -265,6 +265,16 @@ export default function CampaignBuilderPage() {
       });
       if (!dest) return;
       await campaignExport({ json: JSON.stringify(file, null, 2), dest });
+      if (leftOut.length > 0) {
+        const campaignTitle = campaign.title;
+        const files = leftOut.join(", ");
+        setActionError(
+          plural(leftOut.length, {
+            one: `Exported ${campaignTitle}, but # file its briefings use is not in the export: ${files}. An export cannot carry audio, video or a file that cannot be read.`,
+            other: `Exported ${campaignTitle}, but # files its briefings use are not in the export: ${files}. An export cannot carry audio, video or a file that cannot be read.`,
+          }),
+        );
+      }
     } catch (e) {
       setActionError(describeError(e));
     }

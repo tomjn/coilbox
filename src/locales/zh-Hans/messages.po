@@ -1230,6 +1230,11 @@ msgstr "{0, plural, other {已装备在 # 处：}}"
 msgid "{0, plural, one {Estimated from # earlier recording of this game on this computer.} other {Estimated from # earlier recordings of this game on this computer.}}"
 msgstr "{0, plural, other {根据此电脑上此游戏的 # 次早期录制估算。}}"
 
+#. placeholder {0}: leftOut.length
+#: src/campaign/pages/CampaignBuilderPage.tsx
+msgid "{0, plural, one {Exported {campaignTitle}, but # file its briefings use is not in the export: {files}. An export cannot carry audio, video or a file that cannot be read.} other {Exported {campaignTitle}, but # files its briefings use are not in the export: {files}. An export cannot carry audio, video or a file that cannot be read.}}"
+msgstr ""
+
 #. placeholder {0}: info.gameVersions.length
 #: src/content/mapImage.ts
 #, fuzzy

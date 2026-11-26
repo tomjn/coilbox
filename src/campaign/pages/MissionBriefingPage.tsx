@@ -264,7 +264,9 @@ function Briefing({
         {mission.briefing && (
           <BriefingProse
             className="max-h-40 overflow-auto"
+            campaignId={campaign.id}
             gameOrigin={gameOrigin}
+            files={campaign.briefingFiles}
           >
             {mission.briefing}
           </BriefingProse>

@@ -1,11 +1,15 @@
-import { mediaKind } from "../lib/assetUrl";
+import { campaignMediaUrl, mediaKind } from "../lib/assetUrl";
+import { fetchAsDataUrl } from "../lib/dataUrl";
 import {
   type CampaignImageKind,
   campaignImageImportData,
+  campaignMediaImportData,
   campaignUnitFileRead,
   campaignUnitFileWrite,
   campaignUnitList,
 } from "./bindings";
+import { withBriefingFileRefs } from "./briefingFiles";
+import { gameCampaignFileDataUri, gameCampaignOrigin } from "./gameCampaigns";
 import {
   type Campaign,
   type CampaignUnit,
@@ -16,14 +20,18 @@ import { resolveImageDataUri } from "./panorama";
 
 /**
  * What a ref is for: an image field, whose kind picks the encode bounds, or one
- * file of an attached unit's copy, which travels as it is (issue #4517).
+ * file of an attached unit's copy, which travels as it is (issue #4517), or one
+ * file a briefing names, which does too (issue #5484).
  */
-type RefSlot = CampaignImageKind | { unitName: string; file: string };
+type RefSlot =
+  | CampaignImageKind
+  | { unitName: string; file: string }
+  | { briefingFile: string };
 
 /**
  * Apply an async transform to every media ref on a campaign — its icon and
  * background, plus each mission's panorama, side graphic, voiceover and cutscene,
- * and the files of each attached unit's copy — returning a new campaign. The
+ * the files the briefings name and the files of each attached unit's copy — returning a new campaign. The
  * transform is told which field it's handling so it can pick the right encode
  * bounds/format; a ref it resolves to `undefined` is dropped, so one broken image
  * never sinks the whole operation.
@@ -59,7 +67,18 @@ async function mapCampaignImages(
     return { ...unit, files };
   };
 
-  const [icon, background, missions, units] = await Promise.all([
+  const briefingFiles = async (files: Record<string, ImageRef>) => {
+    const next = await Promise.all(
+      Object.entries(files).map(async ([name, ref]) => {
+        const done = await transform(ref, { briefingFile: name });
+        return done ? [[name, done] as const] : [];
+      }),
+    );
+    const kept = next.flat();
+    return kept.length > 0 ? Object.fromEntries(kept) : undefined;
+  };
+
+  const [icon, background, missions, units, briefing] = await Promise.all([
     one(campaign.icon, "icon"),
     one(campaign.background, "background"),
     Promise.all(
@@ -76,6 +95,9 @@ async function mapCampaignImages(
     campaign.units
       ? Promise.all(campaign.units.map(unitFiles))
       : Promise.resolve(undefined),
+    campaign.briefingFiles
+      ? briefingFiles(campaign.briefingFiles)
+      : Promise.resolve(undefined),
   ]);
 
   return {
@@ -84,6 +106,7 @@ async function mapCampaignImages(
     background,
     missions,
     ...(units ? { units } : {}),
+    ...(campaign.briefingFiles ? { briefingFiles: briefing } : {}),
   };
 }
 
@@ -110,6 +133,17 @@ async function withUnitFileRefs(campaign: Campaign): Promise<Campaign> {
   };
 }
 
+/** One image a briefing names, out of the game or coilbox's media folder. */
+async function readBriefingImage(
+  campaignId: string,
+  file: string,
+): Promise<string | undefined> {
+  const origin = gameCampaignOrigin(campaignId);
+  return origin
+    ? gameCampaignFileDataUri(origin, file)
+    : fetchAsDataUrl(campaignMediaUrl(campaignId, file));
+}
+
 /** What `inlineCampaignImages` can be asked to carry besides images. */
 export interface InlineOptions {
   /**
@@ -134,10 +168,12 @@ export async function inlineCampaignImages(
   campaign: Campaign,
   { units = false }: InlineOptions = {},
 ): Promise<Campaign> {
-  const source = units ? await withUnitFileRefs(campaign) : campaign;
+  const source = withBriefingFileRefs(
+    units ? await withUnitFileRefs(campaign) : campaign,
+  );
   return mapCampaignImages(source, async (ref, slot) => {
     if (ref.kind !== "file") return ref; // local + data pass through
-    if (typeof slot === "object") {
+    if (typeof slot === "object" && "unitName" in slot) {
       try {
         const { dataUri } = await campaignUnitFileRead({
           campaignId: campaign.id,
@@ -151,12 +187,41 @@ export async function inlineCampaignImages(
     }
     if (mediaKind(ref.file) !== "image") return ref; // AV file can't be inlined
     try {
-      const dataUri = await resolveImageDataUri(campaign.id, ref.file);
-      return { kind: "data", dataUri };
+      const dataUri =
+        typeof slot === "object"
+          ? await readBriefingImage(campaign.id, ref.file)
+          : await resolveImageDataUri(campaign.id, ref.file);
+      return dataUri ? { kind: "data", dataUri } : undefined;
     } catch {
       return undefined;
     }
   });
+}
+
+/**
+ * A self-contained campaign for an export file: its images and unit copies
+ * inline. `leftOut` names the briefing files the file does not hold, which are
+ * the audio and video, too large to inline, and any that could not be read.
+ */
+export async function inlineCampaignForExport(
+  campaign: Campaign,
+): Promise<{ campaign: Campaign; leftOut: string[] }> {
+  const source = withBriefingFileRefs(campaign);
+  const inlined = await inlineCampaignImages(source, { units: true });
+  const carried = new Map(
+    Object.entries(inlined.briefingFiles ?? {}).filter(
+      ([, ref]) => ref.kind !== "file",
+    ),
+  );
+  return {
+    campaign: {
+      ...inlined,
+      briefingFiles: carried.size > 0 ? Object.fromEntries(carried) : undefined,
+    },
+    leftOut: Object.keys(source.briefingFiles ?? {})
+      .filter((name) => !carried.has(name))
+      .sort(),
+  };
 }
 
 /**
@@ -176,6 +241,14 @@ export async function materializeCampaignImages(
   const written = await mapCampaignImages(campaign, async (ref, slot) => {
     if (ref.kind !== "data") return ref;
     try {
+      if (typeof slot === "object" && "briefingFile" in slot) {
+        const { file } = await campaignMediaImportData({
+          campaignId,
+          dataUri: ref.dataUri,
+          ext: slot.briefingFile.split(".").pop() ?? "",
+        });
+        return { kind: "file", file };
+      }
       if (typeof slot === "object") {
         await campaignUnitFileWrite({
           campaignId,
