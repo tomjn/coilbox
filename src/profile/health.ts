@@ -329,7 +329,10 @@ export function checkLanguagePacks(
     return {
       id: "languagePacks",
       status: "warn",
-      label: t`${failureCount} language pack(s) were not used`,
+      label: plural(failureCount, {
+        one: "# language pack was not used",
+        other: "# language packs were not used",
+      }),
       hint: t`Fix the files in .coilbox/locales/<code>/. A pack is pack.json and the messages.json that lingui compile --namespace json writes.`,
       detail: failures.map((f) => `${f.dir}: ${f.error}`).join("\n"),
     };
@@ -500,7 +503,9 @@ export function checkBundle(bundle: BundleReport | null): HealthCheck | null {
       : t`no engine for this platform`;
   const gameCount = bundle.games;
   const mapCount = bundle.maps;
-  const summary = t`${gameCount} game(s), ${mapCount} map(s), ${engineText}`;
+  const gameText = plural(gameCount, { one: "# game", other: "# games" });
+  const mapText = plural(mapCount, { one: "# map", other: "# maps" });
+  const summary = t`${gameText}, ${mapText}, ${engineText}`;
   const bundlePath = bundle.path;
   const lines = bundle.problems.map(bundleProblemText);
   // No engine at all is not a mistake the Rust side reports, because a bundle
@@ -523,7 +528,10 @@ export function checkBundle(bundle: BundleReport | null): HealthCheck | null {
   return {
     id: "bundle",
     status: "warn",
-    label: t`${problemCount} problem(s) in the bundled content`,
+    label: plural(problemCount, {
+      one: "# problem in the bundled content",
+      other: "# problems in the bundled content",
+    }),
     hint: t`${bundlePath} has ${summary}. Each line below is one thing to fix.`,
     detail: lines.join("\n"),
   };
@@ -657,7 +665,10 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
   } else {
     const portableRoots = i.roots.filter((r) => r.portable).length;
     const rootCount = i.roots.length;
-    const label = t`${rootCount} content folder(s), ${portableRoots} portable`;
+    const label = plural(rootCount, {
+      one: `# content folder, ${portableRoots} portable`,
+      other: `# content folders, ${portableRoots} portable`,
+    });
     checks.push(
       portable && portableRoots === 0
         ? {
@@ -733,7 +744,7 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
     checks.push({
       id: "writeRoot",
       status: "unknown",
-      label: t`Write root portability n/a (not portable)`,
+      label: t`Download folder not checked, as this is not a portable install`,
     });
   } else if (i.writeRootPath === undefined) {
     checks.push({
@@ -772,7 +783,10 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
       "campaigns",
       {
         allLoaded: t`All campaigns loaded`,
-        failed: t`${campaignFailureCount} campaign(s) failed to load`,
+        failed: plural(campaignFailureCount, {
+          one: "# campaign failed to load",
+          other: "# campaigns failed to load",
+        }),
         hint: t`Fix the JSON in .coilbox/campaigns/ (bundled) or the app data campaigns folder (local):`,
       },
       i.campaignFailures,
@@ -781,7 +795,10 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
       "scenarios",
       {
         allLoaded: t`All scenarios loaded`,
-        failed: t`${scenarioFailureCount} scenario(s) failed to load`,
+        failed: plural(scenarioFailureCount, {
+          one: "# scenario failed to load",
+          other: "# scenarios failed to load",
+        }),
         hint: t`Fix the JSON in .coilbox/scenarios/ (bundled) or the app data scenarios folder (local):`,
       },
       i.scenarioFailures,
@@ -795,7 +812,10 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
     const scanRootCount = i.roots.length;
     const scanRootPaths = i.roots.map((r) => r.path).join(", ");
     const scanned = i.roots.length
-      ? t`Scanned ${scanRootCount} content folder(s): ${scanRootPaths}.`
+      ? plural(scanRootCount, {
+          one: `Scanned # content folder: ${scanRootPaths}.`,
+          other: `Scanned # content folders: ${scanRootPaths}.`,
+        })
       : t`No content folders are configured to scan.`;
     if (engines === 0) {
       checks.push({
@@ -812,8 +832,14 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
         id: "content",
         status: "unknown",
         label: i.scanError
-          ? t`${engines} engine(s) found, games scan failed`
-          : t`${engines} engine(s) found, games not scanned yet`,
+          ? plural(engines, {
+              one: "# engine found, games scan failed",
+              other: "# engines found, games scan failed",
+            })
+          : plural(engines, {
+              one: "# engine found, games not scanned yet",
+              other: "# engines found, games not scanned yet",
+            }),
         hint: i.scanError
           ? t`The games scan failed, so it is not known what is installed. unitsync said: ${scanError} ${scanned}`
           : t`Nothing has scanned for games yet. Open Content > Games and let the scan finish, then re-run this. ${scanned}`,
@@ -826,10 +852,15 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
         hint: t`Bundle or download the game archive (.sdz/.sd7). ${scanned}`,
       });
     } else {
+      const engineText = plural(engines, {
+        one: "# engine",
+        other: "# engines",
+      });
+      const gameText = plural(games, { one: "# game", other: "# games" });
       checks.push({
         id: "content",
         status: "ok",
-        label: t`${engines} engine(s), ${games} game(s) found`,
+        label: t`${engineText}, ${gameText} found`,
       });
     }
   }
@@ -862,7 +893,7 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
           : {
               id: "writable",
               status: "ok",
-              label: t`Download + data folders are writable`,
+              label: t`Download and data folders are writable`,
             },
       );
     }
