@@ -214,8 +214,8 @@ The names below are the ones in the compiled mission. The editor shows them with
 
 | Type | What it asks |
 | --- | --- |
-| `units_in_zone` | How many units are in a zone, optionally one team's and optionally only certain unit types. Holds when the count is between `min` and `max`. Neither number means at least one. `max = 0` is how you ask whether a zone is clear. Give a `group` to count only that group's living units, and set `all` to hold only while every living unit of the group is in the zone. `all` is false for a group with no living units. |
-| `unit_count` | How many units a team has, optionally only certain unit types, between `min` and `max`. Give a `group` instead of a team to count that group's living units. |
+| `units_in_zone` | How many units are in a zone, optionally one team's and optionally only certain unit types. Unit types listed under **except unit types** (`exceptDefs`) are never counted, so you can ask whether a base is clear of everything but its walls. Holds when the count is between `min` and `max`. Neither number means at least one. `max = 0` is how you ask whether a zone is clear. Give a `group` to count only that group's living units, and set `all` to hold only while every living unit of the group is in the zone. `all` is false for a group with no living units. |
+| `unit_count` | How many units a team has, optionally only certain unit types, between `min` and `max`. Unit types listed under **except unit types** (`exceptDefs`) are never counted, even if **unit types** lists them too. Give a `group` instead of a team to count that group's living units. |
 | `unit_dead` | An actor has died. |
 | `group_dead` | Every unit in a group has died. It is false until the group has been on the map, so a group waiting for `spawn_group` is not dead. A group that was wiped and spawned again is alive again. |
 | `unit_health_below` | An actor's health is under a fraction of its maximum. |

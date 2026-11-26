@@ -1,8 +1,8 @@
 {
   "id": "convoy",
   "name": "Convoy",
-  "description": "Triggers that ask about a group: the convoy arriving, thinning out, and the raiders being wiped.",
-  "runtimeVersion": 14,
+  "description": "Triggers that count units: the convoy arriving and thinning out, the raiders being wiped, and the depot cleared of everything but walls.",
+  "runtimeVersion": 15,
   "setup": {
     "gameName": "Test Game",
     "mapName": "Comet Catcher Redux",
@@ -158,6 +158,43 @@
           "type": "wake_group",
           "params": {
             "group": "raid"
+          }
+        }
+      ]
+    },
+    {
+      "id": "depot-cleared",
+      "enabled": true,
+      "repeat": false,
+      "conditions": {
+        "op": "all",
+        "conditions": [
+          {
+            "type": "units_in_zone",
+            "params": {
+              "zone": "depot",
+              "team": "raiders",
+              "exceptDefs": ["cordrag", "corfort"],
+              "max": 0
+            }
+          },
+          {
+            "type": "unit_count",
+            "params": {
+              "team": "raiders",
+              "unitDefs": ["corak", "corck"],
+              "exceptDefs": ["corck"],
+              "max": 0
+            }
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "set_var",
+          "params": {
+            "name": "arrived",
+            "value": 2
           }
         }
       ]

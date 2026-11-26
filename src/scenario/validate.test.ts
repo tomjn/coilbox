@@ -546,7 +546,11 @@ describe("validateMission", () => {
               conditions: [
                 {
                   type: "units_in_zone",
-                  params: { zone: "gate", unitDefs: ["armpw", "armbad"] },
+                  params: {
+                    zone: "gate",
+                    unitDefs: ["armpw", "armbad"],
+                    exceptDefs: ["armwal"],
+                  },
                 },
               ],
             },
@@ -565,6 +569,7 @@ describe("validateMission", () => {
         'groups["wave1"].units[1].def',
         'prefabs["base"].buildings[0].queue[1]',
         'triggers["open"].conditions[0].params.unitDefs[1]',
+        'triggers["open"].conditions[0].params.exceptDefs[0]',
         'triggers["open"].actions[0].params.unitDef',
       ]);
       expect(issues.every(isBlocking)).toBe(true);

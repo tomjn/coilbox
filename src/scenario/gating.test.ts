@@ -494,6 +494,46 @@ describe("requiredRuntimeVersion", () => {
   });
 
   /**
+   * Issue #5293. A runtime behind 15 reads past `exceptDefs` and counts the
+   * units it names.
+   */
+  describe("a count that leaves unit types out", () => {
+    const only = (type: string, params: TriggerStep["params"]): Scenario => {
+      const scenario = withTrigger([], []);
+      return {
+        ...scenario,
+        triggers: [
+          {
+            ...scenario.triggers[0],
+            conditions: { op: "all", conditions: [{ type, params }] },
+          },
+        ],
+      };
+    };
+
+    it("asks for 15 on either condition", () => {
+      expect(
+        requiredRuntimeVersion(
+          only("units_in_zone", { zone: "gate", exceptDefs: ["armdrag"] }),
+        ),
+      ).toBe(15);
+      expect(
+        requiredRuntimeVersion(
+          only("unit_count", { team: "player", exceptDefs: ["armdrag"] }),
+        ),
+      ).toBe(15);
+    });
+
+    it("asks for nothing once the list has been emptied", () => {
+      expect(
+        requiredRuntimeVersion(
+          only("units_in_zone", { zone: "gate", exceptDefs: [] }),
+        ),
+      ).toBe(1);
+    });
+  });
+
+  /**
    * Issue #5252. A runtime behind 13 finds no engine team number on the neutral
    * team and drops it with everything placed for it.
    */

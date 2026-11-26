@@ -219,8 +219,9 @@ function huntsAParticipant(scenario: Scenario): boolean {
 
 /**
  * The runtime a step needs for the parameters it sets on a type that shipped
- * without them, from `PARAM_RUNTIME_VERSION`. A parameter written `false` asks
- * for nothing, because every runtime has always answered that question.
+ * without them, from `PARAM_RUNTIME_VERSION`. A parameter written `false` or as
+ * an empty list asks for nothing, because every runtime has always answered that
+ * question.
  */
 function paramVersion(step: TriggerStep): number {
   let version = 1;
@@ -228,7 +229,8 @@ function paramVersion(step: TriggerStep): number {
     PARAM_RUNTIME_VERSION[step.type] ?? {},
   )) {
     const value = step.params[name];
-    if (value !== undefined && value !== false) {
+    const unset = Array.isArray(value) && value.length === 0;
+    if (value !== undefined && value !== false && !unset) {
       version = Math.max(version, since);
     }
   }

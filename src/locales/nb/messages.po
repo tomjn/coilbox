@@ -22908,6 +22908,10 @@ msgstr "Nøyaktige høyder"
 msgid "Exact numbers. A model stores 32-bit floats where the document stores 64, so positions, rotations and scales come back correct to about the seventh digit."
 msgstr "Nøyaktige tall. En modell lagrer 32-biters flyttall der dokumentet lagrer 64, så posisjoner, rotasjoner og skaleringer kommer tilbake riktige til omtrent det sjuende sifferet."
 
+#: src/scenario/triggerTypes.ts
+msgid "except unit types"
+msgstr "unntatt enhetstyper"
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Exclusive interception"
