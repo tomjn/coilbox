@@ -1,5 +1,4 @@
 import { i18n } from "@lingui/core";
-import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
@@ -54,6 +53,7 @@ import {
   mcWriteSkybox,
   mcWriteSplats,
 } from "../bindings";
+import { CT_OPTIONS } from "../compression";
 import { useMapconvConfig } from "../config";
 import { useCompileDraft } from "../drafts";
 import {
@@ -81,13 +81,6 @@ import MapinfoOptions from "./components/MapinfoOptions";
 import { MapPreview3D } from "./components/MapPreview3D";
 import { PathField } from "./components/PathField";
 import { CompiledPlayability } from "./components/PlayabilityPanel";
-
-const CT_OPTIONS = [
-  { value: "1", label: msg`1 — No compression` },
-  { value: "2", label: msg`2 — Fast (compare last N tiles)` },
-  { value: "3", label: msg`3 — Insane (whole map; very slow)` },
-  { value: "4", label: msg`4 — High quality fast` },
-];
 
 /** The parent dir of a native path (handles both / and \ separators). */
 function dirname(p: string): string {
