@@ -19256,6 +19256,10 @@ msgstr "Nie udało się zapisać szablonu"
 msgid "Count"
 msgstr "Liczba"
 
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "Count this condition as holding for the rest of the mission once it has held."
+msgstr ""
+
 #: src/content/pages/components/FolderRow.tsx
 msgid "Count what is in this folder again"
 msgstr ""
@@ -25869,6 +25873,10 @@ msgstr "Ma broń specjalną (stara nazwa)"
 msgid "Has geometry"
 msgstr "Ma geometrię"
 
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "has happened"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Has the attack order"
@@ -26386,6 +26394,10 @@ msgstr "Czas utrzymania"
 #, fuzzy
 msgid "Hold while dragging to place freely, with no step or snap. A joined part is detached"
 msgstr "Przytrzymaj podczas przeciągania, aby umieszczać swobodnie, bez kroku i przyciągania. Połączona część zostaje odłączona"
+
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "Holds for the rest of the mission once it has held. Press to ask about now again."
+msgstr ""
 
 #: src/scenario/triggerTypes.ts
 #, fuzzy

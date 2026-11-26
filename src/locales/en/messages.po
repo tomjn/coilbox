@@ -15689,6 +15689,10 @@ msgstr "Couldn't save preset"
 msgid "Count"
 msgstr "Count"
 
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "Count this condition as holding for the rest of the mission once it has held."
+msgstr "Count this condition as holding for the rest of the mission once it has held."
+
 #: src/content/pages/components/FolderRow.tsx
 msgid "Count what is in this folder again"
 msgstr "Count what is in this folder again"
@@ -21097,6 +21101,10 @@ msgstr "Has a special weapon (old name)"
 msgid "Has geometry"
 msgstr "Has geometry"
 
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "has happened"
+msgstr "has happened"
+
 #: src/content/unitFieldNotes.ts
 msgid "Has the attack order"
 msgstr "Has the attack order"
@@ -21515,6 +21523,10 @@ msgstr "Hold time"
 #: src/lego/shortcuts.ts
 msgid "Hold while dragging to place freely, with no step or snap. A joined part is detached"
 msgstr "Hold while dragging to place freely, with no step or snap. A joined part is detached"
+
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "Holds for the rest of the mission once it has held. Press to ask about now again."
+msgstr "Holds for the rest of the mission once it has held. Press to ask about now again."
 
 #: src/scenario/triggerTypes.ts
 msgid "Holds once a player has clicked away a dialogue line that was set to wait for them."

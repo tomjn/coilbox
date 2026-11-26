@@ -70,6 +70,7 @@ import {
   renameTrigger,
   type StepList,
   setAtTheStart,
+  setStepLatched,
   setStepNegate,
   setStepParam,
   stepsOf,
@@ -819,6 +820,18 @@ function StepSection({
                           scenario,
                           { triggerId: trigger.id, list, index },
                           negate,
+                        ),
+                      )
+                  : null
+              }
+              onLatch={
+                conditions
+                  ? (latched) =>
+                      onChange(
+                        setStepLatched(
+                          scenario,
+                          { triggerId: trigger.id, list, index },
+                          latched,
                         ),
                       )
                   : null

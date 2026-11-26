@@ -209,6 +209,20 @@ const NEUTRAL_TEAM_VERSION = 13;
  */
 const BECOMING_TRUE_VERSION = 16;
 
+/**
+ * The runtime that first remembered that a condition had held (issue #5296). A
+ * runtime behind this reads past the flag and asks what is true now, so "visit
+ * both ridges" waits for a unit on each at the same moment.
+ */
+const LATCHED_CONDITION_VERSION = 20;
+
+/** Whether any condition counts as holding once it has held. */
+function latchesACondition(scenario: Scenario): boolean {
+  return scenario.triggers.some((trigger) =>
+    trigger.conditions.conditions.some((step) => step.latched === true),
+  );
+}
+
 /** Whether any group is told to hunt, at the start or by a `give_orders`. */
 function huntsAParticipant(scenario: Scenario): boolean {
   const hunts = (orders: unknown) =>
@@ -338,6 +352,9 @@ export function requiredRuntimeVersion(
   }
   if (scenario.triggers.some((trigger) => trigger.onBecomingTrue)) {
     version = Math.max(version, BECOMING_TRUE_VERSION);
+  }
+  if (latchesACondition(scenario)) {
+    version = Math.max(version, LATCHED_CONDITION_VERSION);
   }
   return version;
 }

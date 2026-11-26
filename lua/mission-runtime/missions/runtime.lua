@@ -196,8 +196,18 @@
 -- group through the same upgrade (issue #5475), where a runtime behind 19 drops
 -- it and can call the group dead while it is alive.
 
+-- 20 lets a condition count as holding once it has held (issue #5296). One format
+-- feature:
+--
+--   * a condition may carry `latched = true`, and then, once it has held, it holds
+--     for the rest of the mission
+--
+-- A runtime behind 20 reads past the field and asks what is true now, so "visit
+-- both ridges" waits for a unit on each at the same moment. So a scenario using
+-- it asks for 20.
+
 return {
-	version = 19,
+	version = 20,
 
 	-- The compiled mission format this runtime reads.
 	schemaVersion = 1,

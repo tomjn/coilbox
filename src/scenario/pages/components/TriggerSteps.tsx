@@ -157,6 +157,7 @@ export function StepRow({
   onPick,
   onParam,
   onNegate,
+  onLatch,
   onMove,
   onRemove,
 }: {
@@ -183,6 +184,8 @@ export function StepRow({
   /** Read this condition the other way round, or null on an action, which has
    *  no truth to turn over. */
   onNegate: ((negate: boolean) => void) | null;
+  /** Count this condition as holding once it has held, or null on an action. */
+  onLatch: ((latched: boolean) => void) | null;
   /** Move the step within its list, or null where order carries no meaning. */
   onMove: ((delta: number) => void) | null;
   onRemove: () => void;
@@ -194,6 +197,24 @@ export function StepRow({
   return (
     <li className="rounded-md border border-border/60 bg-muted/20 p-2">
       <div className="flex items-center gap-1.5">
+        {/* Ahead of "not", because what is remembered is the condition as
+            "not" leaves it. */}
+        {onLatch && (
+          <Button
+            size="sm"
+            variant={step.latched ? "default" : "outline"}
+            className="h-6 shrink-0 px-1.5 text-[11px]"
+            aria-pressed={step.latched === true}
+            title={
+              step.latched
+                ? t`Holds for the rest of the mission once it has held. Press to ask about now again.`
+                : t`Count this condition as holding for the rest of the mission once it has held.`
+            }
+            onClick={() => onLatch(step.latched !== true)}
+          >
+            <Trans>has happened</Trans>
+          </Button>
+        )}
         {/* The row reads "not units in zone" when it is on, which is the
             sentence the trigger makes. A button rather than a checkbox because
             it is one word that is either there or is not, and because the

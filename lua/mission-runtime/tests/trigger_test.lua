@@ -466,6 +466,169 @@ do
 end
 
 --------------------------------------------------------------------------------
+-- A condition that counts as holding once it has held (issue #5296).
+--------------------------------------------------------------------------------
+
+local function latched(condition)
+	condition.latched = true
+	return condition
+end
+
+local function once(id, list, fields)
+	local built = { conditions = conditions("all", list), actions = { probe(id) } }
+	for key, value in pairs(fields or {}) do
+		built[key] = value
+	end
+	return trigger(id, built)
+end
+
+engine, fired, logs, held = build({ once("both", { latched(flag("a")), latched(flag("b")) }) })
+nextFrame = 0
+held.b = true
+ticks(engine, 1)
+held.b = nil
+ticks(engine, 1)
+check("one of two that has held is not both", #fired == 0, marks(fired))
+held.a = true
+ticks(engine, 1)
+check("each counts from when it held, though they never held together", marks(fired) == "both", marks(fired))
+
+-- The first condition not holding must not stop the second being asked.
+engine, fired, logs, held = build({ once("behind", { flag("a"), latched(flag("b")) }) })
+nextFrame = 0
+held.b = true
+ticks(engine, 1)
+held.b, held.a = nil, true
+ticks(engine, 1)
+check("one is asked while another condition is not holding", marks(fired) == "behind", marks(fired))
+
+engine, fired, logs, held = build({
+	once("either", {}, { conditions = conditions("any", { flag("a"), latched(flag("b")) }), ["repeat"] = true }),
+})
+nextFrame = 0
+held.a, held.b = true, true
+ticks(engine, 1)
+held.a, held.b = nil, nil
+ticks(engine, 1)
+check("one is asked when an earlier condition already settles an any",
+	marks(fired) == "either,either", marks(fired))
+
+engine, fired, logs, held = build({ once("during", { flag("go"), latched(flag("seen")) }, { cooldown = 1, ["repeat"] = true }) })
+nextFrame = 0
+engine.byId.during.readyFrame = TRIGGERS.POLL_FRAMES * 2
+held.seen = true
+ticks(engine, 1)
+held.seen, held.go = nil, true
+ticks(engine, 1)
+check("one is asked while a cooldown runs", marks(fired) == "during", marks(fired))
+
+engine, fired, logs, held = build({ once("off", { latched(flag("a")) }, { enabled = false }) })
+nextFrame = 0
+held.a = true
+ticks(engine, 1)
+held.a = nil
+engine:setEnabled("off", true)
+ticks(engine, 1)
+check("a disabled trigger's condition is not asked, so nothing was remembered", #fired == 0, marks(fired))
+
+engine, fired, logs, held = build({ once("kept", { latched(flag("a")) }) })
+nextFrame = 0
+held.a = true
+ticks(engine, 1)
+held.a = nil
+engine:setEnabled("kept", true)
+ticks(engine, 1)
+check("enabled again, a trigger keeps what had held", marks(fired) == "kept,kept", marks(fired))
+
+engine, fired, logs, held = build({ rising("edge-latched", { latched(flag("a")) }) })
+nextFrame = 0
+held.a = true
+ticks(engine, 1)
+held.a = nil
+ticks(engine, 2)
+held.a = true
+ticks(engine, 1)
+check("on a becomes-true trigger it never stops holding, so it fires once",
+	marks(fired) == "edge-latched", marks(fired))
+
+engine, fired, logs, held = build({ once("left", { latched(negated(flag("a"))), flag("b") }) })
+nextFrame = 0
+ticks(engine, 1)
+held.a, held.b = true, true
+ticks(engine, 1)
+check("with not, what is remembered is that it did not hold", marks(fired) == "left", marks(fired))
+
+engine, fired, logs = build({
+	once("unknown-latched", { latched(negated({ type = "mystery", params = {} })) }),
+})
+nextFrame = 0
+ticks(engine, 2)
+check("one nothing implements is never remembered as held", #fired == 0, marks(fired))
+
+-- Event-driven: heard on its event, remembered for a later one.
+engine, fired, logs, held = build({ once("heard", { latched(chime("a")), latched(chime("b")) }) })
+held.a = true
+engine:event("ding")
+held.a, held.b = nil, true
+engine:event("ding")
+check("event-driven ones are remembered between events", marks(fired) == "heard", marks(fired))
+
+-- A condition spent by a firing, latched, is not spent.
+engine, fired, logs, held = build({
+	once("rung-once", { latched({ type = "rang", params = {} }) }, { ["repeat"] = true }),
+})
+do
+	local rang = 0
+	engine:addCondition("rang", {
+		events = { "ding" },
+		test = function(_, ctx)
+			return rang > ctx.armedAt
+		end,
+	})
+	rang = engine:stamp()
+	engine:event("ding")
+	engine:event("ding")
+	check("a latched moment keeps holding after the firing", marks(fired) == "rung-once,rung-once", marks(fired))
+end
+
+-- The same state loaded again, as `/luarules reload` does it.
+do
+	local kept, holding, count = {}, {}, 0
+	local function loaded()
+		local running = TRIGGERS.new({ triggers = { once("saved", { latched(flag("a")), latched(flag("b")) }) } }, {
+			save = function(id, enabled, readyFrame, wasHeld, happened)
+				local copy = {}
+				for index, value in ipairs(happened or {}) do
+					copy[index] = value
+				end
+				kept[id] = { enabled = enabled, readyFrame = readyFrame, held = wasHeld, latched = copy }
+			end,
+			restore = function(id)
+				return kept[id]
+			end,
+		})
+		running:addCondition("flag", {
+			test = function(params)
+				return holding[params.name] == true
+			end,
+		})
+		running:addAction("probe", function()
+			count = count + 1
+		end)
+		return running
+	end
+
+	nextFrame = 0
+	holding.b = true
+	ticks(loaded(), 1)
+	check("what has held is handed to the host by its place in the list",
+		kept.saved and kept.saved.latched[1] == 2 and #kept.saved.latched == 1)
+	holding.b, holding.a = nil, true
+	ticks(loaded(), 1)
+	check("and read back after a reload", count == 1, count)
+end
+
+--------------------------------------------------------------------------------
 -- Triggers as a state machine.
 --------------------------------------------------------------------------------
 

@@ -176,6 +176,10 @@ describe("scenario fixture corpus", () => {
       "a trigger that fires as its conditions become true": allTriggers.some(
         (t) => t.onBecomingTrue === true,
       ),
+      // Issue #5296.
+      "a condition that counts once it has held": allTriggers.some((t) =>
+        t.conditions.conditions.some((c) => c.latched === true),
+      ),
       "a trigger disarmed at start": allTriggers.some((t) => !t.enabled),
       "a base": allBases.length > 0,
       "a base building with a factory queue": allBuildings.some(

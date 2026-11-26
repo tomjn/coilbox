@@ -760,6 +760,29 @@ describe("parseScenario — triggers", () => {
     }
   });
 
+  it("keeps latched on a condition only when it is on", () => {
+    const parsed = (latched: unknown) =>
+      parseScenario(
+        doc({
+          triggers: [
+            trigger({
+              conditions: {
+                op: "all",
+                conditions: [
+                  { type: "unit_dead", params: { actor: "a" }, latched },
+                ],
+              },
+            }),
+          ],
+        }),
+      )?.triggers[0].conditions.conditions[0];
+
+    expect(parsed(true)?.latched).toBe(true);
+    for (const latched of [false, "true", undefined]) {
+      expect(parsed(latched)).not.toHaveProperty("latched");
+    }
+  });
+
   it("falls back to an all-of condition group", () => {
     const s = parseScenario(
       doc({ triggers: [trigger({ conditions: { op: "some" } })] }),

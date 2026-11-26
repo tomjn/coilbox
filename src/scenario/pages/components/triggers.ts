@@ -429,26 +429,43 @@ export function setStepParam(
   });
 }
 
-/**
- * Read a condition the other way round, or the right way up again.
- *
- * The key is taken out rather than written `false` when it is off, so a
- * condition somebody turned on and off again compiles to the bytes it started
- * as, the same way `parseScenario` reads it.
- */
+/** One of a condition's flags turned on or off. The key is taken out rather than
+ *  written `false`, so a condition somebody turned on and off again compiles to
+ *  the bytes it started as, the same way `parseScenario` reads it. */
+function setStepFlag(
+  scenario: Scenario,
+  ref: StepRef,
+  flag: "negate" | "latched",
+  on: boolean,
+): Scenario {
+  return editSteps(scenario, ref.triggerId, ref.list, (steps) => {
+    const step = steps[ref.index];
+    if (!step) return steps;
+    const next = { ...step };
+    if (on) next[flag] = true;
+    else delete next[flag];
+    const out = steps.slice();
+    out[ref.index] = next;
+    return out;
+  });
+}
+
+/** Read a condition the other way round, or the right way up again. */
 export function setStepNegate(
   scenario: Scenario,
   ref: StepRef,
   negate: boolean,
 ): Scenario {
-  return editSteps(scenario, ref.triggerId, ref.list, (steps) => {
-    const step = steps[ref.index];
-    if (!step) return steps;
-    const out = steps.slice();
-    const { negate: _was, ...rest } = step;
-    out[ref.index] = negate ? { ...rest, negate: true } : rest;
-    return out;
-  });
+  return setStepFlag(scenario, ref, "negate", negate);
+}
+
+/** Have a condition count as holding once it has held, or ask about now again. */
+export function setStepLatched(
+  scenario: Scenario,
+  ref: StepRef,
+  latched: boolean,
+): Scenario {
+  return setStepFlag(scenario, ref, "latched", latched);
 }
 
 /**

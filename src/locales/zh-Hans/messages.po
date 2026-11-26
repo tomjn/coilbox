@@ -19256,6 +19256,10 @@ msgstr "无法保存预设"
 msgid "Count"
 msgstr "数量"
 
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "Count this condition as holding for the rest of the mission once it has held."
+msgstr ""
+
 #: src/content/pages/components/FolderRow.tsx
 msgid "Count what is in this folder again"
 msgstr ""
@@ -25869,6 +25873,10 @@ msgstr "有特殊武器（旧名称）"
 msgid "Has geometry"
 msgstr "有几何体"
 
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "has happened"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Has the attack order"
@@ -26386,6 +26394,10 @@ msgstr "保持时间"
 #, fuzzy
 msgid "Hold while dragging to place freely, with no step or snap. A joined part is detached"
 msgstr "拖动时按住可自由放置，不按步长也不吸附。已连接的零件会被断开"
+
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "Holds for the rest of the mission once it has held. Press to ask about now again."
+msgstr ""
 
 #: src/scenario/triggerTypes.ts
 #, fuzzy

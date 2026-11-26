@@ -19260,6 +19260,10 @@ msgstr "Impossibile salvare la preimpostazione"
 msgid "Count"
 msgstr "Numero"
 
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "Count this condition as holding for the rest of the mission once it has held."
+msgstr ""
+
 #: src/content/pages/components/FolderRow.tsx
 msgid "Count what is in this folder again"
 msgstr ""
@@ -25877,6 +25881,10 @@ msgstr "Ha un’arma speciale (vecchio nome)"
 msgid "Has geometry"
 msgstr "Ha geometria"
 
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "has happened"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Has the attack order"
@@ -26394,6 +26402,10 @@ msgstr "Durata del mantenimento"
 #, fuzzy
 msgid "Hold while dragging to place freely, with no step or snap. A joined part is detached"
 msgstr "Tieni premuto mentre trascini per posizionare liberamente, senza passo né aggancio. Un componente unito viene staccato"
+
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "Holds for the rest of the mission once it has held. Press to ask about now again."
+msgstr ""
 
 #: src/scenario/triggerTypes.ts
 #, fuzzy

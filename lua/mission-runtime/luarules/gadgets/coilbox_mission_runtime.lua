@@ -295,10 +295,13 @@ local UPGRADED_RULES_PREFIX = "coilbox_mission_upgraded_"
 -- a debrief reads is already kept there (issue #4147). The first is whether the
 -- trigger is armed, 1 or 0, the second the frame it may next fire on, and the
 -- third, kept only for a trigger that fires as its conditions become true, whether
--- it has fired for conditions that still hold, 1 or 0.
+-- it has fired for conditions that still hold, 1 or 0. The fourth, kept only for a
+-- trigger with a latched condition, is the places in its list of those that have
+-- held, as "1,3".
 local TRIGGER_RULES_PREFIX = "coilbox_mission_trigger_"
 local TRIGGER_READY_PREFIX = "coilbox_mission_trigger_ready_"
 local TRIGGER_HELD_PREFIX = "coilbox_mission_trigger_held_"
+local TRIGGER_LATCHED_PREFIX = "coilbox_mission_trigger_latched_"
 
 -- What a reload cannot give back, said once in the log. Each of these is a list
 -- or a clock the runtime holds in its own variables and the engine holds no copy
@@ -747,11 +750,14 @@ if gadgetHandler:IsSyncedCode() then
 			-- Which triggers have fired and which have been switched on or off is
 			-- the one piece of mission progress nothing else already mirrors, so it
 			-- is written here whenever it changes and read back by a reloaded runtime.
-			save = function(id, enabled, readyFrame, held)
+			save = function(id, enabled, readyFrame, held, latched)
 				Spring.SetGameRulesParam(TRIGGER_RULES_PREFIX .. id, enabled and 1 or 0)
 				Spring.SetGameRulesParam(TRIGGER_READY_PREFIX .. id, readyFrame)
 				if held ~= nil then
 					Spring.SetGameRulesParam(TRIGGER_HELD_PREFIX .. id, held and 1 or 0)
+				end
+				if latched then
+					Spring.SetGameRulesParam(TRIGGER_LATCHED_PREFIX .. id, table.concat(latched, ","))
 				end
 			end,
 			restore = published.resumed and function(id)
@@ -759,7 +765,13 @@ if gadgetHandler:IsSyncedCode() then
 				if enabled == nil then
 					return nil
 				end
+				local latched = {}
+				local kept = Spring.GetGameRulesParam(TRIGGER_LATCHED_PREFIX .. id)
+				for index in tostring(kept or ""):gmatch("%d+") do
+					latched[#latched + 1] = tonumber(index)
+				end
 				return {
+					latched = latched,
 					enabled = enabled == 1,
 					readyFrame = Spring.GetGameRulesParam(TRIGGER_READY_PREFIX .. id),
 					held = Spring.GetGameRulesParam(TRIGGER_HELD_PREFIX .. id) == 1,
@@ -976,7 +988,8 @@ if gadgetHandler:IsSyncedCode() then
 			log("warning", string.format(
 				"mission %s was reloaded into a running game at frame %d. Kept: actors, "
 					.. "invulnerable units, anchors, variables, objectives, which triggers have fired, "
-					.. "what teams are paid and what has been unlocked. Not kept: %s",
+					.. "which latched conditions have held, what teams are paid and what has been "
+					.. "unlocked. Not kept: %s",
 				MISSION_ID, Spring.GetGameFrame(), NOT_KEPT))
 		end
 

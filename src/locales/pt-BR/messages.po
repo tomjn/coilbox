@@ -19260,6 +19260,10 @@ msgstr "Não foi possível salvar a predefinição"
 msgid "Count"
 msgstr "Quantidade"
 
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "Count this condition as holding for the rest of the mission once it has held."
+msgstr ""
+
 #: src/content/pages/components/FolderRow.tsx
 msgid "Count what is in this folder again"
 msgstr ""
@@ -25877,6 +25881,10 @@ msgstr "Tem uma arma especial (nome antigo)"
 msgid "Has geometry"
 msgstr "Tem geometria"
 
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "has happened"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Has the attack order"
@@ -26394,6 +26402,10 @@ msgstr "Tempo de espera"
 #, fuzzy
 msgid "Hold while dragging to place freely, with no step or snap. A joined part is detached"
 msgstr "Segure enquanto arrasta para posicionar livremente, sem passo nem encaixe. Uma peça ligada é solta"
+
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "Holds for the rest of the mission once it has held. Press to ask about now again."
+msgstr ""
 
 #: src/scenario/triggerTypes.ts
 #, fuzzy
