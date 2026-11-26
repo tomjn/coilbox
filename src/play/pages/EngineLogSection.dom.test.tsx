@@ -20,6 +20,7 @@ const m = vi.hoisted(() => ({
       engineVersion: "2026.03.01",
     } as { dataDir: string; engineVersion: string } | null,
   },
+  targetLoading: { current: false },
 }));
 
 vi.mock("@/play/bindings", () => ({
@@ -32,7 +33,11 @@ vi.mock("@tauri-apps/plugin-opener", () => ({
 }));
 vi.mock("@tauri-apps/api/app", () => ({ getVersion: m.getVersion }));
 vi.mock("@/play/config", () => ({
-  usePreferredTarget: () => ({ target: m.target.current }),
+  usePreferredTarget: () => ({
+    target: m.target.current,
+    loading: m.targetLoading.current,
+    error: null,
+  }),
 }));
 
 import EngineLogSection from "./EngineLogSection";
@@ -41,6 +46,7 @@ const LOG = "/Users/p/.config/spring/infolog.txt";
 
 beforeEach(() => {
   m.target.current = { dataDir: "/root", engineVersion: "2026.03.01" };
+  m.targetLoading.current = false;
   m.playInfolog.mockResolvedValue({
     log: {
       path: LOG,
@@ -136,4 +142,35 @@ it("says so when no engine log exists", async () => {
   render(<EngineLogSection />);
   expect(await screen.findByText("no engine log was found")).toBeTruthy();
   expect(screen.queryByRole("button", { name: /open the log/i })).toBeNull();
+});
+
+it("does not say no engine is installed while the engines are still loading", () => {
+  m.target.current = null;
+  m.targetLoading.current = true;
+  render(<EngineLogSection />);
+  expect(screen.queryByText(/no engine is installed/i)).toBeNull();
+  expect(screen.getByText(/looking for installed engines/i)).toBeTruthy();
+});
+
+it("shows why the log file could not be opened", async () => {
+  m.contentOpenPath.mockRejectedValueOnce(new Error("no app opens .txt"));
+  render(<EngineLogSection />);
+  fireEvent.click(await screen.findByRole("button", { name: /open the log/i }));
+  expect((await screen.findByRole("alert")).textContent).toContain(
+    "no app opens .txt",
+  );
+});
+
+it("shows why the system information could not be copied", async () => {
+  Object.defineProperty(navigator, "clipboard", {
+    value: {
+      writeText: vi.fn(async () => Promise.reject(new Error("denied"))),
+    },
+    configurable: true,
+  });
+  render(<EngineLogSection />);
+  fireEvent.click(
+    await screen.findByRole("button", { name: /copy system info/i }),
+  );
+  expect((await screen.findByRole("alert")).textContent).toContain("denied");
 });

@@ -10274,6 +10274,10 @@ msgstr "Σχετικά με τον όγκο σύγκρουσης"
 msgid "About the colour texture"
 msgstr "Σχετικά με την υφή χρώματος"
 
+#: src/play/pages/EngineLogSection.tsx
+msgid "About the engine log"
+msgstr ""
+
 #: src/general/pages/SettingsSection.tsx
 msgid "About the frame rate"
 msgstr ""
@@ -30154,6 +30158,10 @@ msgstr "Καταγραφή"
 msgid "Log back in on startup"
 msgstr ""
 
+#: src/play/pages/EngineLogSection.tsx
+msgid "Log file"
+msgstr ""
+
 #: src/home/zones/ResumeRail.tsx
 #: src/multiplayer/pages/BattlesPage.tsx
 #: src/onboarding/pages/ServerPage.tsx
@@ -30252,6 +30260,10 @@ msgstr "μακρύ"
 msgid "Longest"
 msgstr "Μεγαλύτεροι"
 
+#: src/play/pages/EngineLogSection.tsx
+msgid "Look for the log again"
+msgstr ""
+
 #: src/content/pages/FoldersSection.tsx
 msgid "Look for Zero-K on Steam"
 msgstr ""
@@ -30281,6 +30293,10 @@ msgstr "Αναζήτηση μηχανής…"
 #, fuzzy
 msgid "Looking for duplicate runtime files..."
 msgstr "Αναζήτηση διπλότυπων αρχείων περιβάλλοντος εκτέλεσης..."
+
+#: src/play/pages/EngineLogSection.tsx
+msgid "Looking for installed engines."
+msgstr ""
 
 #: src/lego/pages/components/GameModelDrawer.tsx
 #, fuzzy
@@ -37417,6 +37433,7 @@ msgid "Open the join form"
 msgstr "Άνοιγμα της φόρμας σύνδεσης σε αίθουσα"
 
 #: src/play/pages/components/EngineLogFile.tsx
+#: src/play/pages/EngineLogSection.tsx
 #, fuzzy
 msgid "Open the log file"
 msgstr "Άνοιγμα του αρχείου καταγραφής"
@@ -40596,7 +40613,6 @@ msgstr "Μόνο για ανάγνωση. Μόνο ο οικοδεσπότης �
 #: src/hub/pages/components/GameFactsControl.tsx
 #: src/hub/pages/components/GamePicturesControl.tsx
 #: src/lego/pages/components/ScriptTab.tsx
-#: src/play/pages/EngineLogSection.tsx
 #: src/widgets/pages/WidgetSettings.tsx
 #, fuzzy
 msgid "Reading"
@@ -41539,7 +41555,6 @@ msgstr "Ανάγλυφο"
 #: src/lego/pages/components/ScriptTab.tsx
 #: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
-#: src/play/pages/EngineLogSection.tsx
 #: src/profile/SettingsSection.tsx
 #, fuzzy
 msgid "Reload"
@@ -45985,6 +46000,7 @@ msgstr "Εμφάνιση ελεύθερων όψεων"
 #: src/mapconv/pages/CompilePage.tsx
 #: src/mapconv/pages/DecompilePage.tsx
 #: src/play/pages/components/EngineLogFile.tsx
+#: src/play/pages/EngineLogSection.tsx
 #, fuzzy
 msgid "Show in folder"
 msgstr "Εμφάνιση στον φάκελο"
@@ -57791,6 +57807,10 @@ msgstr ""
 msgid "When the unit dies it comes apart along its joins. A light hit throws off a few of the biggest groups of parts, a heavy hit throws off every part one by one, smallest first, and the wreck follows what the hit left. A unit with no joins breaks along its piece tree."
 msgstr "Όταν η μονάδα καταστρέφεται, διαλύεται κατά μήκος των ενώσεών της. Ένα ελαφρύ χτύπημα εκτινάσσει λίγες από τις μεγαλύτερες ομάδες εξαρτημάτων, ένα βαρύ χτύπημα εκτινάσσει κάθε εξάρτημα ένα ένα, από το μικρότερο, και το συντρίμμι ακολουθεί ό,τι άφησε το χτύπημα. Μια μονάδα χωρίς ενώσεις διαλύεται κατά μήκος του δέντρου τμημάτων της."
 
+#: src/play/pages/EngineLogSection.tsx
+msgid "When you ask for help with a crash, attach the whole file. Its start records the engine version, the system and the graphics card."
+msgstr ""
+
 #: src/downloads/pages/SettingsSection.tsx
 msgid "When you join a battle whose game or map you don't have, the download starts straight away instead of waiting for a click. The Download button stays available to pause or retry."
 msgstr ""
@@ -58783,6 +58803,7 @@ msgid "Writing…"
 msgstr "Εγγραφή…"
 
 #: src/play/pages/components/EngineLogFile.tsx
+#: src/play/pages/EngineLogSection.tsx
 #, fuzzy
 msgid "Written {writtenAt}"
 msgstr "Γράφτηκε {writtenAt}"

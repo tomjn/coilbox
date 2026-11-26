@@ -8337,6 +8337,10 @@ msgstr "About the collision volume"
 msgid "About the colour texture"
 msgstr "About the colour texture"
 
+#: src/play/pages/EngineLogSection.tsx
+msgid "About the engine log"
+msgstr "About the engine log"
+
 #: src/general/pages/SettingsSection.tsx
 msgid "About the frame rate"
 msgstr "About the frame rate"
@@ -24540,6 +24544,10 @@ msgstr "Log"
 msgid "Log back in on startup"
 msgstr "Log back in on startup"
 
+#: src/play/pages/EngineLogSection.tsx
+msgid "Log file"
+msgstr "Log file"
+
 #: src/home/zones/ResumeRail.tsx
 #: src/multiplayer/pages/BattlesPage.tsx
 #: src/onboarding/pages/ServerPage.tsx
@@ -24619,6 +24627,10 @@ msgstr "long"
 msgid "Longest"
 msgstr "Longest"
 
+#: src/play/pages/EngineLogSection.tsx
+msgid "Look for the log again"
+msgstr "Look for the log again"
+
 #: src/content/pages/FoldersSection.tsx
 msgid "Look for Zero-K on Steam"
 msgstr "Look for Zero-K on Steam"
@@ -24643,6 +24655,10 @@ msgstr "Looking for an engine…"
 #: src/content/pages/components/MissionRuntimeSection.tsx
 msgid "Looking for duplicate runtime files..."
 msgstr "Looking for duplicate runtime files..."
+
+#: src/play/pages/EngineLogSection.tsx
+msgid "Looking for installed engines."
+msgstr "Looking for installed engines."
 
 #: src/lego/pages/components/GameModelDrawer.tsx
 msgid "Looking for installed games."
@@ -30439,6 +30455,7 @@ msgid "Open the join form"
 msgstr "Open the join form"
 
 #: src/play/pages/components/EngineLogFile.tsx
+#: src/play/pages/EngineLogSection.tsx
 msgid "Open the log file"
 msgstr "Open the log file"
 
@@ -33022,7 +33039,6 @@ msgstr "Read-only. Only the host can change battle options."
 #: src/hub/pages/components/GameFactsControl.tsx
 #: src/hub/pages/components/GamePicturesControl.tsx
 #: src/lego/pages/components/ScriptTab.tsx
-#: src/play/pages/EngineLogSection.tsx
 #: src/widgets/pages/WidgetSettings.tsx
 msgid "Reading"
 msgstr "Reading"
@@ -33792,7 +33808,6 @@ msgstr "Relief"
 #: src/lego/pages/components/ScriptTab.tsx
 #: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
-#: src/play/pages/EngineLogSection.tsx
 #: src/profile/SettingsSection.tsx
 msgid "Reload"
 msgstr "Reload"
@@ -37421,6 +37436,7 @@ msgstr "Show free faces"
 #: src/mapconv/pages/CompilePage.tsx
 #: src/mapconv/pages/DecompilePage.tsx
 #: src/play/pages/components/EngineLogFile.tsx
+#: src/play/pages/EngineLogSection.tsx
 msgid "Show in folder"
 msgstr "Show in folder"
 
@@ -46972,6 +46988,10 @@ msgstr "When the app is in the background"
 msgid "When the unit dies it comes apart along its joins. A light hit throws off a few of the biggest groups of parts, a heavy hit throws off every part one by one, smallest first, and the wreck follows what the hit left. A unit with no joins breaks along its piece tree."
 msgstr "When the unit dies it comes apart along its joins. A light hit throws off a few of the biggest groups of parts, a heavy hit throws off every part one by one, smallest first, and the wreck follows what the hit left. A unit with no joins breaks along its piece tree."
 
+#: src/play/pages/EngineLogSection.tsx
+msgid "When you ask for help with a crash, attach the whole file. Its start records the engine version, the system and the graphics card."
+msgstr "When you ask for help with a crash, attach the whole file. Its start records the engine version, the system and the graphics card."
+
 #: src/downloads/pages/SettingsSection.tsx
 msgid "When you join a battle whose game or map you don't have, the download starts straight away instead of waiting for a click. The Download button stays available to pause or retry."
 msgstr "When you join a battle whose game or map you don't have, the download starts straight away instead of waiting for a click. The Download button stays available to pause or retry."
@@ -47774,6 +47794,7 @@ msgid "Writing…"
 msgstr "Writing…"
 
 #: src/play/pages/components/EngineLogFile.tsx
+#: src/play/pages/EngineLogSection.tsx
 msgid "Written {writtenAt}"
 msgstr "Written {writtenAt}"
 
