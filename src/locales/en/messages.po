@@ -96,6 +96,10 @@ msgstr "\"{0}\" is already in Chobby."
 msgid "\"{baseId}\" states a unit of {baseUnit}, which is not a positive number. The unit is {fallback} instead."
 msgstr "\"{baseId}\" states a unit of {baseUnit}, which is not a positive number. The unit is {fallback} instead."
 
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "\"{copyName}\" had nothing this folder can use, so nothing changed."
+msgstr "\"{copyName}\" had nothing this folder can use, so nothing changed."
+
 #: src/blueprint/pages/BlueprintDetailPage.tsx
 #: src/blueprint/pages/components/BlueprintCardMenu.tsx
 msgid "\"{copyName}\" is yours to change."
@@ -1068,11 +1072,6 @@ msgstr "{0, plural, one {Removes # runtime file from the folder coilbox no longe
 #: src/content/mapImage.ts
 msgid "{0, plural, one {Replays: {matches} of this map. # has something on this layer, {events}{inWindow}.} other {Replays: {matches} of this map. # have something on this layer, {events}{inWindow}.}}"
 msgstr "{0, plural, one {Replays: {matches} of this map. # has something on this layer, {events}{inWindow}.} other {Replays: {matches} of this map. # have something on this layer, {events}{inWindow}.}}"
-
-#. placeholder {0}: res.restored
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-msgid "{0, plural, one {Restored \"{profileName}\" (# item).} other {Restored \"{profileName}\" (# items).}}"
-msgstr "{0, plural, one {Restored \"{profileName}\" (# item).} other {Restored \"{profileName}\" (# items).}}"
 
 #. placeholder {0}: players.length
 #: src/content/pages/components/PlayerPicker.tsx
@@ -7193,6 +7192,14 @@ msgstr "A conquest in progress on it is kept and carries on with the new map."
 msgid "A construction unit reaching one way, stopping, then reaching the other, with something there to build. Its nanolathe is aimed, so this is the one with angles in it."
 msgstr "A construction unit reaching one way, stopping, then reaching the other, with something there to build. Its nanolathe is aimed, so this is the one with angles in it."
 
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "A copy called \"{trimmed}\" already exists. Replace it?"
+msgstr "A copy called \"{trimmed}\" already exists. Replace it?"
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "A copy holds this content folder's <0>springsettings.cfg</0>, <1>LuaUI/Config</1> and <2>uikeys.txt</2>, including the ones inside each engine folder. Restoring one puts all of them back."
+msgstr "A copy holds this content folder's <0>springsettings.cfg</0>, <1>LuaUI/Config</1> and <2>uikeys.txt</2>, including the ones inside each engine folder. Restoring one puts all of them back."
+
 #: src/workshop/pages/components/CloneInPlaceNotice.tsx
 msgid "A copy is written as a file or not at all, so this sends the whole copy through the mutator route rather than only the change above. The in-place write then skips it and lists it as still needing a mutator."
 msgstr "A copy is written as a file or not at all, so this sends the whole copy through the mutator route rather than only the change above. The in-place write then skips it and lists it as still needing a mutator."
@@ -8079,6 +8086,10 @@ msgstr "About actions"
 msgid "About ambient effects"
 msgstr "About ambient effects"
 
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "About backing up before restoring"
+msgstr "About backing up before restoring"
+
 #: src/lego/pages/components/MovementSection.tsx
 msgid "About banking"
 msgstr "About banking"
@@ -8150,6 +8161,10 @@ msgstr "About roles"
 #: src/lego/pages/components/ShapeFields.tsx
 msgid "About round shapes"
 msgstr "About round shapes"
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "About saved copies"
+msgstr "About saved copies"
 
 #: src/content/pages/components/KeymapsPanel.tsx
 msgid "About saved keymaps"
@@ -10248,10 +10263,6 @@ msgstr "auto"
 msgid "Auto"
 msgstr "Auto"
 
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-msgid "Auto-backup current settings before restoring"
-msgstr "Auto-backup current settings before restoring"
-
 #: src/lobby-servers/pages/components/AutojoinChannels.tsx
 msgid "Auto-join channels"
 msgstr "Auto-join channels"
@@ -10263,6 +10274,10 @@ msgstr "Autohost vote"
 #: src/multiplayer/battles/HostBattleForm.tsx
 msgid "Automatic"
 msgstr "Automatic"
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Automatic backup"
+msgstr "Automatic backup"
 
 #: src/campaign/pages/components/MediaPlayer.tsx
 msgid "Autoplay"
@@ -10462,8 +10477,8 @@ msgid "Back to warpath run"
 msgstr "Back to warpath run"
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
-msgid "Back up"
-msgstr "Back up"
+msgid "Back up before restoring"
+msgstr "Back up before restoring"
 
 #: src/i18n/frameStrings.ts
 msgid "Back/forward buttons"
@@ -16082,6 +16097,7 @@ msgstr "Delay between shots in a burst"
 #: src/campaign/pages/components/CampaignRowMenu.tsx
 #: src/content/pages/components/BulkDeleteReplaysPanel.tsx
 #: src/content/pages/components/ClearUnfinishedButton.tsx
+#: src/content/pages/components/ConfigProfilesPanel.tsx
 #: src/content/pages/components/DeleteArchiveButton.tsx
 #: src/content/pages/components/DeleteEngineButton.tsx
 #: src/content/pages/components/DeleteReplayButton.tsx
@@ -16127,6 +16143,10 @@ msgstr "Delete {checkpointName}"
 #: src/workshop/pages/components/CollectionsPanel.tsx
 msgid "Delete {collectionName}"
 msgstr "Delete {collectionName}"
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Delete {copyName}"
+msgstr "Delete {copyName}"
 
 #: src/placement/SurfaceBars.tsx
 msgid "Delete {count}"
@@ -16252,10 +16272,6 @@ msgstr "Delete point"
 msgid "Delete preset"
 msgstr "Delete preset"
 
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-msgid "Delete profile {profileName}"
-msgstr "Delete profile {profileName}"
-
 #: src/startbox/StartBoxPresetsPopover.tsx
 msgid "Delete saved layout {number}"
 msgstr "Delete saved layout {number}"
@@ -16337,6 +16353,10 @@ msgstr "Delete this checkpoint"
 #: src/workshop/pages/components/CollectionsPanel.tsx
 msgid "Delete this collection. Its children move up to its own parent."
 msgstr "Delete this collection. Its children move up to its own parent."
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Delete this copy? It cannot be undone."
+msgstr "Delete this copy? It cannot be undone."
 
 #: src/content/pages/components/DeleteReplayButton.tsx
 msgid "Delete this replay?"
@@ -26233,6 +26253,10 @@ msgstr "Name of a model to use for the projectile. Without one, the weapon falls
 msgid "Name or key"
 msgstr "Name or key"
 
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Name this copy"
+msgstr "Name this copy"
+
 #: src/content/pages/components/KeymapsPanel.tsx
 msgid "Name this keymap"
 msgstr "Name this keymap"
@@ -26647,10 +26671,6 @@ msgstr "New password"
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 msgid "New preset from replay"
 msgstr "New preset from replay"
-
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-msgid "New profile name"
-msgstr "New profile name"
 
 #: src/workshop/index.ts
 #: src/workshop/pages/ProjectsPage.tsx
@@ -27957,6 +27977,10 @@ msgstr "No runs yet. Run a load test to populate history."
 msgid "No saved blueprints to include."
 msgstr "No saved blueprints to include."
 
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "No saved copies for this content folder yet."
+msgstr "No saved copies for this content folder yet."
+
 #: src/content/pages/components/KeymapsPanel.tsx
 msgid "No saved keymaps for this content folder yet."
 msgstr "No saved keymaps for this content folder yet."
@@ -27964,10 +27988,6 @@ msgstr "No saved keymaps for this content folder yet."
 #: src/packs/pages/components/ExportPackForm.tsx
 msgid "No saved presets to include."
 msgstr "No saved presets to include."
-
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-msgid "No saved profiles yet."
-msgstr "No saved profiles yet."
 
 #: src/lego/pages/components/WriteSkeletons.tsx
 msgid "No saved unit has a skeleton."
@@ -30645,13 +30665,13 @@ msgstr "Overwrite .cob?"
 msgid "Overwrite {poseName}"
 msgstr "Overwrite {poseName}"
 
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-msgid "Overwrite the current settings with this profile?"
-msgstr "Overwrite the current settings with this profile?"
-
 #: src/lego/pages/components/PosesPopover.tsx
 msgid "Overwrite with the pose being held"
 msgstr "Overwrite with the pose being held"
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Overwrite your current config with this copy?"
+msgstr "Overwrite your current config with this copy?"
 
 #: src/content/unitFieldNotes.ts
 msgid "Own fall speed"
@@ -34044,6 +34064,7 @@ msgstr "repeats · {cooldown}s"
 
 #: src/campaign/pages/components/CampaignImage.tsx
 #: src/campaign/pages/components/MissionMediaFields.tsx
+#: src/content/pages/components/ConfigProfilesPanel.tsx
 #: src/lego/moduleFileIo.ts
 #: src/lego/pages/components/ScriptTab.tsx
 #: src/mapconv/pages/CompilePage.tsx
@@ -34496,6 +34517,10 @@ msgstr "Restore {checkpointName}"
 #: src/content/pages/components/OldConversionNotice.tsx
 msgid "Restore originals"
 msgstr "Restore originals"
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Restored \"{copyName}\"."
+msgstr "Restored \"{copyName}\"."
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "Restored {archive}'s original models and unit definitions."
@@ -35070,6 +35095,7 @@ msgid "sand"
 msgstr "sand"
 
 #: src/account/pages/SettingsSection.tsx
+#: src/content/pages/components/ConfigProfilesPanel.tsx
 #: src/content/pages/components/KeymapsPanel.tsx
 #: src/content/pages/components/ReplaySetsManager.tsx
 #: src/lego/pages/BuilderPage.tsx
@@ -35260,6 +35286,7 @@ msgstr "Saved \"{copyName}\" to your presets."
 msgid "Saved \"{name}\" beside this unit."
 msgstr "Saved \"{name}\" beside this unit."
 
+#: src/content/pages/components/ConfigProfilesPanel.tsx
 #: src/content/pages/components/KeymapsPanel.tsx
 msgid "Saved \"{trimmed}\"."
 msgstr "Saved \"{trimmed}\"."
@@ -35289,6 +35316,10 @@ msgstr "Saved as preset"
 #: src/content/index.ts
 msgid "Saved configs"
 msgstr "Saved configs"
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Saved copies"
+msgstr "Saved copies"
 
 #: src/blueprint/library.ts
 msgid "Saved from the ground"
@@ -35346,10 +35377,6 @@ msgstr "Saved out of the scenario \"{scenarioName}\"."
 msgid "Saved poses in time, written into the script beside the presets."
 msgstr "Saved poses in time, written into the script beside the presets."
 
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-msgid "Saved profile \"{trimmed}\"."
-msgstr "Saved profile \"{trimmed}\"."
-
 #: src/multiplayer/pages/BattleRoomPage.tsx
 #: src/play/pages/components/SaveAsPresetButton.tsx
 #: src/play/pages/SkirmishPage.tsx
@@ -35383,6 +35410,10 @@ msgstr "Saves the chart as a PNG with the map, date, players, metric and game id
 #: src/content/pages/components/MapExportButtons.tsx
 msgid "Saves the map with this layer on it, the legend, and the map, replays, versions, window and filters written under it."
 msgstr "Saves the map with this layer on it, the legend, and the map, replays, versions, window and filters written under it."
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Saves your current config as \"Automatic backup\" just before a restore overwrites it, replacing the last one."
+msgstr "Saves your current config as \"Automatic backup\" just before a restore overwrites it, replacing the last one."
 
 #: src/blueprint/pages/BlueprintDetailPage.tsx
 #: src/content/pages/components/FilePreview.tsx
@@ -36732,10 +36763,6 @@ msgstr "Settings"
 msgid "Settings of {0}"
 msgstr "Settings of {0}"
 
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-msgid "Settings profiles"
-msgstr "Settings profiles"
-
 #: src/lego/animPresets.ts
 msgid "Settle time"
 msgstr "Settle time"
@@ -37895,10 +37922,6 @@ msgstr "snapshot"
 #: src/downloads/pages/components/RapidBrowser.tsx
 msgid "Snapshot"
 msgstr "Snapshot"
-
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-msgid "Snapshot and swap this content folder's <0>springsettings.cfg</0>, <1>LuaUI/Config</1> and <2>uikeys.txt</2>."
-msgstr "Snapshot and swap this content folder's <0>springsettings.cfg</0>, <1>LuaUI/Config</1> and <2>uikeys.txt</2>."
 
 #: src/mapconv/pages/CompilePage.tsx
 msgid "snow"

@@ -118,6 +118,10 @@ msgstr "« {0} » est déjà dans Chobby."
 msgid "\"{baseId}\" states a unit of {baseUnit}, which is not a positive number. The unit is {fallback} instead."
 msgstr "« {baseId} » déclare une unité de {baseUnit}, qui n’est pas un nombre positif. L’unité utilisée est {fallback}."
 
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "\"{copyName}\" had nothing this folder can use, so nothing changed."
+msgstr ""
+
 #: src/blueprint/pages/BlueprintDetailPage.tsx
 #: src/blueprint/pages/components/BlueprintCardMenu.tsx
 #, fuzzy
@@ -1294,12 +1298,6 @@ msgstr "{0, plural, one {Supprime # fichier de runtime du dossier où coilbox n�
 #, fuzzy
 msgid "{0, plural, one {Replays: {matches} of this map. # has something on this layer, {events}{inWindow}.} other {Replays: {matches} of this map. # have something on this layer, {events}{inWindow}.}}"
 msgstr "{0, plural, one {Rediffusions : {matches} de cette carte. # a quelque chose sur ce calque, {events}{inWindow}.} other {Rediffusions : {matches} de cette carte. # ont quelque chose sur ce calque, {events}{inWindow}.}}"
-
-#. placeholder {0}: res.restored
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "{0, plural, one {Restored \"{profileName}\" (# item).} other {Restored \"{profileName}\" (# items).}}"
-msgstr "{0, plural, one {« {profileName} » restauré (# élément).} other {« {profileName} » restauré (# éléments).}}"
 
 #. placeholder {0}: players.length
 #: src/content/pages/components/PlayerPicker.tsx
@@ -8916,6 +8914,14 @@ msgstr "Une conquête en cours dessus est conservée et continue avec la nouvell
 msgid "A construction unit reaching one way, stopping, then reaching the other, with something there to build. Its nanolathe is aimed, so this is the one with angles in it."
 msgstr "Une unité de construction qui tend le bras d’un côté, s’arrête, puis de l’autre, avec quelque chose à construire. Son nanolathe est orienté, c’est donc celle qui comporte des angles."
 
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "A copy called \"{trimmed}\" already exists. Replace it?"
+msgstr ""
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "A copy holds this content folder's <0>springsettings.cfg</0>, <1>LuaUI/Config</1> and <2>uikeys.txt</2>, including the ones inside each engine folder. Restoring one puts all of them back."
+msgstr ""
+
 #: src/workshop/pages/components/CloneInPlaceNotice.tsx
 #, fuzzy
 msgid "A copy is written as a file or not at all, so this sends the whole copy through the mutator route rather than only the change above. The in-place write then skips it and lists it as still needing a mutator."
@@ -10018,6 +10024,10 @@ msgstr "À propos des actions"
 msgid "About ambient effects"
 msgstr ""
 
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "About backing up before restoring"
+msgstr ""
+
 #: src/lego/pages/components/MovementSection.tsx
 #, fuzzy
 msgid "About banking"
@@ -10102,6 +10112,10 @@ msgstr "À propos des rôles"
 #, fuzzy
 msgid "About round shapes"
 msgstr "À propos des formes rondes"
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "About saved copies"
+msgstr ""
 
 #: src/content/pages/components/KeymapsPanel.tsx
 msgid "About saved keymaps"
@@ -12688,11 +12702,6 @@ msgstr "auto"
 msgid "Auto"
 msgstr "Auto"
 
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "Auto-backup current settings before restoring"
-msgstr "Sauvegarder automatiquement les paramètres actuels avant de restaurer"
-
 #: src/lobby-servers/pages/components/AutojoinChannels.tsx
 #, fuzzy
 msgid "Auto-join channels"
@@ -12707,6 +12716,10 @@ msgstr "Vote de l’autohost"
 #, fuzzy
 msgid "Automatic"
 msgstr "Automatique"
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Automatic backup"
+msgstr ""
 
 #: src/campaign/pages/components/MediaPlayer.tsx
 #, fuzzy
@@ -12950,9 +12963,8 @@ msgid "Back to warpath run"
 msgstr "Retour à la partie de sentier de la guerre"
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "Back up"
-msgstr "Sauvegarder"
+msgid "Back up before restoring"
+msgstr ""
 
 #: src/i18n/frameStrings.ts
 #, fuzzy
@@ -19854,6 +19866,7 @@ msgstr "Délai entre les tirs d’une rafale"
 #: src/campaign/pages/components/CampaignRowMenu.tsx
 #: src/content/pages/components/BulkDeleteReplaysPanel.tsx
 #: src/content/pages/components/ClearUnfinishedButton.tsx
+#: src/content/pages/components/ConfigProfilesPanel.tsx
 #: src/content/pages/components/DeleteArchiveButton.tsx
 #: src/content/pages/components/DeleteEngineButton.tsx
 #: src/content/pages/components/DeleteReplayButton.tsx
@@ -19905,6 +19918,10 @@ msgstr "Supprimer {checkpointName}"
 #, fuzzy
 msgid "Delete {collectionName}"
 msgstr "Supprimer {collectionName}"
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Delete {copyName}"
+msgstr ""
 
 #: src/placement/SurfaceBars.tsx
 #, fuzzy
@@ -20060,11 +20077,6 @@ msgstr "Supprimer le point"
 msgid "Delete preset"
 msgstr "Supprimer le préréglage"
 
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "Delete profile {profileName}"
-msgstr "Supprimer le profil {profileName}"
-
 #: src/startbox/StartBoxPresetsPopover.tsx
 #, fuzzy
 msgid "Delete saved layout {number}"
@@ -20166,6 +20178,10 @@ msgstr "Supprimer ce point de contrôle"
 #, fuzzy
 msgid "Delete this collection. Its children move up to its own parent."
 msgstr "Supprimer cette collection. Ses enfants remontent vers son propre parent."
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Delete this copy? It cannot be undone."
+msgstr ""
 
 #: src/content/pages/components/DeleteReplayButton.tsx
 #, fuzzy
@@ -32332,6 +32348,10 @@ msgstr "Nom d’un modèle à utiliser pour le projectile. Sans modèle, l’arm
 msgid "Name or key"
 msgstr "Nom ou clé"
 
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Name this copy"
+msgstr ""
+
 #: src/content/pages/components/KeymapsPanel.tsx
 #, fuzzy
 msgid "Name this keymap"
@@ -32845,11 +32865,6 @@ msgstr "Nouveau mot de passe"
 #, fuzzy
 msgid "New preset from replay"
 msgstr "Nouveau préréglage depuis une rediffusion"
-
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "New profile name"
-msgstr "Nom du nouveau profil"
 
 #: src/workshop/index.ts
 #: src/workshop/pages/ProjectsPage.tsx
@@ -34471,6 +34486,10 @@ msgstr "Pas encore d’exécutions. Lancez un test de charge pour remplir l’hi
 msgid "No saved blueprints to include."
 msgstr "Aucun plan enregistré à inclure."
 
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "No saved copies for this content folder yet."
+msgstr ""
+
 #: src/content/pages/components/KeymapsPanel.tsx
 #, fuzzy
 msgid "No saved keymaps for this content folder yet."
@@ -34480,11 +34499,6 @@ msgstr "Pas encore de configuration de touches enregistrée pour ce dossier de c
 #, fuzzy
 msgid "No saved presets to include."
 msgstr "Aucun préréglage enregistré à inclure."
-
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "No saved profiles yet."
-msgstr "Pas encore de profils enregistrés."
 
 #: src/lego/pages/components/WriteSkeletons.tsx
 #, fuzzy
@@ -37795,15 +37809,14 @@ msgstr "Écraser le .cob ?"
 msgid "Overwrite {poseName}"
 msgstr "Écraser {poseName}"
 
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "Overwrite the current settings with this profile?"
-msgstr "Écraser les paramètres actuels avec ce profil ?"
-
 #: src/lego/pages/components/PosesPopover.tsx
 #, fuzzy
 msgid "Overwrite with the pose being held"
 msgstr "Écraser avec la pose maintenue"
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Overwrite your current config with this copy?"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -41974,6 +41987,7 @@ msgstr "se répète · {cooldown} s"
 
 #: src/campaign/pages/components/CampaignImage.tsx
 #: src/campaign/pages/components/MissionMediaFields.tsx
+#: src/content/pages/components/ConfigProfilesPanel.tsx
 #: src/lego/moduleFileIo.ts
 #: src/lego/pages/components/ScriptTab.tsx
 #: src/mapconv/pages/CompilePage.tsx
@@ -42526,6 +42540,10 @@ msgstr "Restaurer {checkpointName}"
 #, fuzzy
 msgid "Restore originals"
 msgstr "Restaurer les originaux"
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Restored \"{copyName}\"."
+msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
@@ -43231,6 +43249,7 @@ msgid "sand"
 msgstr "sable"
 
 #: src/account/pages/SettingsSection.tsx
+#: src/content/pages/components/ConfigProfilesPanel.tsx
 #: src/content/pages/components/KeymapsPanel.tsx
 #: src/content/pages/components/ReplaySetsManager.tsx
 #: src/lego/pages/BuilderPage.tsx
@@ -43465,6 +43484,7 @@ msgstr "« {copyName} » enregistré dans vos préréglages."
 msgid "Saved \"{name}\" beside this unit."
 msgstr "« {name} » enregistré à côté de cette unité."
 
+#: src/content/pages/components/ConfigProfilesPanel.tsx
 #: src/content/pages/components/KeymapsPanel.tsx
 #, fuzzy
 msgid "Saved \"{trimmed}\"."
@@ -43501,6 +43521,10 @@ msgstr "Enregistré comme préréglage"
 #, fuzzy
 msgid "Saved configs"
 msgstr "Configs enregistrées"
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Saved copies"
+msgstr ""
 
 #: src/blueprint/library.ts
 #, fuzzy
@@ -43571,11 +43595,6 @@ msgstr "Extrait du scénario « {scenarioName} »."
 msgid "Saved poses in time, written into the script beside the presets."
 msgstr "Poses enregistrées dans le temps, écrites dans le script à côté des préréglages."
 
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "Saved profile \"{trimmed}\"."
-msgstr "Profil « {trimmed} » enregistré."
-
 #: src/multiplayer/pages/BattleRoomPage.tsx
 #: src/play/pages/components/SaveAsPresetButton.tsx
 #: src/play/pages/SkirmishPage.tsx
@@ -43616,6 +43635,10 @@ msgstr "Enregistre le graphique en PNG avec la carte, la date, les joueurs, la m
 #, fuzzy
 msgid "Saves the map with this layer on it, the legend, and the map, replays, versions, window and filters written under it."
 msgstr "Enregistre la carte avec ce calque, la légende, ainsi que la carte, les rediffusions, les versions, la fenêtre et les filtres inscrits en dessous."
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Saves your current config as \"Automatic backup\" just before a restore overwrites it, replacing the last one."
+msgstr ""
 
 #: src/blueprint/pages/BlueprintDetailPage.tsx
 #: src/content/pages/components/FilePreview.tsx
@@ -45276,11 +45299,6 @@ msgstr "Paramètres"
 msgid "Settings of {0}"
 msgstr "Paramètres de {0}"
 
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "Settings profiles"
-msgstr "Profils de paramètres"
-
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "Settle time"
@@ -46705,11 +46723,6 @@ msgstr "snapshot"
 #, fuzzy
 msgid "Snapshot"
 msgstr "Snapshot"
-
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "Snapshot and swap this content folder's <0>springsettings.cfg</0>, <1>LuaUI/Config</1> and <2>uikeys.txt</2>."
-msgstr "Sauvegarder et échanger les fichiers <0>springsettings.cfg</0>, <1>LuaUI/Config</1> et <2>uikeys.txt</2> de ce dossier de contenu."
 
 #: src/mapconv/pages/CompilePage.tsx
 #, fuzzy

@@ -118,6 +118,10 @@ msgstr "«{0}» finnes allerede i Chobby."
 msgid "\"{baseId}\" states a unit of {baseUnit}, which is not a positive number. The unit is {fallback} instead."
 msgstr "«{baseId}» oppgir en enhet på {baseUnit}, som ikke er et positivt tall. Enheten blir {fallback} i stedet."
 
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "\"{copyName}\" had nothing this folder can use, so nothing changed."
+msgstr ""
+
 #: src/blueprint/pages/BlueprintDetailPage.tsx
 #: src/blueprint/pages/components/BlueprintCardMenu.tsx
 #, fuzzy
@@ -1294,12 +1298,6 @@ msgstr "{0, plural, one {Fjerner # kjøretidsfil fra mappen coilbox ikke lenger 
 #, fuzzy
 msgid "{0, plural, one {Replays: {matches} of this map. # has something on this layer, {events}{inWindow}.} other {Replays: {matches} of this map. # have something on this layer, {events}{inWindow}.}}"
 msgstr "{0, plural, one {Repriser: {matches} av dette kartet. # har noe på dette kartlaget, {events}{inWindow}.} other {Repriser: {matches} av dette kartet. # har noe på dette kartlaget, {events}{inWindow}.}}"
-
-#. placeholder {0}: res.restored
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "{0, plural, one {Restored \"{profileName}\" (# item).} other {Restored \"{profileName}\" (# items).}}"
-msgstr "{0, plural, one {Gjenopprettet «{profileName}» (# element).} other {Gjenopprettet «{profileName}» (# elementer).}}"
 
 #. placeholder {0}: players.length
 #: src/content/pages/components/PlayerPicker.tsx
@@ -8917,6 +8915,14 @@ msgstr "En pågående erobring på det beholdes og fortsetter med det nye kartet
 msgid "A construction unit reaching one way, stopping, then reaching the other, with something there to build. Its nanolathe is aimed, so this is the one with angles in it."
 msgstr "En byggeenhet som strekker seg én vei, stopper og så strekker seg den andre veien, med noe der å bygge. Nanolatten sikter, så det er denne som har vinkler i seg."
 
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "A copy called \"{trimmed}\" already exists. Replace it?"
+msgstr ""
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "A copy holds this content folder's <0>springsettings.cfg</0>, <1>LuaUI/Config</1> and <2>uikeys.txt</2>, including the ones inside each engine folder. Restoring one puts all of them back."
+msgstr ""
+
 #: src/workshop/pages/components/CloneInPlaceNotice.tsx
 #, fuzzy
 msgid "A copy is written as a file or not at all, so this sends the whole copy through the mutator route rather than only the change above. The in-place write then skips it and lists it as still needing a mutator."
@@ -10019,6 +10025,10 @@ msgstr "Om handlinger"
 msgid "About ambient effects"
 msgstr ""
 
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "About backing up before restoring"
+msgstr ""
+
 #: src/lego/pages/components/MovementSection.tsx
 #, fuzzy
 msgid "About banking"
@@ -10103,6 +10113,10 @@ msgstr "Om roller"
 #, fuzzy
 msgid "About round shapes"
 msgstr "Om runde former"
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "About saved copies"
+msgstr ""
 
 #: src/content/pages/components/KeymapsPanel.tsx
 msgid "About saved keymaps"
@@ -12689,11 +12703,6 @@ msgstr "auto"
 msgid "Auto"
 msgstr "Auto"
 
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "Auto-backup current settings before restoring"
-msgstr "Ta automatisk sikkerhetskopi av gjeldende innstillinger før gjenoppretting"
-
 #: src/lobby-servers/pages/components/AutojoinChannels.tsx
 #, fuzzy
 msgid "Auto-join channels"
@@ -12708,6 +12717,10 @@ msgstr "Autohost-avstemning"
 #, fuzzy
 msgid "Automatic"
 msgstr "Automatisk"
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Automatic backup"
+msgstr ""
 
 #: src/campaign/pages/components/MediaPlayer.tsx
 #, fuzzy
@@ -12951,9 +12964,8 @@ msgid "Back to warpath run"
 msgstr "Tilbake til Krigsstien-toktet"
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "Back up"
-msgstr "Ta sikkerhetskopi"
+msgid "Back up before restoring"
+msgstr ""
 
 #: src/i18n/frameStrings.ts
 #, fuzzy
@@ -19858,6 +19870,7 @@ msgstr "Forsinkelse mellom skudd i en salve"
 #: src/campaign/pages/components/CampaignRowMenu.tsx
 #: src/content/pages/components/BulkDeleteReplaysPanel.tsx
 #: src/content/pages/components/ClearUnfinishedButton.tsx
+#: src/content/pages/components/ConfigProfilesPanel.tsx
 #: src/content/pages/components/DeleteArchiveButton.tsx
 #: src/content/pages/components/DeleteEngineButton.tsx
 #: src/content/pages/components/DeleteReplayButton.tsx
@@ -19909,6 +19922,10 @@ msgstr "Slett {checkpointName}"
 #, fuzzy
 msgid "Delete {collectionName}"
 msgstr "Slett {collectionName}"
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Delete {copyName}"
+msgstr ""
 
 #: src/placement/SurfaceBars.tsx
 #, fuzzy
@@ -20064,11 +20081,6 @@ msgstr "Slett punkt"
 msgid "Delete preset"
 msgstr "Slett forhåndsinnstilling"
 
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "Delete profile {profileName}"
-msgstr "Slett profilen {profileName}"
-
 #: src/startbox/StartBoxPresetsPopover.tsx
 #, fuzzy
 msgid "Delete saved layout {number}"
@@ -20170,6 +20182,10 @@ msgstr "Slett dette sjekkpunktet"
 #, fuzzy
 msgid "Delete this collection. Its children move up to its own parent."
 msgstr "Slett denne samlingen. Undersamlingene flyttes opp til dens egen forelder."
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Delete this copy? It cannot be undone."
+msgstr ""
 
 #: src/content/pages/components/DeleteReplayButton.tsx
 #, fuzzy
@@ -32344,6 +32360,10 @@ msgstr "Navnet på en modell som skal brukes for prosjektilet. Uten en faller v�
 msgid "Name or key"
 msgstr "Navn eller nøkkel"
 
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Name this copy"
+msgstr ""
+
 #: src/content/pages/components/KeymapsPanel.tsx
 #, fuzzy
 msgid "Name this keymap"
@@ -32857,11 +32877,6 @@ msgstr "Nytt passord"
 #, fuzzy
 msgid "New preset from replay"
 msgstr "Ny forhåndsinnstilling fra reprise"
-
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "New profile name"
-msgstr "Nytt profilnavn"
 
 #: src/workshop/index.ts
 #: src/workshop/pages/ProjectsPage.tsx
@@ -34483,6 +34498,10 @@ msgstr "Ingen kjøringer ennå. Kjør en belastningstest for å fylle historikke
 msgid "No saved blueprints to include."
 msgstr "Ingen lagrede blåkopier å ta med."
 
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "No saved copies for this content folder yet."
+msgstr ""
+
 #: src/content/pages/components/KeymapsPanel.tsx
 #, fuzzy
 msgid "No saved keymaps for this content folder yet."
@@ -34492,11 +34511,6 @@ msgstr "Ingen lagrede tastaturoppsett for denne innholdsmappen ennå."
 #, fuzzy
 msgid "No saved presets to include."
 msgstr "Ingen lagrede forhåndsinnstillinger å ta med."
-
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "No saved profiles yet."
-msgstr "Ingen lagrede profiler ennå."
 
 #: src/lego/pages/components/WriteSkeletons.tsx
 #, fuzzy
@@ -37811,15 +37825,14 @@ msgstr "Overskrive .cob?"
 msgid "Overwrite {poseName}"
 msgstr "Overskriv {poseName}"
 
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "Overwrite the current settings with this profile?"
-msgstr "Overskrive gjeldende innstillinger med denne profilen?"
-
 #: src/lego/pages/components/PosesPopover.tsx
 #, fuzzy
 msgid "Overwrite with the pose being held"
 msgstr "Overskriv med posituren som holdes"
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Overwrite your current config with this copy?"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -41993,6 +42006,7 @@ msgstr "gjentas · {cooldown} s"
 
 #: src/campaign/pages/components/CampaignImage.tsx
 #: src/campaign/pages/components/MissionMediaFields.tsx
+#: src/content/pages/components/ConfigProfilesPanel.tsx
 #: src/lego/moduleFileIo.ts
 #: src/lego/pages/components/ScriptTab.tsx
 #: src/mapconv/pages/CompilePage.tsx
@@ -42545,6 +42559,10 @@ msgstr "Gjenopprett {checkpointName}"
 #, fuzzy
 msgid "Restore originals"
 msgstr "Gjenopprett originalene"
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Restored \"{copyName}\"."
+msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
@@ -43252,6 +43270,7 @@ msgid "sand"
 msgstr "sand"
 
 #: src/account/pages/SettingsSection.tsx
+#: src/content/pages/components/ConfigProfilesPanel.tsx
 #: src/content/pages/components/KeymapsPanel.tsx
 #: src/content/pages/components/ReplaySetsManager.tsx
 #: src/lego/pages/BuilderPage.tsx
@@ -43486,6 +43505,7 @@ msgstr "Lagret «{copyName}» i forhåndsinnstillingene dine."
 msgid "Saved \"{name}\" beside this unit."
 msgstr "Lagret «{name}» ved siden av denne enheten."
 
+#: src/content/pages/components/ConfigProfilesPanel.tsx
 #: src/content/pages/components/KeymapsPanel.tsx
 #, fuzzy
 msgid "Saved \"{trimmed}\"."
@@ -43522,6 +43542,10 @@ msgstr "Lagret som forhåndsinnstilling"
 #, fuzzy
 msgid "Saved configs"
 msgstr "Lagrede"
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Saved copies"
+msgstr ""
 
 #: src/blueprint/library.ts
 #, fuzzy
@@ -43593,11 +43617,6 @@ msgstr "Lagret fra scenarioet «{scenarioName}»."
 msgid "Saved poses in time, written into the script beside the presets."
 msgstr "Lagrede positurer i tid, skrevet inn i skriptet ved siden av forhåndsinnstillingene."
 
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "Saved profile \"{trimmed}\"."
-msgstr "Lagret profilen «{trimmed}»."
-
 #: src/multiplayer/pages/BattleRoomPage.tsx
 #: src/play/pages/components/SaveAsPresetButton.tsx
 #: src/play/pages/SkirmishPage.tsx
@@ -43638,6 +43657,10 @@ msgstr "Lagrer diagrammet som PNG med kart, dato, spillere, måltall og spill-id
 #, fuzzy
 msgid "Saves the map with this layer on it, the legend, and the map, replays, versions, window and filters written under it."
 msgstr "Lagrer kartet med dette laget på, forklaringen, og kart, repriser, versjoner, tidsrom og filtre skrevet under."
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Saves your current config as \"Automatic backup\" just before a restore overwrites it, replacing the last one."
+msgstr ""
 
 #: src/blueprint/pages/BlueprintDetailPage.tsx
 #: src/content/pages/components/FilePreview.tsx
@@ -45299,11 +45322,6 @@ msgstr "Innstillinger"
 msgid "Settings of {0}"
 msgstr "Innstillinger for {0}"
 
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "Settings profiles"
-msgstr "Innstillingsprofiler"
-
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "Settle time"
@@ -46733,11 +46751,6 @@ msgstr "øyeblikksbilde"
 #, fuzzy
 msgid "Snapshot"
 msgstr "Øyeblikksbilde"
-
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "Snapshot and swap this content folder's <0>springsettings.cfg</0>, <1>LuaUI/Config</1> and <2>uikeys.txt</2>."
-msgstr "Ta øyeblikksbilde av og bytt <0>springsettings.cfg</0>, <1>LuaUI/Config</1> og <2>uikeys.txt</2> i denne innholdsmappen."
 
 #: src/mapconv/pages/CompilePage.tsx
 #, fuzzy

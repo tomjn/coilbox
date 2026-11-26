@@ -118,6 +118,10 @@ msgstr "「{0}」はすでに Chobby にあります。"
 msgid "\"{baseId}\" states a unit of {baseUnit}, which is not a positive number. The unit is {fallback} instead."
 msgstr "\"{baseId}\" の単位は {baseUnit} ですが、正の数ではありません。代わりに {fallback} を単位にします。"
 
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "\"{copyName}\" had nothing this folder can use, so nothing changed."
+msgstr ""
+
 #: src/blueprint/pages/BlueprintDetailPage.tsx
 #: src/blueprint/pages/components/BlueprintCardMenu.tsx
 #, fuzzy
@@ -1294,12 +1298,6 @@ msgstr "{0, plural, other {coilbox が書き込まなくなったフォルダー
 #, fuzzy
 msgid "{0, plural, one {Replays: {matches} of this map. # has something on this layer, {events}{inWindow}.} other {Replays: {matches} of this map. # have something on this layer, {events}{inWindow}.}}"
 msgstr "{0, plural, other {リプレイ：このマップの {matches}。うち # 件にこのレイヤーのデータがあります（{events}{inWindow}）。}}"
-
-#. placeholder {0}: res.restored
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "{0, plural, one {Restored \"{profileName}\" (# item).} other {Restored \"{profileName}\" (# items).}}"
-msgstr "{0, plural, other {「{profileName}」を復元しました（# 個の項目）。}}"
 
 #. placeholder {0}: players.length
 #: src/content/pages/components/PlayerPicker.tsx
@@ -8916,6 +8914,14 @@ msgstr "このマップで進行中のコンクエストは保持され、新し
 msgid "A construction unit reaching one way, stopping, then reaching the other, with something there to build. Its nanolathe is aimed, so this is the one with angles in it."
 msgstr "建設ユニットが一方に腕を伸ばして止まり、反対側に伸ばします。建設対象もあります。ナノレーザーが照準するため、角度を含むのはこれです。"
 
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "A copy called \"{trimmed}\" already exists. Replace it?"
+msgstr ""
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "A copy holds this content folder's <0>springsettings.cfg</0>, <1>LuaUI/Config</1> and <2>uikeys.txt</2>, including the ones inside each engine folder. Restoring one puts all of them back."
+msgstr ""
+
 #: src/workshop/pages/components/CloneInPlaceNotice.tsx
 #, fuzzy
 msgid "A copy is written as a file or not at all, so this sends the whole copy through the mutator route rather than only the change above. The in-place write then skips it and lists it as still needing a mutator."
@@ -10018,6 +10024,10 @@ msgstr "アクションについて"
 msgid "About ambient effects"
 msgstr ""
 
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "About backing up before restoring"
+msgstr ""
+
 #: src/lego/pages/components/MovementSection.tsx
 #, fuzzy
 msgid "About banking"
@@ -10102,6 +10112,10 @@ msgstr "役割について"
 #, fuzzy
 msgid "About round shapes"
 msgstr "円形の形状について"
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "About saved copies"
+msgstr ""
 
 #: src/content/pages/components/KeymapsPanel.tsx
 msgid "About saved keymaps"
@@ -12688,11 +12702,6 @@ msgstr "自動"
 msgid "Auto"
 msgstr "自動"
 
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "Auto-backup current settings before restoring"
-msgstr "復元前に現在の設定を自動バックアップ"
-
 #: src/lobby-servers/pages/components/AutojoinChannels.tsx
 #, fuzzy
 msgid "Auto-join channels"
@@ -12707,6 +12716,10 @@ msgstr "オートホストの投票"
 #, fuzzy
 msgid "Automatic"
 msgstr "自動"
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Automatic backup"
+msgstr ""
 
 #: src/campaign/pages/components/MediaPlayer.tsx
 #, fuzzy
@@ -12950,9 +12963,8 @@ msgid "Back to warpath run"
 msgstr "ウォーパスのランに戻る"
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "Back up"
-msgstr "バックアップ"
+msgid "Back up before restoring"
+msgstr ""
 
 #: src/i18n/frameStrings.ts
 #, fuzzy
@@ -19854,6 +19866,7 @@ msgstr "バースト内の射撃間隔"
 #: src/campaign/pages/components/CampaignRowMenu.tsx
 #: src/content/pages/components/BulkDeleteReplaysPanel.tsx
 #: src/content/pages/components/ClearUnfinishedButton.tsx
+#: src/content/pages/components/ConfigProfilesPanel.tsx
 #: src/content/pages/components/DeleteArchiveButton.tsx
 #: src/content/pages/components/DeleteEngineButton.tsx
 #: src/content/pages/components/DeleteReplayButton.tsx
@@ -19905,6 +19918,10 @@ msgstr "{checkpointName} を削除"
 #, fuzzy
 msgid "Delete {collectionName}"
 msgstr "{collectionName} を削除"
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Delete {copyName}"
+msgstr ""
 
 #: src/placement/SurfaceBars.tsx
 #, fuzzy
@@ -20060,11 +20077,6 @@ msgstr "ポイントを削除"
 msgid "Delete preset"
 msgstr "プリセットを削除"
 
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "Delete profile {profileName}"
-msgstr "プロファイル {profileName} を削除"
-
 #: src/startbox/StartBoxPresetsPopover.tsx
 #, fuzzy
 msgid "Delete saved layout {number}"
@@ -20166,6 +20178,10 @@ msgstr "このチェックポイントを削除"
 #, fuzzy
 msgid "Delete this collection. Its children move up to its own parent."
 msgstr "このコレクションを削除します。子は 1 つ上の親に移動します。"
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Delete this copy? It cannot be undone."
+msgstr ""
 
 #: src/content/pages/components/DeleteReplayButton.tsx
 #, fuzzy
@@ -32332,6 +32348,10 @@ msgstr "弾に使うモデルの名前。ない場合、武器は 2D スプラ�
 msgid "Name or key"
 msgstr "名前またはキー"
 
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Name this copy"
+msgstr ""
+
 #: src/content/pages/components/KeymapsPanel.tsx
 #, fuzzy
 msgid "Name this keymap"
@@ -32845,11 +32865,6 @@ msgstr "新しいパスワード"
 #, fuzzy
 msgid "New preset from replay"
 msgstr "リプレイから新規プリセット"
-
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "New profile name"
-msgstr "新しいプロファイル名"
 
 #: src/workshop/index.ts
 #: src/workshop/pages/ProjectsPage.tsx
@@ -34471,6 +34486,10 @@ msgstr "まだ実行はありません。負荷テストを実行すると履歴
 msgid "No saved blueprints to include."
 msgstr "含める保存済みの設計図はありません。"
 
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "No saved copies for this content folder yet."
+msgstr ""
+
 #: src/content/pages/components/KeymapsPanel.tsx
 #, fuzzy
 msgid "No saved keymaps for this content folder yet."
@@ -34480,11 +34499,6 @@ msgstr "このコンテンツフォルダーにはまだ保存済みのキーマ
 #, fuzzy
 msgid "No saved presets to include."
 msgstr "含める保存済みのプリセットはありません。"
-
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "No saved profiles yet."
-msgstr "まだ保存済みのプロファイルはありません。"
 
 #: src/lego/pages/components/WriteSkeletons.tsx
 #, fuzzy
@@ -37795,15 +37809,14 @@ msgstr ".cob を上書きしますか？"
 msgid "Overwrite {poseName}"
 msgstr "{poseName} を上書き"
 
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "Overwrite the current settings with this profile?"
-msgstr "現在の設定をこのプロファイルで上書きしますか？"
-
 #: src/lego/pages/components/PosesPopover.tsx
 #, fuzzy
 msgid "Overwrite with the pose being held"
 msgstr "保持中のポーズで上書き"
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Overwrite your current config with this copy?"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -41974,6 +41987,7 @@ msgstr "繰り返し · {cooldown} 秒"
 
 #: src/campaign/pages/components/CampaignImage.tsx
 #: src/campaign/pages/components/MissionMediaFields.tsx
+#: src/content/pages/components/ConfigProfilesPanel.tsx
 #: src/lego/moduleFileIo.ts
 #: src/lego/pages/components/ScriptTab.tsx
 #: src/mapconv/pages/CompilePage.tsx
@@ -42526,6 +42540,10 @@ msgstr "{checkpointName} を復元"
 #, fuzzy
 msgid "Restore originals"
 msgstr "元のファイルを復元"
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Restored \"{copyName}\"."
+msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
@@ -43231,6 +43249,7 @@ msgid "sand"
 msgstr "砂"
 
 #: src/account/pages/SettingsSection.tsx
+#: src/content/pages/components/ConfigProfilesPanel.tsx
 #: src/content/pages/components/KeymapsPanel.tsx
 #: src/content/pages/components/ReplaySetsManager.tsx
 #: src/lego/pages/BuilderPage.tsx
@@ -43465,6 +43484,7 @@ msgstr "「{copyName}」をプリセットに保存しました。"
 msgid "Saved \"{name}\" beside this unit."
 msgstr "「{name}」をこのユニットの隣に保存しました。"
 
+#: src/content/pages/components/ConfigProfilesPanel.tsx
 #: src/content/pages/components/KeymapsPanel.tsx
 #, fuzzy
 msgid "Saved \"{trimmed}\"."
@@ -43501,6 +43521,10 @@ msgstr "プリセットとして保存しました"
 #, fuzzy
 msgid "Saved configs"
 msgstr "保存済み"
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Saved copies"
+msgstr ""
 
 #: src/blueprint/library.ts
 #, fuzzy
@@ -43571,11 +43595,6 @@ msgstr "シナリオ「{scenarioName}」から保存しました。"
 msgid "Saved poses in time, written into the script beside the presets."
 msgstr "時間に沿って保存したポーズで、プリセットと一緒にスクリプトに書き込まれます。"
 
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "Saved profile \"{trimmed}\"."
-msgstr "プロファイル「{trimmed}」を保存しました。"
-
 #: src/multiplayer/pages/BattleRoomPage.tsx
 #: src/play/pages/components/SaveAsPresetButton.tsx
 #: src/play/pages/SkirmishPage.tsx
@@ -43616,6 +43635,10 @@ msgstr "マップ、日付、プレイヤー、指標、ゲーム ID を書き�
 #, fuzzy
 msgid "Saves the map with this layer on it, the legend, and the map, replays, versions, window and filters written under it."
 msgstr "このレイヤーを載せたマップ、凡例、その下に書いたマップ、リプレイ、バージョン、時間帯、フィルターを保存します。"
+
+#: src/content/pages/components/ConfigProfilesPanel.tsx
+msgid "Saves your current config as \"Automatic backup\" just before a restore overwrites it, replacing the last one."
+msgstr ""
 
 #: src/blueprint/pages/BlueprintDetailPage.tsx
 #: src/content/pages/components/FilePreview.tsx
@@ -45276,11 +45299,6 @@ msgstr "設定"
 msgid "Settings of {0}"
 msgstr "{0} の設定"
 
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "Settings profiles"
-msgstr "設定プロファイル"
-
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "Settle time"
@@ -46705,11 +46723,6 @@ msgstr "snapshot"
 #, fuzzy
 msgid "Snapshot"
 msgstr "スナップショット"
-
-#: src/content/pages/components/ConfigProfilesPanel.tsx
-#, fuzzy
-msgid "Snapshot and swap this content folder's <0>springsettings.cfg</0>, <1>LuaUI/Config</1> and <2>uikeys.txt</2>."
-msgstr "このコンテンツフォルダーの <0>springsettings.cfg</0>、<1>LuaUI/Config</1>、<2>uikeys.txt</2> のスナップショットを作成して切り替えます。"
 
 #: src/mapconv/pages/CompilePage.tsx
 #, fuzzy

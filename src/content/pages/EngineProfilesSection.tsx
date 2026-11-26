@@ -19,13 +19,12 @@ import { EmptyState } from "./components/states";
  */
 export default function EngineProfilesSection() {
   const { t } = useLingui();
+  // With no engine at all the toolbar already says so, so nothing below it does.
   const { targets, selected, selectedKey, setSelectedKey, loading, refresh } =
     useEngineEditTarget();
 
   return (
     <div className="space-y-4">
-      {/* No intro paragraph. The section's own description sits under the page
-          title, and the panel below says what a profile covers. */}
       <BrowserToolbar
         targets={targets}
         selectedKey={selectedKey}
@@ -36,7 +35,7 @@ export default function EngineProfilesSection() {
 
       {selected?.rootPath ? (
         <ConfigProfilesPanel rootPath={selected.rootPath} />
-      ) : (
+      ) : targets.length === 0 ? null : (
         <EmptyState
           label={t`No content folder selected, so there is nothing to save a copy of yet.`}
         />
