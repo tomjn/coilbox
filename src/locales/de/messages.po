@@ -19256,6 +19256,10 @@ msgstr "Vorlage konnte nicht gespeichert werden"
 msgid "Count"
 msgstr "Anzahl"
 
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "Count this condition as holding for the rest of the mission once it has held."
+msgstr ""
+
 #: src/content/pages/components/FolderRow.tsx
 msgid "Count what is in this folder again"
 msgstr ""
@@ -25869,6 +25873,10 @@ msgstr "Hat eine Spezialwaffe (alter Name)"
 msgid "Has geometry"
 msgstr "Hat Geometrie"
 
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "has happened"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Has the attack order"
@@ -26386,6 +26394,10 @@ msgstr "Haltezeit"
 #, fuzzy
 msgid "Hold while dragging to place freely, with no step or snap. A joined part is detached"
 msgstr "Beim Ziehen halten, um frei zu platzieren, ohne Schritt oder Einrasten. Ein verbundenes Bauteil wird gelöst"
+
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "Holds for the rest of the mission once it has held. Press to ask about now again."
+msgstr ""
 
 #: src/scenario/triggerTypes.ts
 #, fuzzy

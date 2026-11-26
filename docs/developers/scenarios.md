@@ -207,6 +207,20 @@ In the saved scenario and the compiled mission this is `onBecomingTrue = true` o
 - A condition about an event is also checked on the polled tick, so the trigger can see it stop holding. Stopping and starting again between two checks that nothing else prompts goes unseen.
 - `/luarules reload` does not fire it again. A condition that reads something the reload loses, such as how long a zone has been held, stops holding for a while, so its trigger fires again when it next holds.
 
+### Has happened
+
+Mark a condition **has happened** when it only needs to have held once. From then on it holds for the rest of the mission. For "scout both ridges, in any order", add one **Units in zone** condition per ridge, mark both, and set **all of these hold**. No variable or extra trigger is needed.
+
+In the saved scenario and the compiled mission this is `latched = true` on a condition. It needs runtime 20, and only a scenario that uses it asks for 20.
+
+- A trigger checks its conditions only while it is enabled. What happened before it was enabled does not count unless the condition still holds.
+- Disabling a trigger and enabling it again forgets nothing. A trigger that fired once and is enabled again still has what had held.
+- A wait does not stop the checking.
+- With **not**, what is remembered is that the condition did not hold. **has happened** with **not** on **Units in zone** means "the zone has been empty at some point", not "no unit has ever been there". A zone that is empty when the mission starts counts straight away.
+- A moment such as `unit_attacked` or `command_given` is not used up by a firing once it is marked. A repeating trigger whose conditions are all marked goes on firing, so turn on **Only when it becomes true** or leave it firing once. With that switch on it fires once and never again.
+- A visit that starts and ends between two checks goes unseen. Zone conditions are checked about twice a second.
+- `/luarules reload` keeps what had held.
+
 ### At the start
 
 A trigger that is armed, fires once and has no conditions runs its actions on the first tick of the mission. This is where the briefing lines, the opening camera and the markers go. A new trigger starts this way, and the editor shows its condition list as **At the start**.

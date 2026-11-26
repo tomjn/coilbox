@@ -399,6 +399,14 @@ export type TriggerStep = {
    * this compiles to the bytes it always did.
    */
   negate?: boolean;
+  /**
+   * Once this condition has held, count it as holding for the rest of the
+   * mission (issue #5296). Only read on a condition. With `negate`, what is
+   * remembered is that the condition has not held.
+   *
+   * Only ever `true`, and absent when it is off.
+   */
+  latched?: boolean;
 };
 
 export type ScenarioCondition = TriggerStep;
@@ -1079,11 +1087,12 @@ function parseStep(
   if (type === undefined) return null;
   const params = parseParams(table[type], value.params);
   if (params === null) return null;
-  // Only `true` is a negation. Absent and `false` are the same step, and the
+  // Only `true` sets either flag. Absent and `false` are the same step, and the
   // key is left off so a document round trips to the bytes it came in as.
-  return value.negate === true
-    ? { type, params, negate: true }
-    : { type, params };
+  const step: TriggerStep = { type, params };
+  if (value.negate === true) step.negate = true;
+  if (value.latched === true) step.latched = true;
+  return step;
 }
 
 function parseTrigger(t: Record<string, unknown>): ScenarioTrigger | null {

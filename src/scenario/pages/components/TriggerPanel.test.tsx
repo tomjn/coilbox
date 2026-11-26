@@ -649,6 +649,36 @@ describe("a repeating trigger that fires as its conditions become true", () => {
   });
 });
 
+describe("a condition that has happened", () => {
+  const toggle = () => screen.getByRole("button", { name: "has happened" });
+
+  it("saves the mark into the document, and leaves it out when off", () => {
+    openPanel([
+      trigger({
+        conditions: {
+          op: "all",
+          conditions: [{ type: "time_elapsed", params: { seconds: 5 } }],
+        },
+      }),
+    ]);
+    select("wave-one");
+    const condition = () => stored()[0].conditions.conditions[0];
+
+    fireEvent.click(toggle());
+    expect(condition().latched).toBe(true);
+    expect(toggle().getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.click(toggle());
+    expect(condition()).not.toHaveProperty("latched");
+  });
+
+  it("is not offered on an action", () => {
+    openPanel([trigger({ actions: [{ type: "victory", params: {} }] })]);
+    select("wave-one");
+    expect(screen.queryByRole("button", { name: "has happened" })).toBeNull();
+  });
+});
+
 describe("a trigger's cooldown when the document moves under it", () => {
   it("shows the wait an undo put back", () => {
     openPanel([trigger({ repeat: true, cooldown: 30 })]);

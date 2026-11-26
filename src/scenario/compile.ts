@@ -259,6 +259,7 @@ const step = (s: TriggerStep): LuaTable =>
     // bytes it always did and a runtime that has never heard of it reads a
     // table with no new key in it.
     ["negate", s.negate === true ? true : undefined],
+    ["latched", s.latched === true ? true : undefined],
   ]);
 
 const trigger = (t: ScenarioTrigger): LuaTable =>

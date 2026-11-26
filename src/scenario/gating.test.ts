@@ -555,6 +555,29 @@ describe("requiredRuntimeVersion", () => {
   });
 
   /**
+   * Issue #5296. A runtime behind 20 reads past `latched` and asks what is true
+   * now.
+   */
+  it("asks for 20 for a condition that has happened", () => {
+    const scenario = withTrigger(["unit_dead"], []);
+    const [trigger] = scenario.triggers;
+    const marked = (latched: boolean): Scenario => ({
+      ...scenario,
+      triggers: [
+        {
+          ...trigger,
+          conditions: {
+            op: "all",
+            conditions: [{ ...trigger.conditions.conditions[0], latched }],
+          },
+        },
+      ],
+    });
+    expect(requiredRuntimeVersion(marked(true))).toBe(20);
+    expect(requiredRuntimeVersion(marked(false))).toBe(1);
+  });
+
+  /**
    * Issue #5298. A runtime behind 17 has no `unit_attacked`, so it reports it
    * once and the condition never holds.
    */

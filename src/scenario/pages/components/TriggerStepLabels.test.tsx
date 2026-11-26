@@ -41,6 +41,7 @@ function renderStep(
       picking={null}
       onPick={noop}
       onNegate={null}
+      onLatch={null}
       onParam={noop}
       onMove={null}
       onRemove={noop}

@@ -26,6 +26,7 @@ import {
   removeTrigger,
   renameTrigger,
   setAtTheStart,
+  setStepLatched,
   setStepParam,
   stepAt,
   stepDefaults,
@@ -438,6 +439,30 @@ describe("conditions and actions", () => {
 
     const cleared = setStepParam(s, ref, "team", undefined);
     expect(stepAt(cleared, ref)?.params).toEqual({ group: "g1" });
+  });
+});
+
+describe("setStepLatched", () => {
+  const ref = { triggerId: "open", list: "conditions" as const, index: 0 };
+  const withCondition = () =>
+    addStep(document(), "open", "conditions", {
+      type: "unit_dead",
+      params: { actor: "a1" },
+      negate: true,
+    });
+
+  it("marks a condition and takes the key out again", () => {
+    const before = withCondition();
+    const on = setStepLatched(before, ref, true);
+    expect(stepAt(on, ref)).toEqual({
+      type: "unit_dead",
+      params: { actor: "a1" },
+      negate: true,
+      latched: true,
+    });
+    expect(stepAt(setStepLatched(on, ref, false), ref)).toEqual(
+      stepAt(before, ref),
+    );
   });
 });
 

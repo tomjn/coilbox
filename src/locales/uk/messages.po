@@ -19256,6 +19256,10 @@ msgstr "Не вдалося зберегти шаблон"
 msgid "Count"
 msgstr "Кількість"
 
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "Count this condition as holding for the rest of the mission once it has held."
+msgstr ""
+
 #: src/content/pages/components/FolderRow.tsx
 msgid "Count what is in this folder again"
 msgstr ""
@@ -25869,6 +25873,10 @@ msgstr "Має спеціальну зброю (стара назва)"
 msgid "Has geometry"
 msgstr "Має геометрію"
 
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "has happened"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Has the attack order"
@@ -26386,6 +26394,10 @@ msgstr "Час утримання"
 #, fuzzy
 msgid "Hold while dragging to place freely, with no step or snap. A joined part is detached"
 msgstr "Утримуйте під час перетягування, щоб розміщувати вільно, без кроку чи прилипання. Приєднану деталь буде від’єднано"
+
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "Holds for the rest of the mission once it has held. Press to ask about now again."
+msgstr ""
 
 #: src/scenario/triggerTypes.ts
 #, fuzzy

@@ -15688,6 +15688,10 @@ msgstr ""
 msgid "Count"
 msgstr ""
 
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "Count this condition as holding for the rest of the mission once it has held."
+msgstr ""
+
 #: src/content/pages/components/FolderRow.tsx
 msgid "Count what is in this folder again"
 msgstr ""
@@ -21096,6 +21100,10 @@ msgstr ""
 msgid "Has geometry"
 msgstr ""
 
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "has happened"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 msgid "Has the attack order"
 msgstr ""
@@ -21513,6 +21521,10 @@ msgstr ""
 
 #: src/lego/shortcuts.ts
 msgid "Hold while dragging to place freely, with no step or snap. A joined part is detached"
+msgstr ""
+
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "Holds for the rest of the mission once it has held. Press to ask about now again."
 msgstr ""
 
 #: src/scenario/triggerTypes.ts
