@@ -10273,6 +10273,10 @@ msgstr "当たり判定ボリュームについて"
 msgid "About the colour texture"
 msgstr "カラーテクスチャについて"
 
+#: src/play/pages/EngineLogSection.tsx
+msgid "About the engine log"
+msgstr ""
+
 #: src/general/pages/SettingsSection.tsx
 msgid "About the frame rate"
 msgstr ""
@@ -30144,6 +30148,10 @@ msgstr "ログ"
 msgid "Log back in on startup"
 msgstr ""
 
+#: src/play/pages/EngineLogSection.tsx
+msgid "Log file"
+msgstr ""
+
 #: src/home/zones/ResumeRail.tsx
 #: src/multiplayer/pages/BattlesPage.tsx
 #: src/onboarding/pages/ServerPage.tsx
@@ -30241,6 +30249,10 @@ msgstr "長い"
 msgid "Longest"
 msgstr "長い順"
 
+#: src/play/pages/EngineLogSection.tsx
+msgid "Look for the log again"
+msgstr ""
+
 #: src/content/pages/FoldersSection.tsx
 msgid "Look for Zero-K on Steam"
 msgstr ""
@@ -30270,6 +30282,10 @@ msgstr "エンジンを探しています…"
 #, fuzzy
 msgid "Looking for duplicate runtime files..."
 msgstr "重複したランタイムファイルを探しています…"
+
+#: src/play/pages/EngineLogSection.tsx
+msgid "Looking for installed engines."
+msgstr ""
 
 #: src/lego/pages/components/GameModelDrawer.tsx
 #, fuzzy
@@ -37402,6 +37418,7 @@ msgid "Open the join form"
 msgstr "参加フォームを開く"
 
 #: src/play/pages/components/EngineLogFile.tsx
+#: src/play/pages/EngineLogSection.tsx
 #, fuzzy
 msgid "Open the log file"
 msgstr "ログファイルを開く"
@@ -40578,7 +40595,6 @@ msgstr "読み取り専用です。試合のオプションを変更できるの
 #: src/hub/pages/components/GameFactsControl.tsx
 #: src/hub/pages/components/GamePicturesControl.tsx
 #: src/lego/pages/components/ScriptTab.tsx
-#: src/play/pages/EngineLogSection.tsx
 #: src/widgets/pages/WidgetSettings.tsx
 #, fuzzy
 msgid "Reading"
@@ -41520,7 +41536,6 @@ msgstr "起伏"
 #: src/lego/pages/components/ScriptTab.tsx
 #: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
-#: src/play/pages/EngineLogSection.tsx
 #: src/profile/SettingsSection.tsx
 #, fuzzy
 msgid "Reload"
@@ -45962,6 +45977,7 @@ msgstr "空いている面を表示"
 #: src/mapconv/pages/CompilePage.tsx
 #: src/mapconv/pages/DecompilePage.tsx
 #: src/play/pages/components/EngineLogFile.tsx
+#: src/play/pages/EngineLogSection.tsx
 #, fuzzy
 msgid "Show in folder"
 msgstr "フォルダーで表示"
@@ -57760,6 +57776,10 @@ msgstr ""
 msgid "When the unit dies it comes apart along its joins. A light hit throws off a few of the biggest groups of parts, a heavy hit throws off every part one by one, smallest first, and the wreck follows what the hit left. A unit with no joins breaks along its piece tree."
 msgstr "ユニットは撃破されると接合部に沿って分解します。軽い被弾ではパーツの大きなまとまりがいくつか飛び、大きな被弾では小さいものから順にすべてのパーツが 1 つずつ飛び、残骸は被弾で残ったものに従います。接合部のないユニットはピースツリーに沿って壊れます。"
 
+#: src/play/pages/EngineLogSection.tsx
+msgid "When you ask for help with a crash, attach the whole file. Its start records the engine version, the system and the graphics card."
+msgstr ""
+
 #: src/downloads/pages/SettingsSection.tsx
 msgid "When you join a battle whose game or map you don't have, the download starts straight away instead of waiting for a click. The Download button stays available to pause or retry."
 msgstr ""
@@ -58752,6 +58772,7 @@ msgid "Writing…"
 msgstr "書き込み中…"
 
 #: src/play/pages/components/EngineLogFile.tsx
+#: src/play/pages/EngineLogSection.tsx
 #, fuzzy
 msgid "Written {writtenAt}"
 msgstr "{writtenAt} に書き込み"

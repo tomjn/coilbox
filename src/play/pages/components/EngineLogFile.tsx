@@ -16,10 +16,10 @@ function when(ms: number): string {
  * Where the engine's log file is: its path, when it was written, and buttons to
  * open it and to show it in its folder.
  *
- * The Engine log page and the crash drawer both use this, so the two point at
- * the file the same way. Neither shows a line of it: a slice of `infolog.txt`
- * passes for the whole file, and the start, where the engine records the system
- * and the GPU, is the part a slice leaves out (issues #4064 and #4167).
+ * The crash drawer uses this. Like the Engine log settings page, it shows no
+ * line of the file: a slice of `infolog.txt` passes for the whole file, and the
+ * start, where the engine records the system and the GPU, is the part a slice
+ * leaves out (issues #4064 and #4167).
  *
  * `children` go at the start of the button row.
  */

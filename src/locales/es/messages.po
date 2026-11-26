@@ -10273,6 +10273,10 @@ msgstr "Acerca del volumen de colisión"
 msgid "About the colour texture"
 msgstr "Acerca de la textura de color"
 
+#: src/play/pages/EngineLogSection.tsx
+msgid "About the engine log"
+msgstr ""
+
 #: src/general/pages/SettingsSection.tsx
 msgid "About the frame rate"
 msgstr ""
@@ -30144,6 +30148,10 @@ msgstr "Registro"
 msgid "Log back in on startup"
 msgstr ""
 
+#: src/play/pages/EngineLogSection.tsx
+msgid "Log file"
+msgstr ""
+
 #: src/home/zones/ResumeRail.tsx
 #: src/multiplayer/pages/BattlesPage.tsx
 #: src/onboarding/pages/ServerPage.tsx
@@ -30241,6 +30249,10 @@ msgstr "larga"
 msgid "Longest"
 msgstr "Más largas"
 
+#: src/play/pages/EngineLogSection.tsx
+msgid "Look for the log again"
+msgstr ""
+
 #: src/content/pages/FoldersSection.tsx
 msgid "Look for Zero-K on Steam"
 msgstr ""
@@ -30270,6 +30282,10 @@ msgstr "Buscando un motor…"
 #, fuzzy
 msgid "Looking for duplicate runtime files..."
 msgstr "Buscando archivos del runtime duplicados..."
+
+#: src/play/pages/EngineLogSection.tsx
+msgid "Looking for installed engines."
+msgstr ""
 
 #: src/lego/pages/components/GameModelDrawer.tsx
 #, fuzzy
@@ -37402,6 +37418,7 @@ msgid "Open the join form"
 msgstr "Abrir el formulario para unirse"
 
 #: src/play/pages/components/EngineLogFile.tsx
+#: src/play/pages/EngineLogSection.tsx
 #, fuzzy
 msgid "Open the log file"
 msgstr "Abrir el archivo de registro"
@@ -40578,7 +40595,6 @@ msgstr "Solo lectura. Solo el anfitrión puede cambiar las opciones de la partid
 #: src/hub/pages/components/GameFactsControl.tsx
 #: src/hub/pages/components/GamePicturesControl.tsx
 #: src/lego/pages/components/ScriptTab.tsx
-#: src/play/pages/EngineLogSection.tsx
 #: src/widgets/pages/WidgetSettings.tsx
 #, fuzzy
 msgid "Reading"
@@ -41520,7 +41536,6 @@ msgstr "Relieve"
 #: src/lego/pages/components/ScriptTab.tsx
 #: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
-#: src/play/pages/EngineLogSection.tsx
 #: src/profile/SettingsSection.tsx
 #, fuzzy
 msgid "Reload"
@@ -45962,6 +45977,7 @@ msgstr "Mostrar caras libres"
 #: src/mapconv/pages/CompilePage.tsx
 #: src/mapconv/pages/DecompilePage.tsx
 #: src/play/pages/components/EngineLogFile.tsx
+#: src/play/pages/EngineLogSection.tsx
 #, fuzzy
 msgid "Show in folder"
 msgstr "Mostrar en la carpeta"
@@ -57760,6 +57776,10 @@ msgstr ""
 msgid "When the unit dies it comes apart along its joins. A light hit throws off a few of the biggest groups of parts, a heavy hit throws off every part one by one, smallest first, and the wreck follows what the hit left. A unit with no joins breaks along its piece tree."
 msgstr "Cuando la unidad muere, se rompe por sus uniones. Un impacto leve hace saltar algunos de los grupos de piezas más grandes, un impacto fuerte hace saltar todas las piezas una a una, de la más pequeña a la más grande, y los restos siguen lo que dejó el impacto. Una unidad sin uniones se rompe siguiendo su árbol de partes."
 
+#: src/play/pages/EngineLogSection.tsx
+msgid "When you ask for help with a crash, attach the whole file. Its start records the engine version, the system and the graphics card."
+msgstr ""
+
 #: src/downloads/pages/SettingsSection.tsx
 msgid "When you join a battle whose game or map you don't have, the download starts straight away instead of waiting for a click. The Download button stays available to pause or retry."
 msgstr ""
@@ -58752,6 +58772,7 @@ msgid "Writing…"
 msgstr "Escribiendo…"
 
 #: src/play/pages/components/EngineLogFile.tsx
+#: src/play/pages/EngineLogSection.tsx
 #, fuzzy
 msgid "Written {writtenAt}"
 msgstr "Escrito {writtenAt}"
