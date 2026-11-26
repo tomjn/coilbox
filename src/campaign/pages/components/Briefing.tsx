@@ -1,8 +1,15 @@
+import { Trans } from "@lingui/react/macro";
 import { cn } from "@picoframe/frame";
+import { Loader2 } from "lucide-react";
+import { createContext, useContext, useEffect, useState } from "react";
 import Markdown, { type Components } from "react-markdown";
 import { assetUrl, isLocalRef, mediaKind } from "../../../lib/assetUrl";
 import { externalOnlyLink } from "../../../lib/MarkdownLink";
 import { GFM_PLUGINS, GFM_PROSE_CLASSES } from "../../../lib/markdownGfm";
+import {
+  type CampaignGameOrigin,
+  gameCampaignFileUrl,
+} from "../../gameCampaigns";
 
 /**
  * Renders a mission/campaign briefing as Markdown. Unlike the profile welcome screen
@@ -12,15 +19,156 @@ import { GFM_PLUGINS, GFM_PROSE_CLASSES } from "../../../lib/markdownGfm";
  *
  * Inline media works without raw HTML via a custom `img` renderer: a Markdown image
  * whose source is an audio/video file renders an `<audio>`/`<video>` player instead
- * of an `<img>`. Relative sources resolve against the portable `.coilbox/` folder
- * through the `coilbox://` protocol (so `![](images/x.jpg)` or `![](briefings/vo.ogg)`
- * loads a bundled file); absolute/data URLs are used verbatim.
+ * of an `<img>`. Absolute URLs are used verbatim. A relative source in a bundled
+ * campaign resolves against the portable `.coilbox/` folder through the
+ * `coilbox://` protocol (so `![](images/x.jpg)` loads a bundled file). In a
+ * campaign shipped inside a game it names a file beside that campaign's
+ * `campaign.json`, read out of the game's archive (issue #5468)
  */
 
-/** Resolve a Markdown media source to a URL, mapping local refs to the asset protocol. */
-function resolveSrc(src: unknown): string | undefined {
-  if (typeof src !== "string" || !src) return undefined;
-  return isLocalRef(src) ? assetUrl(src) : src;
+/** The game the briefing's campaign ships inside, if it is a game's campaign */
+const GameOrigin = createContext<CampaignGameOrigin | undefined>(undefined);
+
+type Kind = ReturnType<typeof mediaKind>;
+
+/**
+ * `kind` is decided by the caller, since the `blob:` URL of a file read out of
+ * an archive has no extension to tell by.
+ */
+function InlineMedia({
+  url,
+  kind,
+  alt,
+  title,
+}: {
+  url: string;
+  kind: Kind;
+  alt?: string;
+  title?: string;
+}) {
+  if (kind === "audio") {
+    // biome-ignore lint/a11y/useMediaCaption: author-supplied briefing audio has no caption track
+    return <audio controls src={url} className="my-2 w-full" />;
+  }
+  if (kind === "video") {
+    return (
+      // biome-ignore lint/a11y/useMediaCaption: author-supplied briefing video has no caption track
+      <video
+        controls
+        src={url}
+        className="my-2 max-h-80 w-full rounded-md"
+        title={title}
+      />
+    );
+  }
+  return (
+    <img
+      src={url}
+      alt={alt ?? ""}
+      title={title}
+      className="my-2 max-w-full rounded-md"
+    />
+  );
+}
+
+/**
+ * The file a relative source names. Markdown hands the source over percent
+ * encoded, and the archive holds the name as the author's file system spells it.
+ */
+function gameFileName(src: string): string {
+  const path = src.startsWith("./") ? src.slice(2) : src;
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    return path;
+  }
+}
+
+/** One inline file of a game campaign, which has to be read out of the archive */
+function GameMedia({
+  origin,
+  file,
+  alt,
+  title,
+}: {
+  origin: CampaignGameOrigin;
+  file: string;
+  alt?: string;
+  title?: string;
+}) {
+  const [read, setRead] = useState<{ url: string } | "failed">();
+
+  useEffect(() => {
+    let cancelled = false;
+    setRead(undefined);
+    gameCampaignFileUrl(origin, file)
+      .then((url) => {
+        if (!cancelled) setRead({ url });
+      })
+      .catch((e) => {
+        console.warn("could not read briefing media from its game", file, e);
+        if (!cancelled) setRead("failed");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [origin, file]);
+
+  if (read === "failed") {
+    return (
+      <span className="my-2 block text-xs text-muted-foreground">
+        <Trans>Could not load {file} from the game</Trans>
+      </span>
+    );
+  }
+  if (!read) {
+    return (
+      <span
+        role="status"
+        className="my-2 flex items-center gap-2 text-xs text-muted-foreground"
+      >
+        <Loader2 className="size-4 animate-spin" aria-hidden />
+        <Trans>Loading {file}…</Trans>
+      </span>
+    );
+  }
+  return (
+    <InlineMedia
+      url={read.url}
+      kind={mediaKind(file)}
+      alt={alt}
+      title={title}
+    />
+  );
+}
+
+function BriefingImage({
+  src,
+  alt,
+  title,
+}: {
+  src?: unknown;
+  alt?: string;
+  title?: string;
+}) {
+  const origin = useContext(GameOrigin);
+  if (typeof src !== "string" || !src) return null;
+  if (origin && isLocalRef(src)) {
+    const file = gameFileName(src);
+    return (
+      <GameMedia
+        key={file}
+        origin={origin}
+        file={file}
+        alt={alt}
+        title={title}
+      />
+    );
+  }
+  const url = isLocalRef(src) ? assetUrl(src) : src;
+  return (
+    <InlineMedia url={url} kind={mediaKind(url)} alt={alt} title={title} />
+  );
 }
 
 const MEDIA_COMPONENTS: Components = {
@@ -28,43 +176,21 @@ const MEDIA_COMPONENTS: Components = {
   // an `https:` link to the browser and refuses the rest rather than letting the
   // webview follow it out of the app (issue #1789).
   a: externalOnlyLink("campaign"),
-  img({ src, alt, title }) {
-    const url = resolveSrc(src);
-    if (!url) return null;
-    const kind = mediaKind(url);
-    if (kind === "audio") {
-      // biome-ignore lint/a11y/useMediaCaption: author-supplied briefing audio has no caption track
-      return <audio controls src={url} className="my-2 w-full" />;
-    }
-    if (kind === "video") {
-      return (
-        // biome-ignore lint/a11y/useMediaCaption: author-supplied briefing video has no caption track
-        <video
-          controls
-          src={url}
-          className="my-2 max-h-80 w-full rounded-md"
-          title={title}
-        />
-      );
-    }
-    return (
-      <img
-        src={url}
-        alt={alt ?? ""}
-        title={title}
-        className="my-2 max-w-full rounded-md"
-      />
-    );
-  },
+  img: ({ src, alt, title }) => (
+    <BriefingImage src={src} alt={alt} title={title} />
+  ),
 };
 
-/** Markdown briefing body with themed typography and inline media. */
+/** Markdown briefing body with themed typography and inline media */
 export function BriefingProse({
   children,
   className,
+  gameOrigin,
 }: {
   children: string;
   className?: string;
+  /** Set for a campaign shipped inside a game, whose media stays in the game */
+  gameOrigin?: CampaignGameOrigin;
 }) {
   return (
     <div
@@ -78,9 +204,11 @@ export function BriefingProse({
         className,
       )}
     >
-      <Markdown components={MEDIA_COMPONENTS} remarkPlugins={GFM_PLUGINS}>
-        {children}
-      </Markdown>
+      <GameOrigin.Provider value={gameOrigin}>
+        <Markdown components={MEDIA_COMPONENTS} remarkPlugins={GFM_PLUGINS}>
+          {children}
+        </Markdown>
+      </GameOrigin.Provider>
     </div>
   );
 }

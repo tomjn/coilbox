@@ -18824,6 +18824,10 @@ msgstr "Não foi possível sair da partida da qual {name} saiu"
 msgid "Could not list this archive's contents."
 msgstr "Não foi possível listar o conteúdo deste arquivo compactado."
 
+#: src/campaign/pages/components/Briefing.tsx
+msgid "Could not load {file} from the game"
+msgstr ""
+
 #: src/lego/moduleFileIo.ts
 #, fuzzy
 msgid "Could not load the module"
@@ -29967,6 +29971,10 @@ msgstr ""
 #, fuzzy
 msgid "Loaded the preset \"{loadedName}\"."
 msgstr "A predefinição “{loadedName}” foi carregada."
+
+#: src/campaign/pages/components/Briefing.tsx
+msgid "Loading {file}…"
+msgstr ""
 
 #: src/lego/scriptPlayback.ts
 #, fuzzy
