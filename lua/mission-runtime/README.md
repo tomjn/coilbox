@@ -172,16 +172,18 @@ A hit is a moment rather than a state, so it is counted by the stamps `command_g
 
 ## Upgrades
 
-An actor that a game upgrades is followed to its new unit ([issue #5297](https://github.com/tomjn/coilbox/issues/5297)). Beyond All Reason's evolving commanders and Splinter Faction's morphs both upgrade a unit by creating a new one where it stands and destroying the old one. Headless runs on both, on engine 2026.09.03, gave the new unit a new id every time. Beyond All Reason destroys the old unit in the same frame. Splinter Faction destroys it on the next frame. The engine reports the destruction with no attacker and weapon id -21. That is what runtime 18 added.
+An actor that a game upgrades is followed to its new unit ([issue #5297](https://github.com/tomjn/coilbox/issues/5297)), and so is a group's unit ([issue #5475](https://github.com/tomjn/coilbox/issues/5475)). Beyond All Reason's evolving commanders and Splinter Faction's morphs both upgrade a unit by creating a new one where it stands and destroying the old one. Headless runs on both, on engine 2026.09.03, gave the new unit a new id every time. Beyond All Reason destroys the old unit in the same frame. Splinter Faction destroys it on the next frame. The engine reports the destruction with no attacker and weapon id -21. Runtime 18 follows actors, and runtime 19 follows groups.
 
 The rule is the replay logger's from [issue #3898](https://github.com/tomjn/coilbox/issues/3898), and it names no game and no unit:
 
-- The new unit was created by no builder, for the actor's team, while the actor was alive.
-- It was created exactly where the actor stood. For a building, which a game snaps to the build grid, it was created no further away on each axis than half its footprint or one build square, whichever is less.
-- A script destroyed the actor with no attacker, on the frame the new unit was created or the next. A gadget handler as old as Balanced Annihilation's passes no weapon id at all, and then the other rules decide.
-- Exactly one unit fits. With two, the actor dies.
+- The new unit was created by no builder, for the old unit's team, while the old unit was alive.
+- It was created exactly where the old unit stood. For a building, which a game snaps to the build grid, it was created no further away on each axis than half its footprint or one build square, whichever is less.
+- A script destroyed the old unit with no attacker, on the frame the new unit was created or the next. A gadget handler as old as Balanced Annihilation's passes no weapon id at all, and then the other rules decide.
+- Exactly one unit fits, and exactly one actor or group unit stood in that place. With two of either, the old unit dies.
 
-The runtime's own units are never taken for a successor. Once followed, the actor is the new unit everywhere: `GG.CoilboxMission.units`, the rules param the panel reads, the unsynced half and invulnerability. The death raises `unit_destroyed` with no actor, so `unit_dead` stays false. A group's unit is not followed.
+The runtime's own units are never taken for a successor. Once followed, an actor is the new unit everywhere: `GG.CoilboxMission.units`, the rules param the panel reads, the unsynced half and invulnerability. The death raises `unit_destroyed` with no actor, so `unit_dead` stays false.
+
+A group's new unit takes the old one's place in the group, so `group_dead`, `unit_count`, `units_in_zone`, `unit_attacked` and the group's orders all read it. A gifted or released group keeps it too. The runtime gives it no order of its own: its queue is the one the game left it. The unit of a sleeping group is the exception. It is told to hold position, and waking gives it the move state the old unit came with. A `/luarules reload` forgets which units are in a group, upgraded or not.
 
 ## What the player did
 
@@ -572,7 +574,7 @@ Every `tests/*_test.lua` file, each in its own `luajit`. Adding a suite is addin
 
 `attacked_test.lua` proves what `unit_attacked` counts and for how long, and that a mission without it defines no `UnitDamaged`.
 
-`upgrade_test.lua` proves an actor is followed through an upgrade in one frame and over two, that a reload keeps it, and that a unit beside it, on another team, with a builder, or one of two does not replace it.
+`upgrade_test.lua` proves an actor and a group's unit are followed through an upgrade in one frame and over two, that a reload keeps the actor, and that a unit beside it, on another team, with a builder, or one of two does not replace it.
 
 `terrain_test.lua` proves a base's ground is set before its buildings, at the start and from `spawn_base`, against the stub's heightmap and against the `stronghold` fixture.
 
@@ -614,7 +616,7 @@ What it has settled:
 - A base's terrain changes. The `stronghold` mission's wall ring stands 48 above the map's own ground from frame 5, and its outpost's hill is not there until its trigger fires a minute in, then rises by 32 with the turret on it.
 
 - A unit being attacked. The `attacked` mission, written by hand in `tests/headless/missions/`, puts an enemy turret in range of one of the player's units and of a group, and its triggers fire from the engine's own `UnitDamaged`, narrowed by the attacker's team and type. Damage dealt with no attacker fires nothing. The `sentries` run, whose mission asks no such condition, checks that the runtime gadget has no `UnitDamaged` in the engine's gadget handler.
-- An actor upgraded. The `upgrade` mission, written by hand in `tests/headless/missions/`, has the probe replace three actors with the engine's own `Spring.CreateUnit` and `Spring.DestroyUnit`: one in one frame, one over two frames and a building half a build square off. Each is its new unit afterwards, `unit_dead` stays false, `unit_health_below` reads the new unit, and the new unit's death still counts. This run caught that Balanced Annihilation's gadget handler passes `UnitDestroyed` no weapon id.
+- An actor and a group's units upgraded. The `upgrade` mission, written by hand in `tests/headless/missions/`, has the probe replace three actors with the engine's own `Spring.CreateUnit` and `Spring.DestroyUnit`: one in one frame, one over two frames and a building half a build square off. Each is its new unit afterwards, `unit_dead` stays false, `unit_health_below` reads the new unit, and the new unit's death still counts. It does the same to both units of a sleeping group: the new units are the group's, hold position, take its next order and keep `group_dead` false until they die. This run caught that Balanced Annihilation's gadget handler passes `UnitDestroyed` no weapon id.
 - A full `/luarules reload` in the middle of a mission. The `reload` mission is written by hand in `tests/headless/missions/` rather than compiled, because no scenario is it: an invulnerable actor, an ordinary one, a var, two objectives and a trigger that fires once. The probe records what the engine holds, sends `luarules reload`, and the probe the reload loads checks the same things with real damage and real units: the actors are still the units they were, the invulnerable actor and the anchor still survive a hit, the var, the objective and the spent trigger are where they were. Before the fix 8 of those 17 checks failed.
 
 What it has caught:
