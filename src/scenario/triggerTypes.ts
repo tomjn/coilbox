@@ -110,7 +110,7 @@ export type TypeSpec = Record<string, ParamSpec>;
  * would drift.
  */
 export function isUnitDefParam(name: string): boolean {
-  return name === "unitDef" || name === "unitDefs" || name === "exceptDefs";
+  return ["unitDef", "unitDefs", "exceptDefs", "attackerDefs"].includes(name);
 }
 
 /** Comparisons a `var` condition can make. */
@@ -236,6 +236,38 @@ export const CONDITION_TYPES: Record<string, TypeSpec> = {
       kind: "number",
       get label() {
         return t`health fraction`;
+      },
+    },
+  },
+  /**
+   * Holds once the actor, or any unit of the group, has taken damage from
+   * another unit since the trigger was armed, or since it last fired (issue
+   * #5298). Damage with no attacker, such as a fall, does not count.
+   */
+  unit_attacked: {
+    /** One of the two is required, which `REQUIRES_ONE_OF` says. */
+    actor: {
+      kind: "actorId",
+      optional: true,
+      get label() {
+        return t`placed unit`;
+      },
+    },
+    /** Takes the place of the actor. */
+    group: { kind: "groupId", optional: true },
+    /** Whose hits count. Absent means anybody's. */
+    attackerTeam: {
+      kind: "teamId",
+      optional: true,
+      get label() {
+        return t`attacking team`;
+      },
+    },
+    attackerDefs: {
+      kind: "strings",
+      optional: true,
+      get label() {
+        return t`attacking unit types`;
       },
     },
   },
@@ -601,6 +633,7 @@ const TYPE_DESCRIPTION_MESSAGES: Record<string, MessageDescriptor> = {
   unit_dead: msg`Becomes true the moment a named actor is destroyed.`,
   group_dead: msg`Holds once every unit in a group has died. A group that has not been placed yet is not dead.`,
   unit_health_below: msg`Trips once an actor's health drops below the fraction you set.`,
+  unit_attacked: msg`Holds once an actor, or a unit of a group, has taken damage from another unit since this trigger was armed.`,
   unit_built: msg`Holds once a team has finished building enough of a unit type.`,
   unit_captured: msg`True once an actor changes hands, whether captured or gifted away.`,
   unit_selected: msg`Holds while a player has a unit selected: any unit, one of a type, or one you placed.`,
@@ -689,6 +722,7 @@ export const TYPE_GROUPS: Record<string, string> = {
   unit_dead: "Units",
   group_dead: "Units",
   unit_health_below: "Units",
+  unit_attacked: "Units",
   unit_built: "Units",
   unit_captured: "Units",
   unit_selected: "Player",
@@ -789,6 +823,9 @@ export const TYPE_RUNTIME_VERSION: Record<string, number> = {
   /** Issue #5292. A runtime behind 14 has no implementation, so the condition
    *  reports itself once and never holds. */
   group_dead: 14,
+  /** Issue #5298. A runtime behind 17 has no implementation, so the condition
+   *  reports itself once and never holds. */
+  unit_attacked: 17,
 };
 
 /**
@@ -816,6 +853,7 @@ export const PARAM_RUNTIME_VERSION: Record<string, Record<string, number>> = {
  */
 export const REQUIRES_ONE_OF: Record<string, readonly (readonly string[])[]> = {
   unit_count: [["team", "group"]],
+  unit_attacked: [["actor", "group"]],
 };
 
 /**

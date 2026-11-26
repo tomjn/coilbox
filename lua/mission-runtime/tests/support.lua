@@ -393,6 +393,24 @@ function M.newEngine(modOptions, files, options)
 		return unitID
 	end
 
+	--- A unit is hit, the way the engine does it: UnitPreDamaged may change the
+	-- damage, a hit it takes to nothing stops there, and UnitDamaged hears the
+	-- rest. `attackerID` is nil for a fall, terrain or damage nothing dealt.
+	function engine.damage(unitID, damage, attackerID, paralyzer)
+		local unit = engine.units[unitID]
+		local attacker = attackerID and engine.units[attackerID]
+		local pre = engine.env.UnitPreDamaged
+		if pre then
+			local changed, impulse = pre(engine.env, unitID, unit.defID, unit.team, damage, paralyzer == true)
+			if changed == 0 and impulse == 0 then
+				return
+			end
+			damage = changed or damage
+		end
+		fire("UnitDamaged", unitID, unit.defID, unit.team, damage, paralyzer == true, 1, 1,
+			attackerID, attacker and attacker.defID, attacker and attacker.team)
+	end
+
 	--- A player ordered a unit, the way the engine tells synced Lua once the unit
 	-- has accepted the order. `fromLua` is true for an order synced Lua gave, and
 	-- the engine names no player for one of those.

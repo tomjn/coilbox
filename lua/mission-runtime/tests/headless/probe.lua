@@ -1491,6 +1491,32 @@ plans.stronghold = {
 	},
 }
 
+--- Whether the runtime gadget is on the handler's list for a callin, or nil when
+-- the handler's lists cannot be read. The handler is a global of the state it
+-- runs gadgets in, which a gadget reaches through `_G`.
+local function runtimeHears(callin)
+	local handler = gadget._G and gadget._G.gadgetHandler
+	local list = handler and handler[callin .. "List"]
+	if not list then
+		return nil
+	end
+	for _, other in ipairs(list) do
+		if other.ghInfo.name == "Coilbox mission runtime" then
+			return true
+		end
+	end
+	return false
+end
+
+local function checkHears(name, callin, wanted)
+	local hears = runtimeHears(callin)
+	if hears == nil then
+		say("skip " .. name .. ": this game's gadget handler cannot be read")
+		return
+	end
+	check(name, hears == wanted, tostring(hears))
+end
+
 -- A group that starts asleep (issue #900): a garrison in its post from the first
 -- frame, walking its patrol once the trigger ten seconds in wakes it.
 local sentryX, sentryZ
@@ -1500,6 +1526,10 @@ plans.sentries = {
 	steps = {
 		{ frame = 1, run = checkPlacement },
 		{ frame = 5, run = function()
+			-- A mission with no unit_attacked condition pays nothing per hit
+			-- (issue #5298). UnitDestroyed shows the list read is the real one.
+			checkHears("the runtime hears deaths", "UnitDestroyed", true)
+			checkHears("a mission with no unit_attacked defines no UnitDamaged", "UnitDamaged", false)
 			local unitID = state().groups.units("post")[1]
 			check("a group that starts asleep is on the map", #state().groups.units("post") == 2,
 				#state().groups.units("post"))
@@ -1587,6 +1617,64 @@ plans.pursuit = {
 				busy = busy + #Spring.GetUnitCommands(unitID, -1)
 			end
 			check("and the group is given no more orders", busy == 0, busy)
+		end },
+	},
+}
+
+-- Who hit whom (issue #5298). The attacked mission's units stand unarmed until
+-- the probe puts an enemy laser tower beside them, so every hit a trigger hears
+-- is the engine's own, from a real weapon through the game's gadget handler.
+
+-- The weaponDefID the engine passes for ground collision damage.
+local FALL = -2
+local HEARD = { "any", "llt", "convoy", "killed" }
+local UNHEARD = { "ownside", "pw", "safe", "statue" }
+local statueTower
+
+local function enemyTower(x, z)
+	return Spring.CreateUnit("armllt", x, Spring.GetGroundHeight(x, z), z, 0, 1)
+end
+
+plans.attacked = {
+	deadline = 900,
+	steps = {
+		{ frame = 5, run = function()
+			checkHears("a mission with unit_attacked defines UnitDamaged", "UnitDamaged", true)
+			local units = state().units
+			check("the actors are on the map", units.victim and units.safe and units.statue)
+			-- A fall: the engine's own ground collision damage, with nobody behind it.
+			local before = Spring.GetUnitHealth(units.safe)
+			Spring.AddUnitDamage(units.safe, 20, 0, nil, FALL)
+			Spring.AddUnitDamage(units.victim, 20, 0, nil, FALL)
+			check("a fall damages them", Spring.GetUnitHealth(units.safe) < before,
+				tostring(before) .. " then " .. tostring(Spring.GetUnitHealth(units.safe)))
+		end },
+		{ frame = 55, run = function()
+			for _, id in ipairs({ "any", "safe" }) do
+				check("and fires nothing: " .. id, objectiveIs(id) == ACTIVE, objectiveIs(id))
+			end
+			-- Told to shoot the actor first, so it is dead in time and the group
+			-- is shot after it.
+			local tower = enemyTower(2300, 2100)
+			check("an enemy laser tower is beside them", tower ~= nil)
+			Spring.GiveOrderToUnit(tower, CMD.ATTACK, { state().units.victim }, 0)
+			-- And one in range of the invulnerable actor alone, whose shots the
+			-- runtime takes to nothing before the engine calls UnitDamaged.
+			statueTower = enemyTower(3600, 1400)
+			check("and one beside the invulnerable actor", statueTower ~= nil)
+		end },
+		{ frame = 880, run = function()
+			check("which has been shooting at it",
+				Spring.GetUnitLastAttacker(state().units.statue) == statueTower,
+				tostring(Spring.GetUnitLastAttacker(state().units.statue)))
+			for _, id in ipairs(HEARD) do
+				check("a real hit fires " .. id, objectiveIs(id) == COMPLETE, objectiveIs(id))
+			end
+			for _, id in ipairs(UNHEARD) do
+				check("and does not fire " .. id, objectiveIs(id) == ACTIVE, objectiveIs(id))
+			end
+			check("a repeating trigger fired on more than one hit",
+				(rules("coilbox_mission_var_hits") or 0) > 1, tostring(rules("coilbox_mission_var_hits")))
 		end },
 	},
 }

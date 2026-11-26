@@ -12862,6 +12862,14 @@ msgstr "{nodeName} を攻撃"
 msgid "attacker"
 msgstr "攻撃者"
 
+#: src/scenario/triggerTypes.ts
+msgid "attacking team"
+msgstr ""
+
+#: src/scenario/triggerTypes.ts
+msgid "attacking unit types"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Attacks from a hover"
@@ -26398,6 +26406,10 @@ msgstr "チームがユニットタイプを必要な数だけ建設し終える
 #, fuzzy
 msgid "Holds once a team has kept a zone for the time you set, optionally only while uncontested."
 msgstr "チームがゾーンを設定した時間だけ確保すると成立します。他チームがいないときだけに限定することもできます。"
+
+#: src/scenario/triggerTypes.ts
+msgid "Holds once an actor, or a unit of a group, has taken damage from another unit since this trigger was armed."
+msgstr ""
 
 #: src/scenario/triggerTypes.ts
 #, fuzzy

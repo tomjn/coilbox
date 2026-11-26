@@ -1,8 +1,8 @@
 {
   "id": "convoy",
   "name": "Convoy",
-  "description": "Triggers that count units: the convoy arriving and thinning out, the raiders being wiped, the depot cleared of everything but walls, and counted each time they come back to it.",
-  "runtimeVersion": 16,
+  "description": "Triggers that count units: the convoy arriving and thinning out, the raiders being wiped, the depot cleared of everything but walls, counted each time they come back to it, and woken when they fire on the convoy.",
+  "runtimeVersion": 17,
   "setup": {
     "gameName": "Test Game",
     "mapName": "Comet Catcher Redux",
@@ -222,6 +222,33 @@
           "params": {
             "name": "arrived",
             "value": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "convoy-attacked",
+      "enabled": true,
+      "repeat": false,
+      "conditions": {
+        "op": "all",
+        "conditions": [
+          {
+            "type": "unit_attacked",
+            "params": {
+              "group": "convoy",
+              "attackerTeam": "raiders",
+              "attackerDefs": ["corak"]
+            }
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "give_orders",
+          "params": {
+            "group": "convoy",
+            "orders": [{ "kind": "attack", "target": "raid" }]
           }
         }
       ]

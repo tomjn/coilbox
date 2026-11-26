@@ -199,7 +199,7 @@ In the saved scenario and the compiled mission this is `onBecomingTrue = true` o
 
 - A wait delays a firing. The conditions are still checked while it runs, so if they stop and start again, the trigger fires when the wait is over. If they have stopped by then, it does not fire.
 - Enabling a trigger that was disabled makes it ready, even if its conditions never stopped. Enabling one that is already enabled does not.
-- A condition about something the player did, `command_given` or `dialogue_dismissed`, is used up by the firing. The next order or dismissal fires the trigger again.
+- A condition about a moment, `unit_attacked`, `command_given` or `dialogue_dismissed`, is used up by the firing. The next hit, order or dismissal fires the trigger again.
 - A condition about an event is also checked on the polled tick, so the trigger can see it stop holding. Stopping and starting again between two checks that nothing else prompts goes unseen.
 - `/luarules reload` does not fire it again. A condition that reads something the reload loses, such as how long a zone has been held, stops holding for a while, so its trigger fires again when it next holds.
 
@@ -231,6 +231,7 @@ The names below are the ones in the compiled mission. The editor shows them with
 | `unit_dead` | An actor has died. |
 | `group_dead` | Every unit in a group has died. It is false until the group has been on the map, so a group waiting for `spawn_group` is not dead. A group that was wiped and spawned again is alive again. |
 | `unit_health_below` | An actor's health is under a fraction of its maximum. |
+| `unit_attacked` | An actor, or any unit of a `group`, has taken damage from another unit since the trigger was armed. Optionally only one team's hits, and only hits by certain unit types. |
 | `unit_built` | A team has finished building this many of a unit type. |
 | `unit_captured` | An actor has changed hands, optionally to a named team. |
 | `unit_selected` | A player has a unit selected. Any unit, or one of a unit type, or one actor. Optionally one team's player. |
@@ -245,6 +246,12 @@ The names below are the ones in the compiled mission. The editor shows them with
 Gaia does not contest. It owns the map's own furniture, critters and the units some maps place, which belongs to no side and fights for none, so a mission that told the player to clear the keep would otherwise be asking them to hunt down a deer. Allies do not contest either. A scenario that ticks the box needs mission runtime 3.
 
 You cannot build this out of `units_in_zone` with `max = 0`. That reads the moment the timer runs out rather than the whole minute leading up to it.
+
+`unit_attacked` is how a mission reacts to a fight starting: the neutral convoy's escort turns hostile when the player fires on it, or a warning plays when the outpost comes under attack. Name a placed unit or a base building, or give a `group` instead to watch all of its units. **Attacking team** (`attackerTeam`) counts only that team's hits, so pick the enemy to stop the mission's own friendly fire setting it off. **Attacking unit types** (`attackerDefs`) counts only hits by those types.
+
+It counts hits that land after the trigger was armed, and after each firing for a trigger that fires every time. A weapon can land several hits a second, so give a repeating trigger a wait. A trigger with a second condition remembers the hit until the second one holds.
+
+Damage with no attacker, such as a fall or terrain, does not count, and nor does a shot that does no damage. A placed unit marked invulnerable takes no damage, so it is never attacked. A scenario that uses `unit_attacked` needs mission runtime 17.
 
 `unit_selected` and `command_given` are the two conditions that read what a player did, and they are what a first lesson is made of. A scenario that uses either needs mission runtime 8.
 

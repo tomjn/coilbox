@@ -177,8 +177,16 @@
 -- hold, so a line meant once is said twice a second. So a scenario using it asks
 -- for 16.
 
+-- 17 adds one condition, the first that hears a hit (issue #5298):
+--
+--   * unit_attacked holds once a named actor, or any unit of a group, has taken
+--     damage from another unit since the trigger was armed
+--
+-- A runtime behind 17 has no implementation for it, so it reports itself once
+-- and never holds. So a scenario using it asks for 17.
+
 return {
-	version = 16,
+	version = 17,
 
 	-- The compiled mission format this runtime reads.
 	schemaVersion = 1,
@@ -189,6 +197,7 @@ return {
 		"unit_dead",
 		"group_dead",
 		"unit_health_below",
+		"unit_attacked",
 		"unit_built",
 		"unit_captured",
 		"unit_selected",

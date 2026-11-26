@@ -10459,6 +10459,14 @@ msgstr "Attack {nodeName}"
 msgid "attacker"
 msgstr "attacker"
 
+#: src/scenario/triggerTypes.ts
+msgid "attacking team"
+msgstr "attacking team"
+
+#: src/scenario/triggerTypes.ts
+msgid "attacking unit types"
+msgstr "attacking unit types"
+
 #: src/content/unitFieldNotes.ts
 msgid "Attacks from a hover"
 msgstr "Attacks from a hover"
@@ -21523,6 +21531,10 @@ msgstr "Holds once a team has finished building enough of a unit type."
 #: src/scenario/triggerTypes.ts
 msgid "Holds once a team has kept a zone for the time you set, optionally only while uncontested."
 msgstr "Holds once a team has kept a zone for the time you set, optionally only while uncontested."
+
+#: src/scenario/triggerTypes.ts
+msgid "Holds once an actor, or a unit of a group, has taken damage from another unit since this trigger was armed."
+msgstr "Holds once an actor, or a unit of a group, has taken damage from another unit since this trigger was armed."
 
 #: src/scenario/triggerTypes.ts
 msgid "Holds once every unit in a group has died. A group that has not been placed yet is not dead."
