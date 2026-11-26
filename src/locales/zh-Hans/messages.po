@@ -15325,6 +15325,7 @@ msgstr "挑战"
 msgid "Chance of setting static map features alight on impact."
 msgstr "命中时点燃地图上静态物体的几率。"
 
+#: src/account/pages/SettingsSection.tsx
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/lego/pages/components/TexturePicker.tsx
 #, fuzzy
@@ -15455,11 +15456,6 @@ msgstr "更换武器"
 #, fuzzy
 msgid "Change what a game's units cost, carry and can do."
 msgstr "更改游戏单位的消耗、携带内容和能力。"
-
-#: src/account/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Change your account"
-msgstr "更改你的账号"
 
 #: src/content/compatReport.ts
 #: src/play/pages/components/GameOptionsPanel.tsx
@@ -38188,6 +38184,7 @@ msgstr "乘员跟随部件"
 msgid "Passengers survive its death"
 msgstr "乘员在其被摧毁后存活"
 
+#: src/account/pages/SettingsSection.tsx
 #: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/lobby-servers/RegisterForm.tsx

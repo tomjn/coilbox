@@ -15327,6 +15327,7 @@ msgstr "Uitdagingen"
 msgid "Chance of setting static map features alight on impact."
 msgstr "Kans dat vaste kaartobjecten bij inslag in brand vliegen."
 
+#: src/account/pages/SettingsSection.tsx
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/lego/pages/components/TexturePicker.tsx
 #, fuzzy
@@ -15457,11 +15458,6 @@ msgstr "Wapen wijzigen"
 #, fuzzy
 msgid "Change what a game's units cost, carry and can do."
 msgstr "Wijzig wat de eenheden van een spel kosten, dragen en kunnen."
-
-#: src/account/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Change your account"
-msgstr "Je account wijzigen"
 
 #: src/content/compatReport.ts
 #: src/play/pages/components/GameOptionsPanel.tsx
@@ -38204,6 +38200,7 @@ msgstr "Passagiers volgen het deel"
 msgid "Passengers survive its death"
 msgstr "Passagiers overleven de vernietiging"
 
+#: src/account/pages/SettingsSection.tsx
 #: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/lobby-servers/RegisterForm.tsx

@@ -15325,6 +15325,7 @@ msgstr "Défis"
 msgid "Chance of setting static map features alight on impact."
 msgstr "Probabilité d’enflammer les éléments de décor statiques à l’impact."
 
+#: src/account/pages/SettingsSection.tsx
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/lego/pages/components/TexturePicker.tsx
 #, fuzzy
@@ -15455,11 +15456,6 @@ msgstr "Changer d’arme"
 #, fuzzy
 msgid "Change what a game's units cost, carry and can do."
 msgstr "Modifiez ce que coûtent, transportent et savent faire les unités d’un jeu."
-
-#: src/account/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Change your account"
-msgstr "Modifier votre compte"
 
 #: src/content/compatReport.ts
 #: src/play/pages/components/GameOptionsPanel.tsx
@@ -38188,6 +38184,7 @@ msgstr "Les passagers suivent la pièce"
 msgid "Passengers survive its death"
 msgstr "Les passagers survivent à sa destruction"
 
+#: src/account/pages/SettingsSection.tsx
 #: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/lobby-servers/RegisterForm.tsx

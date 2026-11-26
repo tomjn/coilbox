@@ -15327,6 +15327,7 @@ msgstr "Προκλήσεις"
 msgid "Chance of setting static map features alight on impact."
 msgstr "Πιθανότητα να πάρουν φωτιά τα στατικά αντικείμενα χάρτη κατά την πρόσκρουση."
 
+#: src/account/pages/SettingsSection.tsx
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/lego/pages/components/TexturePicker.tsx
 #, fuzzy
@@ -15457,11 +15458,6 @@ msgstr "Αλλαγή όπλου"
 #, fuzzy
 msgid "Change what a game's units cost, carry and can do."
 msgstr "Αλλάξτε τι κοστίζουν, τι φέρουν και τι μπορούν να κάνουν οι μονάδες ενός παιχνιδιού."
-
-#: src/account/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Change your account"
-msgstr "Αλλαγή του λογαριασμού σας"
 
 #: src/content/compatReport.ts
 #: src/play/pages/components/GameOptionsPanel.tsx
@@ -38204,6 +38200,7 @@ msgstr "Οι επιβάτες ακολουθούν το τμήμα"
 msgid "Passengers survive its death"
 msgstr "Οι επιβάτες επιζούν από την καταστροφή του"
 
+#: src/account/pages/SettingsSection.tsx
 #: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/lobby-servers/RegisterForm.tsx

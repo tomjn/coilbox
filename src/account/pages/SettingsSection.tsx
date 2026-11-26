@@ -1,8 +1,16 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
+import { Loader2, MailCheck } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { Field } from "@/components/Field";
+import { SettingList, SettingRow } from "@/components/SettingRow";
 import { SlideDrawer } from "@/components/SlideDrawer";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { describeError } from "@/i18n/uiError";
 import { identifierFieldProps } from "@/lib/identifierField";
 import { lsStoreCredential } from "../../lobby-servers/bindings";
@@ -22,9 +30,6 @@ import {
   useProtocolServers,
   usernameFromKey,
 } from "../../multiplayer/store";
-
-const H2_CLASS =
-  "flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground";
 
 /**
  * Account management for the signed-in lobby account (`/settings/account`).
@@ -70,15 +75,15 @@ export default function AccountSettings() {
           onChange={setManualPick}
         />
       )}
+      {/* Keyed so a resend result or an open drawer does not carry over
+          to another account picked above. */}
       <AccountDetails
+        key={pickedKey}
+        serverKey={pickedKey}
         username={picked?.mirror.state?.myUsername ?? null}
         registrationDate={picked?.accountInfo?.registrationDate ?? null}
         email={picked?.accountInfo?.email ?? null}
         ingameHours={picked?.accountInfo?.ingameHours ?? null}
-      />
-      <AccountActions
-        email={picked?.accountInfo?.email ?? null}
-        serverKey={pickedKey}
       />
     </div>
   );
@@ -121,101 +126,122 @@ function OtherProtocolPanel() {
   );
 }
 
+/**
+ * The account's details and the changes the server accepts, as one list. The
+ * email and password rows carry their own Change buttons, so each action sits
+ * beside the thing it changes.
+ */
 function AccountDetails({
+  serverKey,
   username,
   registrationDate,
   email,
   ingameHours,
 }: {
+  serverKey: string;
   username: string | null;
   registrationDate: string | null;
   email: string | null;
   ingameHours: string | null;
 }) {
   const { t } = useLingui();
-  const NOT_KNOWN = t`Not known yet`;
-  return (
-    <section className="space-y-3">
-      <h2 className={H2_CLASS}>
-        <Trans>Account</Trans>
-      </h2>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 rounded-md border border-border p-3 text-sm">
-        <dt className="text-muted-foreground">
-          <Trans>Username</Trans>
-        </dt>
-        <dd className="font-medium">{username ?? NOT_KNOWN}</dd>
-        <dt className="text-muted-foreground">
-          <Trans>Member since</Trans>
-        </dt>
-        <dd>{registrationDate ?? NOT_KNOWN}</dd>
-        <dt className="text-muted-foreground">
-          <Trans>Email address</Trans>
-        </dt>
-        <dd>{email ?? NOT_KNOWN}</dd>
-        <dt className="text-muted-foreground">
-          <Trans>Playtime</Trans>
-        </dt>
-        <dd>{ingameHours ?? NOT_KNOWN}</dd>
-      </dl>
-    </section>
-  );
-}
-
-function AccountActions({
-  email,
-  serverKey,
-}: {
-  email: string | null;
-  serverKey: string;
-}) {
-  const { t } = useLingui();
   const { resendVerification } = useMultiplayer();
   const [drawer, setDrawer] = useState<"password" | "email" | null>(null);
-  const [resendStatus, setResendStatus] = useState<string | null>(null);
+  const [resendSent, setResendSent] = useState(false);
+  const [resendError, setResendError] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
+  const NOT_KNOWN = t`Not known yet`;
 
   const doResend = async () => {
     if (!email) return;
     setResending(true);
-    setResendStatus(null);
+    setResendSent(false);
+    setResendError(null);
     try {
       await resendVerification(email, serverKey);
-      setResendStatus(t`Verification email sent.`);
+      setResendSent(true);
     } catch (err) {
-      setResendStatus(describeError(err));
+      setResendError(describeError(err));
     } finally {
       setResending(false);
     }
   };
 
+  const value = (text: string | null) => (
+    <span className="select-text text-sm">{text ?? NOT_KNOWN}</span>
+  );
+
   return (
-    <section className="space-y-3">
-      <h2 className={H2_CLASS}>
-        <Trans>Change your account</Trans>
+    <section className="flex flex-col gap-3">
+      <h2 className="text-sm font-semibold">
+        <Trans>Account</Trans>
       </h2>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setDrawer("password")}
+      <SettingList>
+        <SettingRow label={t`Username`}>{value(username)}</SettingRow>
+        <SettingRow label={t`Member since`}>
+          {value(registrationDate)}
+        </SettingRow>
+        <SettingRow label={t`Playtime`}>{value(ingameHours)}</SettingRow>
+        <SettingRow
+          label={t`Email address`}
+          description={email ?? NOT_KNOWN}
+          error={resendError}
         >
-          <Trans>Change password</Trans>
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => setDrawer("email")}>
-          <Trans>Change email</Trans>
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={email == null || resending}
-          onClick={() => void doResend()}
-        >
-          <Trans>Resend verification email</Trans>
-        </Button>
-      </div>
-      {resendStatus && (
-        <p className="text-xs text-muted-foreground">{resendStatus}</p>
-      )}
+          <div className="flex items-center gap-1">
+            {resendSent && (
+              <span
+                role="status"
+                className="mr-1 text-xs text-muted-foreground"
+              >
+                <Trans>Verification email sent.</Trans>
+              </span>
+            )}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={email == null || resending}
+                    onClick={() => void doResend()}
+                    aria-label={t`Resend verification email`}
+                  >
+                    {resending ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <MailCheck className="size-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <Trans>Resend verification email</Trans>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setDrawer("email")}
+              aria-label={t`Change email`}
+            >
+              <Trans>Change</Trans>
+            </Button>
+          </div>
+        </SettingRow>
+        <SettingRow label={t`Password`}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setDrawer("password")}
+            aria-label={t`Change password`}
+          >
+            <Trans>Change</Trans>
+          </Button>
+        </SettingRow>
+      </SettingList>
       <ChangePasswordDrawer
         open={drawer === "password"}
         serverKey={serverKey}
