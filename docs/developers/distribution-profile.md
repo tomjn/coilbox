@@ -109,7 +109,7 @@ See the [about page](#/pages/about) for more.
 
 Notes:
 
-- **Assets are `.coilbox`-relative**, the same convention as the splash/logo images. A Markdown image `![](../pages/diagram.png)` or a `background: pages/bg.jpg` resolves to a file under `.coilbox/`. Audio/video files referenced as images render inline players.
+- **Assets are `.coilbox`-relative**, the same convention as the splash/logo images. A Markdown image `![](pages/diagram.png)` or a `background: pages/bg.jpg` resolves to a file under `.coilbox/`. If a name in a Markdown image has a space in it, wrap it in angle brackets, as in `![](<pages/unit diagram.png>)`. Audio/video files referenced as images render inline players.
 - **Link between pages** (or from a welcome screen) with `#/pages/<path>`, or a plain `[label](../other.md)` link — handy with `nav: false` for pages reached only from elsewhere. See [File references](#file-references) for the full link/route scheme.
 - **Compose** pages with [`@` references](#file-references): include shared fragments (`@.coilbox/pages/_foo.md`), link to routes (`@route/singleplayer`), and embed live GUI (`@widget/onboarding`, `@widget/build-tree/<game>`).
 - Content is trusted bundler-authored Markdown (safe by default: no raw HTML/JS). Malformed or duplicate `path`s are skipped rather than breaking the app.
