@@ -15742,6 +15742,7 @@ msgstr "Sök efter uppdateringar"
 msgid "Check it loads"
 msgstr "Kontrollera att den laddas"
 
+#: src/game-updates/pages/GameUpdatesSection.tsx
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Check now"
 msgstr ""
@@ -27713,11 +27714,6 @@ msgstr "installerad"
 msgid "Installed"
 msgstr "Installerad"
 
-#: src/game-updates/pages/GameUpdatesSection.tsx
-#, fuzzy
-msgid "Installed — restart to apply the updated profile."
-msgstr "Installerad – starta om för att använda den uppdaterade profilen."
-
 #: src/deeplink/DeepLinkHandler.tsx
 #, fuzzy
 msgid "Installed {fileName}"
@@ -27728,11 +27724,6 @@ msgstr "Installerade {fileName}"
 #, fuzzy
 msgid "Installed <0>{0}</0>"
 msgstr "Installerade <0>{0}</0>"
-
-#: src/game-updates/pages/GameUpdatesSection.tsx
-#, fuzzy
-msgid "Installed and ready."
-msgstr "Installerad och klar."
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
 #: src/widgets/pages/CoilboxWidgets.tsx
@@ -27760,6 +27751,14 @@ msgstr "Installerad, och {staleCount} av {fileCount, plural, one {# fil skiljer 
 #, fuzzy
 msgid "Installed, and its licence notice is missing or out of date"
 msgstr "Installerad, och dess licensmeddelande saknas eller är inaktuellt"
+
+#: src/game-updates/pages/GameUpdatesSection.tsx
+msgid "Installed."
+msgstr ""
+
+#: src/game-updates/pages/GameUpdatesSection.tsx
+msgid "Installed. Restart to apply the new profile."
+msgstr ""
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Installed. Restart to apply."
@@ -29135,9 +29134,8 @@ msgid "Latest"
 msgstr "Senaste"
 
 #: src/game-updates/pages/GameUpdatesSection.tsx
-#, fuzzy
-msgid "Latest: {releaseName}"
-msgstr "Senaste: {releaseName}"
+msgid "Latest release {releaseName}"
+msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -45169,11 +45167,6 @@ msgstr "Ange först en nedladdningsmapp i <0>inställningarna för innehållsmap
 msgid "Set a download folder in <0>Content folders settings</0> to enable downloads."
 msgstr "Ange en nedladdningsmapp i <0>inställningarna för innehållsmappar</0> för att aktivera nedladdningar."
 
-#: src/game-updates/pages/GameUpdatesSection.tsx
-#, fuzzy
-msgid "Set a download folder in <0>Content folders settings</0> to enable updates."
-msgstr "Ange en nedladdningsmapp i <0>inställningarna för innehållsmappar</0> för att aktivera uppdateringar."
-
 #: src/home/zones/SuggestedMap.tsx
 #, fuzzy
 msgid "Set a download folder in <0>Content folders settings</0> to install it."
@@ -45188,6 +45181,10 @@ msgstr "Ange en nedladdningsmapp under <0>Innehållsmappar</0> för att installe
 #, fuzzy
 msgid "Set a download folder in <0>Content folders</0> to install maps."
 msgstr "Ange en nedladdningsmapp under <0>Innehållsmappar</0> för att installera kartor."
+
+#: src/game-updates/pages/GameUpdatesSection.tsx
+msgid "Set a download folder in <0>Content folders</0> to install updates."
+msgstr ""
 
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #, fuzzy
@@ -56216,6 +56213,10 @@ msgstr "Upp"
 msgid "Up to 30 minutes"
 msgstr "Upp till 30 minuter"
 
+#: src/game-updates/pages/GameUpdatesSection.tsx
+msgid "Up to date with {releaseName}"
+msgstr ""
+
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Up to date. Last checked {lastCheckedText}"
 msgstr ""
@@ -59126,11 +59127,6 @@ msgstr "Du har inte gått med i {0}."
 #, fuzzy
 msgid "You have not shared a replay with {other}."
 msgstr "Du har inte delat någon repris med {other}."
-
-#: src/game-updates/pages/GameUpdatesSection.tsx
-#, fuzzy
-msgid "You have the latest game version ({releaseTag})."
-msgstr "Du har den senaste spelversionen ({releaseTag})."
 
 #: src/challenge/SubstitutedMapNote.tsx
 #, fuzzy
