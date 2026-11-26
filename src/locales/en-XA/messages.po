@@ -22167,6 +22167,7 @@ msgstr ""
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
+#: src/content/pages/EnginesSection.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
 #: src/downloads/pages/components/HubEngineList.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
@@ -22240,7 +22241,7 @@ msgid "Installing…"
 msgstr ""
 
 #: src/downloads/pages/components/EngineInstaller.tsx
-msgid "Installs an engine matching this platform into the configured content folder's <0>engine/</0> directory (set the destination in <1>Content folders settings</1>)."
+msgid "Installs into {writePath}/engine"
 msgstr ""
 
 #: src/runlite/pages/components/ArsenalOverlay.tsx
@@ -23935,7 +23936,7 @@ msgid "Loading content…"
 msgstr ""
 
 #: src/downloads/pages/components/EngineInstaller.tsx
-msgid "loading engines…"
+msgid "Loading engines…"
 msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
@@ -23976,7 +23977,7 @@ msgid "Loading sides…"
 msgstr ""
 
 #: src/downloads/pages/components/HubEngineList.tsx
-msgid "loading test builds…"
+msgid "Loading test builds…"
 msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
@@ -29909,6 +29910,10 @@ msgstr ""
 msgid "Open the build the hub has"
 msgstr ""
 
+#: src/content/pages/components/EngineRow.tsx
+msgid "Open the engine's folder"
+msgstr ""
+
 #: src/deeplink/actions.ts
 msgid "Open the game \"{id}\"."
 msgstr ""
@@ -33959,6 +33964,10 @@ msgstr ""
 msgid "Report the outcome to record your progress."
 msgstr ""
 
+#: src/content/pages/components/EngineRow.tsx
+msgid "reports {sync}"
+msgstr ""
+
 #: src/downloads/pages/components/RapidBrowser.tsx
 msgid "Repositories"
 msgstr ""
@@ -34685,6 +34694,14 @@ msgstr ""
 
 #: src/lego/pages/components/GameScriptPanel.tsx
 msgid "Run the compiled script"
+msgstr ""
+
+#: src/content/pages/components/EngineRow.tsx
+msgid "Run the engine again to read its version"
+msgstr ""
+
+#: src/content/pages/components/EngineRow.tsx
+msgid "Run the engine to read its version"
 msgstr ""
 
 #: src/uberstress/pages/components/SeedSqlForm.tsx
@@ -45557,11 +45574,11 @@ msgid "Verification email sent."
 msgstr ""
 
 #: src/content/pages/components/EngineRow.tsx
-msgid "Verify"
+msgid "Verified"
 msgstr ""
 
-#: src/content/pages/EnginesSection.tsx
-msgid "Verify reads the real version from the binary."
+#: src/content/pages/components/EngineRow.tsx
+msgid "Verify"
 msgstr ""
 
 #: src/content/achievements.ts

@@ -22168,6 +22168,7 @@ msgstr "installed"
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
+#: src/content/pages/EnginesSection.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
 #: src/downloads/pages/components/HubEngineList.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
@@ -22241,8 +22242,8 @@ msgid "Installing…"
 msgstr "Installing…"
 
 #: src/downloads/pages/components/EngineInstaller.tsx
-msgid "Installs an engine matching this platform into the configured content folder's <0>engine/</0> directory (set the destination in <1>Content folders settings</1>)."
-msgstr "Installs an engine matching this platform into the configured content folder's <0>engine/</0> directory (set the destination in <1>Content folders settings</1>)."
+msgid "Installs into {writePath}/engine"
+msgstr "Installs into {writePath}/engine"
 
 #: src/runlite/pages/components/ArsenalOverlay.tsx
 msgid "Intelligence"
@@ -23936,8 +23937,8 @@ msgid "Loading content…"
 msgstr "Loading content…"
 
 #: src/downloads/pages/components/EngineInstaller.tsx
-msgid "loading engines…"
-msgstr "loading engines…"
+msgid "Loading engines…"
+msgstr "Loading engines…"
 
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Loading game data…"
@@ -23977,8 +23978,8 @@ msgid "Loading sides…"
 msgstr "Loading sides…"
 
 #: src/downloads/pages/components/HubEngineList.tsx
-msgid "loading test builds…"
-msgstr "loading test builds…"
+msgid "Loading test builds…"
+msgstr "Loading test builds…"
 
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Loading the game's factions…"
@@ -29910,6 +29911,10 @@ msgstr "Open the battle page"
 msgid "Open the build the hub has"
 msgstr "Open the build the hub has"
 
+#: src/content/pages/components/EngineRow.tsx
+msgid "Open the engine's folder"
+msgstr "Open the engine's folder"
+
 #: src/deeplink/actions.ts
 msgid "Open the game \"{id}\"."
 msgstr "Open the game \"{id}\"."
@@ -33960,6 +33965,10 @@ msgstr "Report JSON"
 msgid "Report the outcome to record your progress."
 msgstr "Report the outcome to record your progress."
 
+#: src/content/pages/components/EngineRow.tsx
+msgid "reports {sync}"
+msgstr "reports {sync}"
+
 #: src/downloads/pages/components/RapidBrowser.tsx
 msgid "Repositories"
 msgstr "Repositories"
@@ -34687,6 +34696,14 @@ msgstr "Run test"
 #: src/lego/pages/components/GameScriptPanel.tsx
 msgid "Run the compiled script"
 msgstr "Run the compiled script"
+
+#: src/content/pages/components/EngineRow.tsx
+msgid "Run the engine again to read its version"
+msgstr "Run the engine again to read its version"
+
+#: src/content/pages/components/EngineRow.tsx
+msgid "Run the engine to read its version"
+msgstr "Run the engine to read its version"
 
 #: src/uberstress/pages/components/SeedSqlForm.tsx
 msgid "Run the output against the server's database, then run a scenario with <0>register</0> unchecked."
@@ -45558,12 +45575,12 @@ msgid "Verification email sent."
 msgstr "Verification email sent."
 
 #: src/content/pages/components/EngineRow.tsx
+msgid "Verified"
+msgstr "Verified"
+
+#: src/content/pages/components/EngineRow.tsx
 msgid "Verify"
 msgstr "Verify"
-
-#: src/content/pages/EnginesSection.tsx
-msgid "Verify reads the real version from the binary."
-msgstr "Verify reads the real version from the binary."
 
 #: src/content/achievements.ts
 msgid "Versatile"

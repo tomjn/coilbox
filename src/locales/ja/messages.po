@@ -27373,6 +27373,7 @@ msgstr "インストール済み"
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
+#: src/content/pages/EnginesSection.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
 #: src/downloads/pages/components/HubEngineList.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
@@ -27461,9 +27462,8 @@ msgid "Installing…"
 msgstr "インストール中…"
 
 #: src/downloads/pages/components/EngineInstaller.tsx
-#, fuzzy
-msgid "Installs an engine matching this platform into the configured content folder's <0>engine/</0> directory (set the destination in <1>Content folders settings</1>)."
-msgstr "このプラットフォームに合うエンジンを、設定したコンテンツフォルダーの <0>engine/</0> ディレクトリにインストールします（インストール先は<1>コンテンツフォルダーの設定</1>で設定します）。"
+msgid "Installs into {writePath}/engine"
+msgstr ""
 
 #: src/runlite/pages/components/ArsenalOverlay.tsx
 #, fuzzy
@@ -29565,9 +29565,8 @@ msgid "Loading content…"
 msgstr "コンテンツを読み込み中…"
 
 #: src/downloads/pages/components/EngineInstaller.tsx
-#, fuzzy
-msgid "loading engines…"
-msgstr "エンジンを読み込み中…"
+msgid "Loading engines…"
+msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
 #, fuzzy
@@ -29616,7 +29615,7 @@ msgid "Loading sides…"
 msgstr "勢力を読み込み中…"
 
 #: src/downloads/pages/components/HubEngineList.tsx
-msgid "loading test builds…"
+msgid "Loading test builds…"
 msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
@@ -36950,6 +36949,10 @@ msgstr "試合ページを開く"
 msgid "Open the build the hub has"
 msgstr ""
 
+#: src/content/pages/components/EngineRow.tsx
+msgid "Open the engine's folder"
+msgstr ""
+
 #: src/deeplink/actions.ts
 #, fuzzy
 msgid "Open the game \"{id}\"."
@@ -41937,6 +41940,10 @@ msgstr "レポート JSON"
 msgid "Report the outcome to record your progress."
 msgstr "進捗を記録するには結果を報告してください。"
 
+#: src/content/pages/components/EngineRow.tsx
+msgid "reports {sync}"
+msgstr ""
+
 #: src/downloads/pages/components/RapidBrowser.tsx
 #, fuzzy
 msgid "Repositories"
@@ -42831,6 +42838,14 @@ msgstr "テストを実行"
 #, fuzzy
 msgid "Run the compiled script"
 msgstr "コンパイル済みのスクリプトを実行"
+
+#: src/content/pages/components/EngineRow.tsx
+msgid "Run the engine again to read its version"
+msgstr ""
+
+#: src/content/pages/components/EngineRow.tsx
+msgid "Run the engine to read its version"
+msgstr ""
 
 #: src/uberstress/pages/components/SeedSqlForm.tsx
 #, fuzzy
@@ -56286,14 +56301,13 @@ msgid "Verification email sent."
 msgstr "確認メールを送信しました。"
 
 #: src/content/pages/components/EngineRow.tsx
+msgid "Verified"
+msgstr ""
+
+#: src/content/pages/components/EngineRow.tsx
 #, fuzzy
 msgid "Verify"
 msgstr "検証"
-
-#: src/content/pages/EnginesSection.tsx
-#, fuzzy
-msgid "Verify reads the real version from the binary."
-msgstr "検証すると、バイナリから実際のバージョンを読み取ります。"
 
 #: src/content/achievements.ts
 #, fuzzy

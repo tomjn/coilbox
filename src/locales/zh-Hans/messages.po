@@ -27373,6 +27373,7 @@ msgstr "已安装"
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
+#: src/content/pages/EnginesSection.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
 #: src/downloads/pages/components/HubEngineList.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
@@ -27461,9 +27462,8 @@ msgid "Installing…"
 msgstr "安装中…"
 
 #: src/downloads/pages/components/EngineInstaller.tsx
-#, fuzzy
-msgid "Installs an engine matching this platform into the configured content folder's <0>engine/</0> directory (set the destination in <1>Content folders settings</1>)."
-msgstr "将适用于此平台的引擎安装到所配置内容文件夹的 <0>engine/</0> 目录中（在<1>内容文件夹设置</1>中设置目标位置）。"
+msgid "Installs into {writePath}/engine"
+msgstr ""
 
 #: src/runlite/pages/components/ArsenalOverlay.tsx
 #, fuzzy
@@ -29565,9 +29565,8 @@ msgid "Loading content…"
 msgstr "正在加载内容…"
 
 #: src/downloads/pages/components/EngineInstaller.tsx
-#, fuzzy
-msgid "loading engines…"
-msgstr "正在加载引擎…"
+msgid "Loading engines…"
+msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
 #, fuzzy
@@ -29616,7 +29615,7 @@ msgid "Loading sides…"
 msgstr "正在加载阵营…"
 
 #: src/downloads/pages/components/HubEngineList.tsx
-msgid "loading test builds…"
+msgid "Loading test builds…"
 msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
@@ -36950,6 +36949,10 @@ msgstr "打开对局页面"
 msgid "Open the build the hub has"
 msgstr ""
 
+#: src/content/pages/components/EngineRow.tsx
+msgid "Open the engine's folder"
+msgstr ""
+
 #: src/deeplink/actions.ts
 #, fuzzy
 msgid "Open the game \"{id}\"."
@@ -41937,6 +41940,10 @@ msgstr "报告 JSON"
 msgid "Report the outcome to record your progress."
 msgstr "报告结果以记录你的进度。"
 
+#: src/content/pages/components/EngineRow.tsx
+msgid "reports {sync}"
+msgstr ""
+
 #: src/downloads/pages/components/RapidBrowser.tsx
 #, fuzzy
 msgid "Repositories"
@@ -42831,6 +42838,14 @@ msgstr "运行测试"
 #, fuzzy
 msgid "Run the compiled script"
 msgstr "运行编译后的脚本"
+
+#: src/content/pages/components/EngineRow.tsx
+msgid "Run the engine again to read its version"
+msgstr ""
+
+#: src/content/pages/components/EngineRow.tsx
+msgid "Run the engine to read its version"
+msgstr ""
 
 #: src/uberstress/pages/components/SeedSqlForm.tsx
 #, fuzzy
@@ -56286,14 +56301,13 @@ msgid "Verification email sent."
 msgstr "已发送验证邮件。"
 
 #: src/content/pages/components/EngineRow.tsx
+msgid "Verified"
+msgstr ""
+
+#: src/content/pages/components/EngineRow.tsx
 #, fuzzy
 msgid "Verify"
 msgstr "验证"
-
-#: src/content/pages/EnginesSection.tsx
-#, fuzzy
-msgid "Verify reads the real version from the binary."
-msgstr "“验证”会从程序文件中读取真实版本。"
 
 #: src/content/achievements.ts
 #, fuzzy

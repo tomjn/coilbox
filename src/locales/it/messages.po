@@ -27382,6 +27382,7 @@ msgstr "installato"
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
+#: src/content/pages/EnginesSection.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
 #: src/downloads/pages/components/HubEngineList.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
@@ -27470,9 +27471,8 @@ msgid "Installing…"
 msgstr "Installazione…"
 
 #: src/downloads/pages/components/EngineInstaller.tsx
-#, fuzzy
-msgid "Installs an engine matching this platform into the configured content folder's <0>engine/</0> directory (set the destination in <1>Content folders settings</1>)."
-msgstr "Installa un motore per questa piattaforma nella cartella <0>engine/</0> della cartella dei contenuti configurata (imposta la destinazione in <1>Impostazioni cartelle dei contenuti</1>)."
+msgid "Installs into {writePath}/engine"
+msgstr ""
 
 #: src/runlite/pages/components/ArsenalOverlay.tsx
 #, fuzzy
@@ -29575,9 +29575,8 @@ msgid "Loading content…"
 msgstr "Caricamento dei contenuti…"
 
 #: src/downloads/pages/components/EngineInstaller.tsx
-#, fuzzy
-msgid "loading engines…"
-msgstr "caricamento dei motori…"
+msgid "Loading engines…"
+msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
 #, fuzzy
@@ -29626,7 +29625,7 @@ msgid "Loading sides…"
 msgstr "Caricamento delle fazioni…"
 
 #: src/downloads/pages/components/HubEngineList.tsx
-msgid "loading test builds…"
+msgid "Loading test builds…"
 msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
@@ -36964,6 +36963,10 @@ msgstr "Apri la pagina della battaglia"
 msgid "Open the build the hub has"
 msgstr ""
 
+#: src/content/pages/components/EngineRow.tsx
+msgid "Open the engine's folder"
+msgstr ""
+
 #: src/deeplink/actions.ts
 #, fuzzy
 msgid "Open the game \"{id}\"."
@@ -41956,6 +41959,10 @@ msgstr "Report JSON"
 msgid "Report the outcome to record your progress."
 msgstr "Indica l’esito per registrare i tuoi progressi."
 
+#: src/content/pages/components/EngineRow.tsx
+msgid "reports {sync}"
+msgstr ""
+
 #: src/downloads/pages/components/RapidBrowser.tsx
 #, fuzzy
 msgid "Repositories"
@@ -42852,6 +42859,14 @@ msgstr "Esegui test"
 #, fuzzy
 msgid "Run the compiled script"
 msgstr "Esegui lo script compilato"
+
+#: src/content/pages/components/EngineRow.tsx
+msgid "Run the engine again to read its version"
+msgstr ""
+
+#: src/content/pages/components/EngineRow.tsx
+msgid "Run the engine to read its version"
+msgstr ""
 
 #: src/uberstress/pages/components/SeedSqlForm.tsx
 #, fuzzy
@@ -56317,14 +56332,13 @@ msgid "Verification email sent."
 msgstr "Email di verifica inviata."
 
 #: src/content/pages/components/EngineRow.tsx
+msgid "Verified"
+msgstr ""
+
+#: src/content/pages/components/EngineRow.tsx
 #, fuzzy
 msgid "Verify"
 msgstr "Verifica"
-
-#: src/content/pages/EnginesSection.tsx
-#, fuzzy
-msgid "Verify reads the real version from the binary."
-msgstr "Verifica legge la versione reale dal binario."
 
 #: src/content/achievements.ts
 #, fuzzy

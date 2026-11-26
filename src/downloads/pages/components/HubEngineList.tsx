@@ -124,20 +124,21 @@ export function HubEngineList() {
   };
 
   return (
-    <section className="space-y-3 border-t border-border pt-5">
-      <h2 className="text-sm font-semibold">
-        <Trans>Hub test builds</Trans>
-      </h2>
-      <Alert>
-        <AlertTriangle size={15} />
-        <AlertDescription>{HUB_ENGINE_WARNING}</AlertDescription>
-      </Alert>
-      {canUpload && <EngineUpload hubUrl={hubUrl} onListed={load} />}
+    <section className="flex flex-col gap-3">
+      <div>
+        <h2 className="text-sm font-semibold">
+          <Trans>Hub test builds</Trans>
+        </h2>
+        <p className="mt-1 flex max-w-prose gap-2 text-xs text-amber-700 dark:text-amber-400">
+          <AlertTriangle className="mt-px size-3.5 shrink-0" />
+          {HUB_ENGINE_WARNING}
+        </p>
+      </div>
 
       {loading && engines === null && (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 size={15} className="animate-spin" />{" "}
-          <Trans>loading test builds…</Trans>
+          <Trans>Loading test builds…</Trans>
         </p>
       )}
       {error && (
@@ -149,7 +150,7 @@ export function HubEngineList() {
         </Alert>
       )}
       {engines && engines.length === 0 && platform && (
-        <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+        <p className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
           <Trans>The hub has no test builds for this computer.</Trans>
         </p>
       )}
@@ -229,6 +230,7 @@ export function HubEngineList() {
           })}
         </ul>
       )}
+      {canUpload && <EngineUpload hubUrl={hubUrl} onListed={load} />}
     </section>
   );
 }

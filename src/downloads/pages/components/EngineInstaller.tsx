@@ -150,46 +150,45 @@ export function EngineInstaller() {
   );
 
   return (
-    <section className="space-y-3 border-t border-border pt-5">
-      <h2 className="text-sm font-semibold">
-        <Trans>Download an engine</Trans>
-      </h2>
-      <p className="text-xs text-muted-foreground">
-        <Trans>
-          Installs an engine matching this platform into the configured content
-          folder's <code>engine/</code> directory (set the destination in{" "}
-          <Link
-            className="underline underline-offset-4"
-            to="/settings/content-folders"
-          >
-            Content folders settings
-          </Link>
-          ).
-        </Trans>
-      </p>
-      <div className="flex items-center gap-2">
-        <OptionSelect
-          value={source}
-          onValueChange={(v) => setSource(v as Source)}
-          className="w-56"
-          options={[
-            { value: "recoil", label: t`Recoil (GitHub releases)` },
-            { value: "springfiles", label: "springfiles" },
-          ]}
-        />
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => load(source, true)}
-          disabled={loading}
-        >
-          {loading ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <RefreshCw className="size-4" />
+    <section className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold">
+            <Trans>Download an engine</Trans>
+          </h2>
+          {writePath && (
+            <p
+              className="truncate font-mono text-xs text-muted-foreground"
+              title={`${writePath}/engine`}
+            >
+              <Trans>Installs into {writePath}/engine</Trans>
+            </p>
           )}
-          <Trans>Refresh</Trans>
-        </Button>
+        </div>
+        <div className="flex items-center gap-1">
+          <OptionSelect
+            value={source}
+            onValueChange={(v) => setSource(v as Source)}
+            className="w-56"
+            options={[
+              { value: "recoil", label: t`Recoil (GitHub releases)` },
+              { value: "springfiles", label: "springfiles" },
+            ]}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => load(source, true)}
+            disabled={loading}
+            aria-label={t`Refresh`}
+          >
+            {loading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <RefreshCw className="size-4" />
+            )}
+          </Button>
+        </div>
       </div>
       {noWriteRoot && (
         <p className="text-xs text-muted-foreground">
@@ -209,7 +208,7 @@ export function EngineInstaller() {
       {loading && (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 size={15} className="animate-spin" />{" "}
-          <Trans>loading engines…</Trans>
+          <Trans>Loading engines…</Trans>
         </p>
       )}
       {error && (
@@ -221,7 +220,7 @@ export function EngineInstaller() {
         </Alert>
       )}
       {items && items.length === 0 && (
-        <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+        <p className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
           {emptyEngineListMessage({ source, platform, listsThisPlatform })}
         </p>
       )}
