@@ -13,6 +13,7 @@ import { OptionSelect } from "@/components/OptionSelect";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { formatBytes } from "@/lib/format";
 import { errorText } from "@/lib/helpers";
+import { useInstalledEngines } from "../../../content/replayAnalysisOffer";
 import { useWriteRoot } from "../../config";
 import {
   type EnqueueInput,
@@ -24,6 +25,7 @@ import {
   emptyEngineListMessage,
 } from "../../emptyEngineList";
 import { loadRecoilEngines, loadSpringfilesEngines } from "../../engineLists";
+import { isEngineInstalled } from "../../hubEngines";
 import { QueueProgress } from "./ProgressBar";
 
 type Source = EngineSource;
@@ -56,6 +58,7 @@ export function EngineInstaller() {
   // is undefined whatever the user has configured (issue #1104).
   const noWriteRoot = !writeRootLoading && !writePath;
   const { enqueue, itemFor, active } = useDownloadQueue();
+  const installed = useInstalledEngines();
   const [source, setSource] = useState<Source>("recoil");
   const [items, setItems] = useState<EngineItem[] | null>(null);
   const [platform, setPlatform] = useState("");
@@ -227,7 +230,10 @@ export function EngineInstaller() {
           {items.map((item) => {
             const input = engineInput(item);
             const queueItem = input ? itemFor(identityOf(input)) : null;
-            const status = queueItem?.status ?? null;
+            // An engine already on disk shows as installed, however it got there.
+            const status =
+              queueItem?.status ??
+              (isEngineInstalled(installed, item.key) ? "done" : null);
             const engineName = item.title;
             return (
               <li key={item.key} className="flex flex-col gap-2 px-4 py-2">
@@ -279,7 +285,7 @@ export function EngineInstaller() {
                       : status === "queued"
                         ? t`Queued`
                         : status === "done"
-                          ? t`Done`
+                          ? t`Installed`
                           : active
                             ? t`Add to queue`
                             : t`Install`}
