@@ -8230,6 +8230,10 @@ msgstr "About highlights"
 msgid "About hosting your own server"
 msgstr "About hosting your own server"
 
+#: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "About ignoring"
+msgstr "About ignoring"
+
 #: src/deeplink/pages/ImportSection.tsx
 msgid "About importing"
 msgstr "About importing"
@@ -8528,6 +8532,7 @@ msgstr "Access level"
 #: src/hub/pages/components/AccountControl.tsx
 #: src/multiplayer/AccountPicker.tsx
 #: src/multiplayer/admin/PlayerLookupSection.tsx
+#: src/multiplayer/pages/IgnoreSettings.tsx
 msgid "Account"
 msgstr "Account"
 
@@ -14648,6 +14653,10 @@ msgstr "Connect as {username} and join"
 msgid "Connect on startup"
 msgstr "Connect on startup"
 
+#: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "Connect to a lobby server to see this account's list."
+msgstr "Connect to a lobby server to see this account's list."
+
 #: src/multiplayer/LobbyStatusButton.tsx
 msgid "Connect to multiplayer"
 msgstr "Connect to multiplayer"
@@ -17691,6 +17700,10 @@ msgstr "e.g. cost < 200"
 #: src/packs/pages/components/ExportPackForm.tsx
 msgid "e.g. Popular water maps"
 msgstr "e.g. Popular water maps"
+
+#: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "Each account has its own list. You can also ignore someone from their name in chat."
+msgstr "Each account has its own list. You can also ignore someone from their name in chat."
 
 #: src/content/pages/components/ReplayBaseCrops.tsx
 msgid "Each base view shows the buildings a player ordered, not the buildings that were built."
@@ -21258,10 +21271,6 @@ msgstr "Hidden settings"
 msgid "Hidden until it is settled"
 msgstr "Hidden until it is settled"
 
-#: src/multiplayer/pages/IgnoreSettings.tsx
-msgid "Hidden users' channel and private messages are hidden in the client."
-msgstr "Hidden users' channel and private messages are hidden in the client."
-
 #: src/lego/pages/components/GuidesPopover.tsx
 #: src/multiplayer/battles/BattleFilterPopover.tsx
 msgid "Hide"
@@ -22061,6 +22070,10 @@ msgstr "Ignore"
 msgid "Ignore {dmPeer}"
 msgstr "Ignore {dmPeer}"
 
+#: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "Ignore list"
+msgstr "Ignore list"
+
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Ignored a coilbox link"
 msgstr "Ignored a coilbox link"
@@ -22072,10 +22085,6 @@ msgstr "Ignored a file"
 #: src/multiplayer/index.tsx
 msgid "Ignored users"
 msgstr "Ignored users"
-
-#: src/multiplayer/pages/IgnoreSettings.tsx
-msgid "Ignores are per-account. Connect to a lobby server to manage the ignore list for that account."
-msgstr "Ignores are per-account. Connect to a lobby server to manage the ignore list for that account."
 
 #: src/campaign/pages/components/CampaignImage.tsx
 #: src/campaign/slots.ts
@@ -27681,8 +27690,8 @@ msgid "No icon or background yet"
 msgstr "No icon or background yet"
 
 #: src/multiplayer/pages/IgnoreSettings.tsx
-msgid "No ignored users. Add one above, or use the ignore action next to a user in chat."
-msgstr "No ignored users. Add one above, or use the ignore action next to a user in chat."
+msgid "No ignored users."
+msgstr "No ignored users."
 
 #: src/campaign/pages/components/ArchiveMediaImportButton.tsx
 msgid "No image files matched in this game's archive."
@@ -39089,6 +39098,10 @@ msgid "Stop and return to the built pose"
 msgstr "Stop and return to the built pose"
 
 #: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "Stop ignoring"
+msgstr "Stop ignoring"
+
+#: src/multiplayer/pages/IgnoreSettings.tsx
 msgid "Stop ignoring {name}"
 msgstr "Stop ignoring {name}"
 
@@ -48194,6 +48207,10 @@ msgstr "You start in the middle, and your rivals start out on the rim all around
 #: src/conquest/pages/components/StartPositionSelect.tsx
 msgid "You start on the western edge, with your rivals far across the map."
 msgstr "You start on the western edge, with your rivals far across the map."
+
+#: src/multiplayer/pages/IgnoreSettings.tsx
+msgid "You stop seeing an ignored user's channel and private messages. Where the lobby server supports it, the server is told too."
+msgstr "You stop seeing an ignored user's channel and private messages. Where the lobby server supports it, the server is told too."
 
 #: src/hub/uploadOutcomes.ts
 msgid "You stopped the picture uploads"
