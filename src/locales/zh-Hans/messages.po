@@ -9740,6 +9740,10 @@ msgstr "单位静止时缓慢地来回转动：主体轻轻摇摆，如果部件
 msgid "A sound set to zero volume is dropped rather than played quietly."
 msgstr "音量为零的音效会被丢弃，而不是小声播放。"
 
+#: src/sound/SoundSettings.tsx
+msgid "A sound's final volume is the master, times its group, times its own. Play lets you hear one whether or not it is muted."
+msgstr ""
+
 #: src/lego/pages/components/CollisionPanel.tsx
 #, fuzzy
 msgid "A sphere cannot be stretched, so the engine takes the largest of the three sizes and uses it on every axis."
@@ -10250,6 +10254,10 @@ msgstr ""
 msgid "About shooting at each piece"
 msgstr "关于对每个部件射击"
 
+#: src/sound/SoundSettings.tsx
+msgid "About sounds"
+msgstr ""
+
 #: src/lego/pages/components/AimPointPanel.tsx
 #, fuzzy
 msgid "About the aim point"
@@ -10275,6 +10283,14 @@ msgstr ""
 
 #: src/hub/pages/components/HubAddressField.tsx
 msgid "About the hub address"
+msgstr ""
+
+#: src/sound/SoundSettings.tsx
+msgid "About the master volume"
+msgstr ""
+
+#: src/sound/MusicSource.tsx
+msgid "About the music source"
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
@@ -21679,11 +21695,6 @@ msgstr "每场对局先缩放到其最激烈的地点为一，再对所有对局
 msgid "Each match's busiest spot"
 msgstr "每场对局最激烈的地点"
 
-#: src/sound/SoundSettings.tsx
-#, fuzzy
-msgid "Each of these plays a sound you can change. A sound's final volume is the master, times the group it sits under, times its own. Play lets you hear one whether or not it is muted."
-msgstr "每一项都会播放一个可更改的音效。音效的最终音量是主音量乘以所属分组音量，再乘以其自身音量。无论是否静音，点击“播放”都可以试听。"
-
 #: src/content/pages/components/ReplayBuildOrders.tsx
 #, fuzzy
 msgid "Each player's opening is their orders folded into a sequence, with repeats shown as a count."
@@ -24880,6 +24891,7 @@ msgstr "游戏"
 #: src/play/presetParts.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/components/RunSetupForm.tsx
+#: src/sound/MusicSource.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
@@ -25676,7 +25688,6 @@ msgid "group unit {number}"
 msgstr "组单位 {number}"
 
 #: src/scenario/pages/components/modes.tsx
-#: src/sound/SoundSettings.tsx
 #, fuzzy
 msgid "Groups"
 msgstr "组"
@@ -30975,6 +30986,10 @@ msgstr "质量"
 msgid "Mass"
 msgstr "质量"
 
+#: src/sound/SoundSettings.tsx
+msgid "Master"
+msgstr ""
+
 #: src/downloads/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Master URL"
@@ -32298,6 +32313,7 @@ msgid "Music source"
 msgstr "音乐来源"
 
 #: src/content/engineSettingText.ts
+#: src/sound/SoundSettings.tsx
 msgid "Music volume"
 msgstr ""
 
@@ -43819,9 +43835,8 @@ msgid "Scale the selection"
 msgstr "缩放所选对象"
 
 #: src/sound/SoundSettings.tsx
-#, fuzzy
-msgid "Scales every sound Coilbox makes. Audio played by a campaign briefing or a profile page has its own controls and is not affected."
-msgstr "调整 Coilbox 发出的所有声音的音量。战役简报或个人资料页面播放的音频有自己的控制，不受影响。"
+msgid "Scales every sound Coilbox makes. Audio played by a campaign briefing or a profile page has its own controls and is not affected. Muting keeps your volume setting."
+msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
 msgid "Scales text, spacing and the 3D views. Cmd or Ctrl with plus or minus changes it, and with zero sets it back to 100%."
@@ -46430,11 +46445,6 @@ msgstr "退出登录只影响这台电脑，不会删除你已经分享的任何
 msgid "Signs in with your browser"
 msgstr "通过浏览器登录"
 
-#: src/sound/SoundSettings.tsx
-#, fuzzy
-msgid "Silence everything without losing your volume setting."
-msgstr "静音所有声音，同时保留音量设置。"
-
 #: src/lego/pages/components/GameFitSection.tsx
 #, fuzzy
 msgid "Similar units use {suggestions}."
@@ -46957,7 +46967,6 @@ msgstr "项目排序"
 
 #: src/content/index.ts
 #: src/sound/index.ts
-#: src/sound/SoundSettings.tsx
 #, fuzzy
 msgid "Sound"
 msgstr "音效"
@@ -57713,11 +57722,6 @@ msgstr "轮子"
 #, fuzzy
 msgid "Wheels turning"
 msgstr "轮子转动"
-
-#: src/sound/SoundSettings.tsx
-#, fuzzy
-msgid "When"
-msgstr "时机"
 
 #: src/content/pages/components/ReplayTracksStorage.tsx
 #, fuzzy

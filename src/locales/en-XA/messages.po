@@ -7882,6 +7882,10 @@ msgstr ""
 msgid "A sound set to zero volume is dropped rather than played quietly."
 msgstr ""
 
+#: src/sound/SoundSettings.tsx
+msgid "A sound's final volume is the master, times its group, times its own. Play lets you hear one whether or not it is muted."
+msgstr ""
+
 #: src/lego/pages/components/CollisionPanel.tsx
 msgid "A sphere cannot be stretched, so the engine takes the largest of the three sizes and uses it on every axis."
 msgstr ""
@@ -8314,6 +8318,10 @@ msgstr ""
 msgid "About shooting at each piece"
 msgstr ""
 
+#: src/sound/SoundSettings.tsx
+msgid "About sounds"
+msgstr ""
+
 #: src/lego/pages/components/AimPointPanel.tsx
 msgid "About the aim point"
 msgstr ""
@@ -8336,6 +8344,14 @@ msgstr ""
 
 #: src/hub/pages/components/HubAddressField.tsx
 msgid "About the hub address"
+msgstr ""
+
+#: src/sound/SoundSettings.tsx
+msgid "About the master volume"
+msgstr ""
+
+#: src/sound/MusicSource.tsx
+msgid "About the music source"
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
@@ -17638,10 +17654,6 @@ msgstr ""
 msgid "Each match's busiest spot"
 msgstr ""
 
-#: src/sound/SoundSettings.tsx
-msgid "Each of these plays a sound you can change. A sound's final volume is the master, times the group it sits under, times its own. Play lets you hear one whether or not it is muted."
-msgstr ""
-
 #: src/content/pages/components/ReplayBuildOrders.tsx
 msgid "Each player's opening is their orders folded into a sequence, with repeats shown as a count."
 msgstr ""
@@ -20244,6 +20256,7 @@ msgstr ""
 #: src/play/presetParts.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/components/RunSetupForm.tsx
+#: src/sound/MusicSource.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
@@ -20894,7 +20907,6 @@ msgid "group unit {number}"
 msgstr ""
 
 #: src/scenario/pages/components/modes.tsx
-#: src/sound/SoundSettings.tsx
 msgid "Groups"
 msgstr ""
 
@@ -25201,6 +25213,10 @@ msgstr ""
 msgid "Mass"
 msgstr ""
 
+#: src/sound/SoundSettings.tsx
+msgid "Master"
+msgstr ""
+
 #: src/downloads/pages/SettingsSection.tsx
 msgid "Master URL"
 msgstr ""
@@ -26278,6 +26294,7 @@ msgid "Music source"
 msgstr ""
 
 #: src/content/engineSettingText.ts
+#: src/sound/SoundSettings.tsx
 msgid "Music volume"
 msgstr ""
 
@@ -35648,7 +35665,7 @@ msgid "Scale the selection"
 msgstr ""
 
 #: src/sound/SoundSettings.tsx
-msgid "Scales every sound Coilbox makes. Audio played by a campaign briefing or a profile page has its own controls and is not affected."
+msgid "Scales every sound Coilbox makes. Audio played by a campaign briefing or a profile page has its own controls and is not affected. Muting keeps your volume setting."
 msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
@@ -37771,10 +37788,6 @@ msgstr ""
 msgid "Signs in with your browser"
 msgstr ""
 
-#: src/sound/SoundSettings.tsx
-msgid "Silence everything without losing your volume setting."
-msgstr ""
-
 #: src/lego/pages/components/GameFitSection.tsx
 msgid "Similar units use {suggestions}."
 msgstr ""
@@ -38200,7 +38213,6 @@ msgstr ""
 
 #: src/content/index.ts
 #: src/sound/index.ts
-#: src/sound/SoundSettings.tsx
 msgid "Sound"
 msgstr ""
 
@@ -46894,10 +46906,6 @@ msgstr ""
 
 #: src/lego/animPresets.ts
 msgid "Wheels turning"
-msgstr ""
-
-#: src/sound/SoundSettings.tsx
-msgid "When"
 msgstr ""
 
 #: src/content/pages/components/ReplayTracksStorage.tsx

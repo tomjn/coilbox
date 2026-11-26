@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 /**
- * The Sounds table on the Sound settings page: putting a changed sound back,
+ * The Sounds lists on the Sound settings page: putting a changed sound back,
  * the preview button, and which group each row sits under.
  *
  * The preview used to play through the real gain chain, so the two Interface
@@ -107,7 +107,7 @@ async function renderPage() {
   render(<SoundSettings />);
 }
 
-describe("the Sounds table", () => {
+describe("the Sounds lists", () => {
   it("previews a sound whose group is muted", async () => {
     // Interface sounds ship muted, so on a fresh install these two are the ones
     // a player finds. Their group's switch is in a different section, which is
@@ -180,15 +180,27 @@ describe("the Sounds table", () => {
 
   it("puts each event under the group that controls it", async () => {
     await renderPage();
-    const headings = screen
-      .getAllByRole("columnheader")
-      .map((h) => h.textContent);
-    expect(headings).toEqual([
-      "When",
-      "Sound",
-      "Volume",
-      "Alerts",
-      "Interface",
+    const lists = screen
+      .getAllByRole("heading", { level: 3 })
+      .map((h) => [
+        h.textContent,
+        Array.from(
+          h.nextElementSibling?.querySelectorAll(":scope > li") ?? [],
+          (li) => li.querySelector("label")?.textContent,
+        ),
+      ]);
+    expect(lists).toEqual([
+      [
+        "Alerts",
+        [
+          "Rung by the host",
+          "A vote names you",
+          "Mentioned in chat",
+          "The host starts the game",
+          "You launch a game",
+        ],
+      ],
+      ["Interface", ["Something finished", "Something failed"]],
     ]);
   });
 
@@ -224,5 +236,23 @@ describe("the Sounds table", () => {
     });
     expect(gong.getAttribute("data-default")).toBe("yes");
     expect(ping.getAttribute("data-default")).toBe(null);
+  });
+});
+
+describe("the music play button", () => {
+  it("is off while the source is No music, where it would play nothing", async () => {
+    settings.set("sound.music.source", "off");
+    await renderPage();
+    const play = screen.getByRole("button", { name: "Play music" });
+    expect((play as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("plays once a source is picked", async () => {
+    settings.set("sound.music.source", "nostalgia");
+    await renderPage();
+    const play = screen.getByRole("button", { name: "Play music" });
+    expect((play as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(play);
+    expect(settings.get("sound.music.playing")).toBe(true);
   });
 });
