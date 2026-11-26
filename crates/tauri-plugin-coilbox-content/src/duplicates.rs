@@ -118,8 +118,9 @@ pub fn report(roots: &[PathBuf]) -> DuplicateReport {
     }
 }
 
-/// Every regular file directly in each root's `maps/` and `games/`. A file
-/// reached twice, through a linked folder, is kept once.
+/// Every `.sd7` or `.sdz` directly in each root's `maps/` and `games/`. Other
+/// files, such as the `.DS_Store` Finder leaves in each folder, are not content.
+/// A file reached twice, through a linked folder, is kept once.
 fn loose_files(roots: &[PathBuf]) -> Vec<Loose> {
     let mut seen = HashSet::new();
     let mut out = Vec::new();
@@ -130,6 +131,9 @@ fn loose_files(roots: &[PathBuf]) -> Vec<Loose> {
             };
             for entry in rd.flatten() {
                 let path = entry.path();
+                if !is_packed_archive(&path) {
+                    continue;
+                }
                 let Ok(md) = std::fs::metadata(&path) else {
                     continue;
                 };
@@ -290,19 +294,23 @@ fn rapid_maps(roots: &[PathBuf]) -> Vec<RapidMap> {
 /// The map file stems inside a loose `.sd7` or `.sdz`. An archive that cannot be
 /// read has none, so it is never matched.
 fn loose_map_stems(path: &Path) -> HashSet<String> {
-    let packaged = matches!(
-        path.extension()
-            .and_then(|e| e.to_str())
-            .map(str::to_ascii_lowercase)
-            .as_deref(),
-        Some("sd7" | "sdz")
-    );
-    if !packaged {
+    if !is_packed_archive(path) {
         return HashSet::new();
     }
     tauri_plugin_coilbox_scenario::member_names(path)
         .map(|names| names.iter().filter_map(|n| map_stem(n)).collect())
         .unwrap_or_default()
+}
+
+/// Whether `path` ends in `.sd7` or `.sdz`, in any case.
+fn is_packed_archive(path: &Path) -> bool {
+    matches!(
+        path.extension()
+            .and_then(|e| e.to_str())
+            .map(str::to_ascii_lowercase)
+            .as_deref(),
+        Some("sd7" | "sdz")
+    )
 }
 
 /// Maps that are both a loose archive and inside a rapid package.
@@ -445,6 +453,16 @@ mod tests {
         assert_eq!(g.sizes_match, Some(true));
         assert_eq!(g.wasted_bytes, 5, "one copy of two is the waste");
         assert_eq!(r.wasted_bytes, 5);
+    }
+
+    #[test]
+    fn files_that_are_not_archives_are_not_duplicates() {
+        let (a, b) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+        for d in [&a, &b] {
+            write(&d.path().join("maps/.DS_Store"), b"6148");
+            write(&d.path().join("games/readme.txt"), b"hi");
+        }
+        assert!(report(&roots(&[&a, &b])).groups.is_empty());
     }
 
     #[test]
