@@ -2,8 +2,9 @@ import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { ExternalLink, FolderSearch } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { contentOpenPath } from "@/content/bindings";
+import { describeError } from "@/i18n/uiError";
 import { formatDateTime } from "@/lib/format";
 import type { InfologTail } from "@/play/bindings";
 
@@ -31,6 +32,7 @@ export function EngineLogFile({
   children?: ReactNode;
 }) {
   const writtenAt = log ? when(log.modifiedMs) : "";
+  const [openError, setOpenError] = useState<string | null>(null);
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
@@ -41,7 +43,10 @@ export function EngineLogFile({
               variant="outline"
               className="gap-1.5"
               onClick={() => {
-                void contentOpenPath({ path: log.path }).catch(() => {});
+                setOpenError(null);
+                contentOpenPath({ path: log.path }).catch((e) =>
+                  setOpenError(describeError(e)),
+                );
               }}
             >
               <ExternalLink className="size-4" />{" "}
@@ -51,7 +56,10 @@ export function EngineLogFile({
               variant="outline"
               className="gap-1.5"
               onClick={() => {
-                void revealItemInDir(log.path).catch(() => {});
+                setOpenError(null);
+                revealItemInDir(log.path).catch((e) =>
+                  setOpenError(describeError(e)),
+                );
               }}
             >
               <FolderSearch className="size-4" /> <Trans>Show in folder</Trans>
@@ -59,6 +67,14 @@ export function EngineLogFile({
           </>
         ) : null}
       </div>
+      {openError && (
+        <p
+          role="alert"
+          className="select-text break-words text-xs text-destructive"
+        >
+          {openError}
+        </p>
+      )}
       {log ? (
         <p className="break-all text-sm">
           <code>{log.path}</code>

@@ -219,6 +219,36 @@ describe("CrashDrawer", () => {
     expect(screen.getByText(/code 1/)).toBeTruthy();
   });
 
+  it("shows why the log file could not be opened", async () => {
+    m.contentOpenPath.mockRejectedValueOnce(new Error("no app opens .txt"));
+    render(<CrashDrawer open onOpenChange={() => {}} triage={triage()} />);
+    fireEvent.click(screen.getByRole("button", { name: /open the log file/i }));
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "no app opens .txt",
+    );
+  });
+
+  it("shows why the log file could not be shown in its folder", async () => {
+    m.revealItemInDir.mockRejectedValueOnce(new Error("no file manager"));
+    render(<CrashDrawer open onOpenChange={() => {}} triage={triage()} />);
+    fireEvent.click(screen.getByRole("button", { name: /show in folder/i }));
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "no file manager",
+    );
+  });
+
+  it("shows why the crash report could not be copied", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      value: {
+        writeText: vi.fn(async () => Promise.reject(new Error("denied"))),
+      },
+      configurable: true,
+    });
+    render(<CrashDrawer open onOpenChange={() => {}} triage={triage()} />);
+    fireEvent.click(screen.getByRole("button", { name: /copy crash report/i }));
+    expect((await screen.findByRole("alert")).textContent).toContain("denied");
+  });
+
   it("renders nothing without a triage", () => {
     const { container } = render(
       <CrashDrawer open onOpenChange={() => {}} triage={null} />,
