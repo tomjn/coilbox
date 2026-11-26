@@ -9363,15 +9363,14 @@ msgstr "Er is een wedstrijd gevonden"
 msgid "A match with no recorded result is in no win or loss. Every figure about wins is a count of the matches that have one, with the number it is out of beside it."
 msgstr "Een wedstrijd zonder opgenomen uitslag telt niet als winst of verlies. Elke waarde over overwinningen telt de wedstrijden die er een hebben, met het totaal waaruit dat komt ernaast."
 
-#: src/multiplayer/pages/HighlightsSettings.tsx
-#, fuzzy
-msgid "A matching message flashes the window and plays a sound. Choose which sound, and how loud, under <0>Sound</0>."
-msgstr "Een overeenkomend bericht laat het venster knipperen en speelt een geluid af. Kies welk geluid en hoe hard onder <0>Geluid</0>."
-
 #: src/content/pages/MatchupPage.tsx
 #, fuzzy
 msgid "A matchup is the games where you were on opposing teams, from the replays in your content folders."
 msgstr "Een confrontatie bestaat uit de spellen waarin jullie in tegengestelde teams zaten, uit de replays in je inhoudsmappen."
+
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "A message that names you or a highlight word is outlined in chat, flashes the window, plays a sound and shows a notice. Choose the sound under <0>Sound</0>."
+msgstr ""
 
 #: src/hub/upload/messages.ts
 #, fuzzy
@@ -9956,6 +9955,10 @@ msgstr "Een wapennaam mag alleen kleine letters, cijfers en underscores bevatten
 msgid "A widget that lists the blueprints in this library while you play, places one at the cursor as ghosts and build orders, and saves the buildings you have selected back here. It reads BAR's own blueprints.json too, and never writes it. It opens no network connection."
 msgstr "Een widget die de blauwdrukken in deze bibliotheek toont terwijl je speelt, er een als schimmen en bouwopdrachten bij de cursor plaatst, en de gebouwen die je hebt geselecteerd hier terug opslaat. Hij leest ook de eigen blueprints.json van BAR, en schrijft die nooit. Hij maakt geen netwerkverbinding."
 
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "A word counts only on its own and in any case, so \"alice\" matches \"Hi Alice!\" but not \"malice\"."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "A yellow circle that grows and fades is an explosion: a projectile landing, or, larger, a unit destroyed. Debris landing makes none. The Explosions switch turns them off."
@@ -10136,6 +10139,14 @@ msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "About going away when idle"
+msgstr ""
+
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "About highlight words"
+msgstr ""
+
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "About highlights"
 msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
@@ -23980,11 +23991,6 @@ msgstr "Vaste kaartposities"
 msgid "Fixed start positions: team N spawns at the map's start position N."
 msgstr "Vaste startposities: team N spawnt op startpositie N van de kaart."
 
-#: src/multiplayer/pages/HighlightsSettings.tsx
-#, fuzzy
-msgid "Flag messages that mention your logged-in username."
-msgstr "Berichten markeren waarin je ingelogde gebruikersnaam wordt genoemd."
-
 #: src/multiplayer/chat/emoji.ts
 #, fuzzy
 msgid "Flags"
@@ -31365,6 +31371,10 @@ msgstr "Gebruiker noemen"
 msgid "Mentioned in chat"
 msgstr "Genoemd in de chat"
 
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "Mentions"
+msgstr ""
+
 #: src/workshop/pages/components/UnitList.tsx
 #, fuzzy
 msgid "menu"
@@ -33954,6 +33964,10 @@ msgstr "Geen GitHub-repository opgegeven voor bron \"{sourceKey}\"."
 msgid "No hand-made map with the id \"{id}\" is installed, and no installed game carries one. A game update may have removed it."
 msgstr "Er is geen handgemaakte kaart met de id \"{id}\" geïnstalleerd, en geen geïnstalleerd spel bevat er een. Misschien heeft een spelupdate hem verwijderd."
 
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "No highlight words."
+msgstr ""
+
 #: src/campaign/pages/components/presentationOpen.ts
 #, fuzzy
 msgid "No icon or background yet"
@@ -35367,11 +35381,6 @@ msgstr "Niets besteld in dit tijdvak"
 #, fuzzy
 msgid "none yet"
 msgstr "nog geen"
-
-#: src/multiplayer/pages/HighlightsSettings.tsx
-#, fuzzy
-msgid "None yet. Add a word to have it flag matching chat messages."
-msgstr "Nog geen. Voeg een woord toe om chatberichten waarin het voorkomt te markeren."
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
@@ -41717,6 +41726,7 @@ msgstr "Geremixt van"
 #: src/lego/pages/components/BuiltBySection.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/multiplayer/battle/MemberRow.tsx
+#: src/multiplayer/pages/HighlightsSettings.tsx
 #: src/play/ChobbyPresetsView.tsx
 #: src/uberstress/pages/SettingsSection.tsx
 #: src/widgets/pages/WidgetsPage.tsx
@@ -58188,11 +58198,6 @@ msgstr "Heel model"
 #, fuzzy
 msgid "Whole project"
 msgstr "Heel project"
-
-#: src/multiplayer/pages/HighlightsSettings.tsx
-#, fuzzy
-msgid "Whole-word, case-insensitive. Messages containing any of these are visually flagged."
-msgstr "Hele woorden, hoofdletterongevoelig. Berichten met een van deze woorden worden gemarkeerd."
 
 #: src/hub/maps/catalogSweep.ts
 #, fuzzy

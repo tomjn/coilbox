@@ -1,8 +1,17 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input, useSetting } from "@picoframe/frame";
 import { Plus, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import { HelpPopover } from "@/components/HelpPopover";
+import { SettingList, SettingRow } from "@/components/SettingRow";
 import { Switch } from "@/components/ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { HIGHLIGHT_OWN_KEY, HIGHLIGHT_WORDS_KEY } from "../chat/highlight";
 
 /**
@@ -22,95 +31,125 @@ export default function HighlightsSettings() {
     HIGHLIGHT_OWN_KEY,
     true,
   );
+  // The row Add word just made, focused once it renders so you can type.
+  const [focusRow, setFocusRow] = useState<number | null>(null);
+  useEffect(() => {
+    if (focusRow === null) return;
+    document.getElementById(`highlight-word-${focusRow}`)?.focus();
+    setFocusRow(null);
+  }, [focusRow]);
 
-  // Rows are edited by index (words may be blank while typing); empty entries are
-  // ignored by the matcher, so there's no need to prune them on every keystroke.
+  // Rows are edited by index, as words may be blank while typing. The matcher
+  // ignores empty entries, so there's no need to prune them on every keystroke.
   const updateWord = (i: number, value: string) =>
     setWords(words.map((w, idx) => (idx === i ? value : w)));
   const removeWord = (i: number) =>
     setWords(words.filter((_, idx) => idx !== i));
-  const addWord = () => setWords([...words, ""]);
+  const addWord = () => {
+    setWords([...words, ""]);
+    setFocusRow(words.length);
+  };
 
   return (
-    <div className="flex flex-col gap-6">
-      <label
-        htmlFor="highlight-own-username"
-        className="flex items-center justify-between gap-4"
-      >
-        <span className="flex flex-col">
-          <span className="text-sm font-medium">
-            <Trans>Highlight my username</Trans>
-          </span>
-          <span className="text-xs text-muted-foreground">
-            <Trans>Flag messages that mention your logged-in username.</Trans>
-          </span>
-        </span>
-        <Switch
-          id="highlight-own-username"
-          checked={ownEnabled}
-          onCheckedChange={setOwnEnabled}
-        />
-      </label>
-
-      <p className="text-xs text-muted-foreground">
-        <Trans>
-          A matching message flashes the window and plays a sound. Choose which
-          sound, and how loud, under{" "}
-          <Link to="/settings/sound" className="underline underline-offset-2">
-            Sound
-          </Link>
-          .
-        </Trans>
-      </p>
-
-      <div className="flex flex-col gap-2">
-        <span className="text-sm font-medium">
-          <Trans>Highlight words</Trans>
-        </span>
-        <span className="text-xs text-muted-foreground">
-          <Trans>
-            Whole-word, case-insensitive. Messages containing any of these are
-            visually flagged.
-          </Trans>
-        </span>
-        {words.length === 0 ? (
-          <p className="text-xs text-muted-foreground">
-            <Trans>
-              None yet. Add a word to have it flag matching chat messages.
-            </Trans>
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {words.map((w, i) => (
-              <li
-                // biome-ignore lint/suspicious/noArrayIndexKey: rows are positional (words may be blank/duplicate while editing)
-                key={i}
-                className="grid grid-cols-[1fr_auto] items-center gap-2"
-              >
-                <Input
-                  value={w}
-                  onChange={(e) => updateWord(i, e.target.value)}
-                  placeholder={t`word`}
-                  aria-label={t`Highlight word`}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => removeWord(i)}
-                  aria-label={w ? t`Remove ${w}` : t`Remove word`}
+    <div className="flex flex-col gap-10">
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center gap-1">
+          <h2 className="text-sm font-semibold">
+            <Trans>Mentions</Trans>
+          </h2>
+          <HelpPopover label={t`About highlights`}>
+            <p>
+              <Trans>
+                A message that names you or a highlight word is outlined in
+                chat, flashes the window, plays a sound and shows a notice.
+                Choose the sound under{" "}
+                <Link
+                  to="/settings/sound"
+                  className="underline underline-offset-2"
                 >
-                  <Trash2 />
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div>
-          <Button variant="outline" size="sm" onClick={addWord}>
+                  Sound
+                </Link>
+                .
+              </Trans>
+            </p>
+          </HelpPopover>
+        </div>
+        <SettingList>
+          <SettingRow
+            id="highlight-own-username"
+            label={t`Highlight my username`}
+          >
+            <Switch
+              id="highlight-own-username"
+              checked={ownEnabled}
+              onCheckedChange={setOwnEnabled}
+            />
+          </SettingRow>
+        </SettingList>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-1">
+            <h2 className="text-sm font-semibold">
+              <Trans>Highlight words</Trans>
+            </h2>
+            <HelpPopover label={t`About highlight words`}>
+              <p>
+                <Trans>
+                  A word counts only on its own and in any case, so "alice"
+                  matches "Hi Alice!" but not "malice".
+                </Trans>
+              </p>
+            </HelpPopover>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={addWord}>
             <Plus /> <Trans>Add word</Trans>
           </Button>
         </div>
-      </div>
+        {words.length === 0 ? (
+          <p className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
+            <Trans>No highlight words.</Trans>
+          </p>
+        ) : (
+          <TooltipProvider>
+            <ul className="divide-y divide-border rounded-md border border-border">
+              {words.map((w, i) => (
+                <li
+                  // biome-ignore lint/suspicious/noArrayIndexKey: rows are positional (words may be blank/duplicate while editing)
+                  key={i}
+                  className="flex items-center gap-2 px-4 py-2"
+                >
+                  <Input
+                    id={`highlight-word-${i}`}
+                    value={w}
+                    onChange={(e) => updateWord(i, e.target.value)}
+                    placeholder={t`word`}
+                    aria-label={t`Highlight word`}
+                    className="min-w-0 flex-1"
+                  />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeWord(i)}
+                        aria-label={w ? t`Remove ${w}` : t`Remove word`}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <Trans>Remove</Trans>
+                    </TooltipContent>
+                  </Tooltip>
+                </li>
+              ))}
+            </ul>
+          </TooltipProvider>
+        )}
+      </section>
     </div>
   );
 }

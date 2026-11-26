@@ -7576,13 +7576,13 @@ msgstr "A match is found"
 msgid "A match with no recorded result is in no win or loss. Every figure about wins is a count of the matches that have one, with the number it is out of beside it."
 msgstr "A match with no recorded result is in no win or loss. Every figure about wins is a count of the matches that have one, with the number it is out of beside it."
 
-#: src/multiplayer/pages/HighlightsSettings.tsx
-msgid "A matching message flashes the window and plays a sound. Choose which sound, and how loud, under <0>Sound</0>."
-msgstr "A matching message flashes the window and plays a sound. Choose which sound, and how loud, under <0>Sound</0>."
-
 #: src/content/pages/MatchupPage.tsx
 msgid "A matchup is the games where you were on opposing teams, from the replays in your content folders."
 msgstr "A matchup is the games where you were on opposing teams, from the replays in your content folders."
+
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "A message that names you or a highlight word is outlined in chat, flashes the window, plays a sound and shows a notice. Choose the sound under <0>Sound</0>."
+msgstr "A message that names you or a highlight word is outlined in chat, flashes the window, plays a sound and shows a notice. Choose the sound under <0>Sound</0>."
 
 #: src/hub/upload/messages.ts
 msgid "A mirror already has a file with this name that the hub has not listed, so the hub cannot list this one."
@@ -8056,6 +8056,10 @@ msgstr "A weapon name can only use lowercase letters, numbers and underscores."
 msgid "A widget that lists the blueprints in this library while you play, places one at the cursor as ghosts and build orders, and saves the buildings you have selected back here. It reads BAR's own blueprints.json too, and never writes it. It opens no network connection."
 msgstr "A widget that lists the blueprints in this library while you play, places one at the cursor as ghosts and build orders, and saves the buildings you have selected back here. It reads BAR's own blueprints.json too, and never writes it. It opens no network connection."
 
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "A word counts only on its own and in any case, so \"alice\" matches \"Hi Alice!\" but not \"malice\"."
+msgstr "A word counts only on its own and in any case, so \"alice\" matches \"Hi Alice!\" but not \"malice\"."
+
 #: src/content/pages/components/ReplayMapUnits.tsx
 msgid "A yellow circle that grows and fades is an explosion: a projectile landing, or, larger, a unit destroyed. Debris landing makes none. The Explosions switch turns them off."
 msgstr "A yellow circle that grows and fades is an explosion: a projectile landing, or, larger, a unit destroyed. Debris landing makes none. The Explosions switch turns them off."
@@ -8213,6 +8217,14 @@ msgstr "About fullscreen"
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "About going away when idle"
 msgstr "About going away when idle"
+
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "About highlight words"
+msgstr "About highlight words"
+
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "About highlights"
+msgstr "About highlights"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "About hosting your own server"
@@ -19540,10 +19552,6 @@ msgstr "Fixed map positions"
 msgid "Fixed start positions: team N spawns at the map's start position N."
 msgstr "Fixed start positions: team N spawns at the map's start position N."
 
-#: src/multiplayer/pages/HighlightsSettings.tsx
-msgid "Flag messages that mention your logged-in username."
-msgstr "Flag messages that mention your logged-in username."
-
 #: src/multiplayer/chat/emoji.ts
 msgid "Flags"
 msgstr "Flags"
@@ -25558,6 +25566,10 @@ msgstr "Mention a user"
 msgid "Mentioned in chat"
 msgstr "Mentioned in chat"
 
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "Mentions"
+msgstr "Mentions"
+
 #: src/workshop/pages/components/UnitList.tsx
 msgid "menu"
 msgstr "menu"
@@ -27660,6 +27672,10 @@ msgstr "No GitHub repo declared for source \"{sourceKey}\"."
 msgid "No hand-made map with the id \"{id}\" is installed, and no installed game carries one. A game update may have removed it."
 msgstr "No hand-made map with the id \"{id}\" is installed, and no installed game carries one. A game update may have removed it."
 
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "No highlight words."
+msgstr "No highlight words."
+
 #: src/campaign/pages/components/presentationOpen.ts
 msgid "No icon or background yet"
 msgstr "No icon or background yet"
@@ -28802,10 +28818,6 @@ msgstr "None ordered in this window"
 #: src/career/pages/CareerPage.tsx
 msgid "none yet"
 msgstr "none yet"
-
-#: src/multiplayer/pages/HighlightsSettings.tsx
-msgid "None yet. Add a word to have it flag matching chat messages."
-msgstr "None yet. Add a word to have it flag matching chat messages."
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
 msgid "None yet. Draw a base on the map, or open a game's file above."
@@ -33969,6 +33981,7 @@ msgstr "Remixed from"
 #: src/lego/pages/components/BuiltBySection.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/multiplayer/battle/MemberRow.tsx
+#: src/multiplayer/pages/HighlightsSettings.tsx
 #: src/play/ChobbyPresetsView.tsx
 #: src/uberstress/pages/SettingsSection.tsx
 #: src/widgets/pages/WidgetsPage.tsx
@@ -47333,10 +47346,6 @@ msgstr "Whole model"
 #: src/workshop/pages/components/PackagePanel.tsx
 msgid "Whole project"
 msgstr "Whole project"
-
-#: src/multiplayer/pages/HighlightsSettings.tsx
-msgid "Whole-word, case-insensitive. Messages containing any of these are visually flagged."
-msgstr "Whole-word, case-insensitive. Messages containing any of these are visually flagged."
 
 #: src/hub/maps/catalogSweep.ts
 msgid "whose archive coilbox could not read"

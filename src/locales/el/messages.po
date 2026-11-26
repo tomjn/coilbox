@@ -9363,15 +9363,14 @@ msgstr "Βρίσκεται αγώνας"
 msgid "A match with no recorded result is in no win or loss. Every figure about wins is a count of the matches that have one, with the number it is out of beside it."
 msgstr "Ένας αγώνας χωρίς καταγεγραμμένο αποτέλεσμα δεν μετρά ως νίκη ή ήττα. Κάθε αριθμός για νίκες μετρά τους αγώνες που έχουν αποτέλεσμα, με το σύνολο από το οποίο προκύπτει δίπλα του."
 
-#: src/multiplayer/pages/HighlightsSettings.tsx
-#, fuzzy
-msgid "A matching message flashes the window and plays a sound. Choose which sound, and how loud, under <0>Sound</0>."
-msgstr "Ένα μήνυμα που ταιριάζει αναβοσβήνει το παράθυρο και παίζει έναν ήχο. Επιλέξτε ποιον ήχο και πόσο δυνατά στο <0>Ήχος</0>."
-
 #: src/content/pages/MatchupPage.tsx
 #, fuzzy
 msgid "A matchup is the games where you were on opposing teams, from the replays in your content folders."
 msgstr "Μια αναμέτρηση είναι τα παιχνίδια όπου ήσασταν σε αντίπαλες ομάδες, από τις επαναλήψεις στους φακέλους περιεχομένου σας."
+
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "A message that names you or a highlight word is outlined in chat, flashes the window, plays a sound and shows a notice. Choose the sound under <0>Sound</0>."
+msgstr ""
 
 #: src/hub/upload/messages.ts
 #, fuzzy
@@ -9956,6 +9955,10 @@ msgstr "Ένα όνομα όπλου μπορεί να περιέχει μόνο
 msgid "A widget that lists the blueprints in this library while you play, places one at the cursor as ghosts and build orders, and saves the buildings you have selected back here. It reads BAR's own blueprints.json too, and never writes it. It opens no network connection."
 msgstr "Ένα widget που εμφανίζει τα σχέδια αυτής της βιβλιοθήκης όσο παίζετε, τοποθετεί ένα στον κέρσορα ως φαντάσματα και εντολές κατασκευής, και αποθηκεύει εδώ τα κτίρια που έχετε επιλέξει. Διαβάζει και το blueprints.json του BAR, και δεν το γράφει ποτέ. Δεν ανοίγει καμία σύνδεση δικτύου."
 
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "A word counts only on its own and in any case, so \"alice\" matches \"Hi Alice!\" but not \"malice\"."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "A yellow circle that grows and fades is an explosion: a projectile landing, or, larger, a unit destroyed. Debris landing makes none. The Explosions switch turns them off."
@@ -10136,6 +10139,14 @@ msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "About going away when idle"
+msgstr ""
+
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "About highlight words"
+msgstr ""
+
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "About highlights"
 msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
@@ -23980,11 +23991,6 @@ msgstr "Σταθερές θέσεις χάρτη"
 msgid "Fixed start positions: team N spawns at the map's start position N."
 msgstr "Σταθερές θέσεις εκκίνησης: η ομάδα N εμφανίζεται στη θέση εκκίνησης N του χάρτη."
 
-#: src/multiplayer/pages/HighlightsSettings.tsx
-#, fuzzy
-msgid "Flag messages that mention your logged-in username."
-msgstr "Σήμανση μηνυμάτων που αναφέρουν το όνομα χρήστη με το οποίο έχετε συνδεθεί."
-
 #: src/multiplayer/chat/emoji.ts
 #, fuzzy
 msgid "Flags"
@@ -31365,6 +31371,10 @@ msgstr "Αναφορά σε χρήστη"
 msgid "Mentioned in chat"
 msgstr "Αναφορά στη συνομιλία"
 
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "Mentions"
+msgstr ""
+
 #: src/workshop/pages/components/UnitList.tsx
 #, fuzzy
 msgid "menu"
@@ -33954,6 +33964,10 @@ msgstr "Δεν έχει δηλωθεί αποθετήριο GitHub για την
 msgid "No hand-made map with the id \"{id}\" is installed, and no installed game carries one. A game update may have removed it."
 msgstr "Δεν είναι εγκατεστημένος χειροποίητος χάρτης με id «{id}» και κανένα εγκατεστημένο παιχνίδι δεν τον περιέχει. Ίσως τον αφαίρεσε μια ενημέρωση του παιχνιδιού."
 
+#: src/multiplayer/pages/HighlightsSettings.tsx
+msgid "No highlight words."
+msgstr ""
+
 #: src/campaign/pages/components/presentationOpen.ts
 #, fuzzy
 msgid "No icon or background yet"
@@ -35367,11 +35381,6 @@ msgstr "Καμία παραγγελία σε αυτό το χρονικό διά
 #, fuzzy
 msgid "none yet"
 msgstr "κανένα ακόμη"
-
-#: src/multiplayer/pages/HighlightsSettings.tsx
-#, fuzzy
-msgid "None yet. Add a word to have it flag matching chat messages."
-msgstr "Τίποτα ακόμη. Προσθέστε μια λέξη για να επισημαίνονται τα μηνύματα συνομιλίας που την περιέχουν."
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
@@ -41717,6 +41726,7 @@ msgstr "Remix από"
 #: src/lego/pages/components/BuiltBySection.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/multiplayer/battle/MemberRow.tsx
+#: src/multiplayer/pages/HighlightsSettings.tsx
 #: src/play/ChobbyPresetsView.tsx
 #: src/uberstress/pages/SettingsSection.tsx
 #: src/widgets/pages/WidgetsPage.tsx
@@ -58188,11 +58198,6 @@ msgstr "Ολόκληρο το μοντέλο"
 #, fuzzy
 msgid "Whole project"
 msgstr "Ολόκληρο το έργο"
-
-#: src/multiplayer/pages/HighlightsSettings.tsx
-#, fuzzy
-msgid "Whole-word, case-insensitive. Messages containing any of these are visually flagged."
-msgstr "Ολόκληρη λέξη, χωρίς διάκριση πεζών-κεφαλαίων. Τα μηνύματα που περιέχουν κάποια από αυτές επισημαίνονται."
 
 #: src/hub/maps/catalogSweep.ts
 #, fuzzy
