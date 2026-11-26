@@ -187,7 +187,7 @@ Includes are cycle-guarded and depth-capped; a missing file or an include loop s
 
 ### Linking between pages and routes
 
-Markdown links resolve intelligently:
+Markdown links resolve intelligently. If a file or page name has a space in it, wrap the target in angle brackets, as in `[Guide](<docs/my guide.pdf>)`.
 
 - `[Rules](../rules.md)` → the page `#/pages/rules` (a `.md` link maps to its page by filename; a nested page can be linked with `@route/pages/...`).
 - `[Play](../@route/singleplayer)` → navigates in-app.
