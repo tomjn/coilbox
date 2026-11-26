@@ -37146,6 +37146,10 @@ msgstr "Μόνο έως"
 msgid "Only used when the weapon has no model."
 msgstr "Χρησιμοποιείται μόνο όταν το όπλο δεν έχει μοντέλο."
 
+#: src/scenario/pages/components/TriggerPanel.tsx
+msgid "Only when it becomes true"
+msgstr "Μόνο όταν γίνεται αληθές"
+
 #: src/direct/hostingRoute.ts
 #, fuzzy
 msgid "Only when players cannot reach you directly."

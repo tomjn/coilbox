@@ -197,7 +197,8 @@ export function removeTrigger(scenario: Scenario, id: string): Scenario {
 
 /** One trigger's fields changed. A cooldown that is not a wait is dropped, so
  *  clearing the box leaves the field out of the document rather than storing a
- *  zero the runtime would have to interpret. */
+ *  zero the runtime would have to interpret. `onBecomingTrue` goes the same way
+ *  when it is off, or when the trigger no longer repeats. */
 export function editTrigger(
   scenario: Scenario,
   id: string,
@@ -207,6 +208,7 @@ export function editTrigger(
   if (at < 0) return scenario;
   const next: ScenarioTrigger = { ...scenario.triggers[at], ...patch };
   if (next.cooldown === undefined || !(next.cooldown > 0)) delete next.cooldown;
+  if (!next.repeat || !next.onBecomingTrue) delete next.onBecomingTrue;
   const triggers = scenario.triggers.slice();
   triggers[at] = next;
   return { ...scenario, triggers };
@@ -752,11 +754,12 @@ export function setAtTheStart(scenario: Scenario, triggerId: string): Scenario {
   });
 }
 
-/** When a trigger with an empty condition list fires. Only an armed fire-once
- *  trigger fires at the start, so the others keep a name that is true of them. */
+/** When a trigger with an empty condition list fires. A trigger that fires over
+ *  and over is the only one that **Always** is true of. One that waits for its
+ *  conditions to become true fires once, as a fire-once trigger does. */
 export function noConditionsLabel(trigger: ScenarioTrigger): string {
   if (trigger.conditions.op === "any") return t`Never`;
-  if (trigger.repeat) return t`Always`;
+  if (trigger.repeat && !trigger.onBecomingTrue) return t`Always`;
   return trigger.enabled ? t`At the start` : t`When armed`;
 }
 

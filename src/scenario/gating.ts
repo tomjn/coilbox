@@ -202,6 +202,13 @@ const HUNT_VERSION = 12;
  */
 const NEUTRAL_TEAM_VERSION = 13;
 
+/**
+ * The runtime that first fired a repeating trigger only as its conditions became
+ * true (issue #5295). A runtime behind this reads past the flag and fires on
+ * every pass they hold, so a line meant once is said twice a second.
+ */
+const BECOMING_TRUE_VERSION = 16;
+
 /** Whether any group is told to hunt, at the start or by a `give_orders`. */
 function huntsAParticipant(scenario: Scenario): boolean {
   const hunts = (orders: unknown) =>
@@ -328,6 +335,9 @@ export function requiredRuntimeVersion(
   }
   if (scenario.neutral) {
     version = Math.max(version, NEUTRAL_TEAM_VERSION);
+  }
+  if (scenario.triggers.some((trigger) => trigger.onBecomingTrue)) {
+    version = Math.max(version, BECOMING_TRUE_VERSION);
   }
   return version;
 }

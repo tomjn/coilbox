@@ -69,7 +69,7 @@ local MISSION = compiled({
 		},
 	},
 	restrictions = { buildable = { mode = "deny", units = { "nuke" } } },
-	vars = { counter = 5, pulses = 0 },
+	vars = { counter = 5, pulses = 0, rises = 0 },
 	objectives = {
 		{ id = "first", kind = "primary", text = "Happens once.", hidden = false },
 		{ id = "second", kind = "primary", text = "Never happens.", hidden = false },
@@ -96,6 +96,10 @@ local MISSION = compiled({
 		once("pulse", {
 			{ type = "add_var", params = { name = "pulses", value = 1 } },
 		}, { ["repeat"] = true, cooldown = 10 }),
+		-- Holds all mission long, so it fires once however often it is asked.
+		once("rise", {
+			{ type = "add_var", params = { name = "rises", value = 1 } },
+		}, { ["repeat"] = true, onBecomingTrue = true }),
 	},
 })
 
@@ -310,6 +314,8 @@ check("a repeating trigger's cooldown survives too",
 		.. tostring(first.triggers.byId.pulse.readyFrame))
 check("and it did not fire in the meantime", published.vars.get("pulses") == 1,
 	tostring(published.vars.get("pulses")))
+check("a trigger waiting for its conditions to come back does not fire for the reload",
+	published.vars.get("rises") == 1, tostring(published.vars.get("rises")))
 
 --------------------------------------------------------------------------------
 -- How the mission ended.

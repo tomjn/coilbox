@@ -2,10 +2,10 @@
 --
 -- A scenario's triggers are a flat list of "when these conditions hold, run
 -- these actions". Triggers that enable and disable other triggers are what turn
--- that list into a state machine, so this module owns enable, disable, repeat
--- and cooldown, and knows nothing about what any other condition or action
--- means. Those are registered into it, by the runtime's own modules and by a
--- game's extensions.
+-- that list into a state machine, so this module owns enable, disable, repeat,
+-- cooldown and "only when it becomes true", and knows nothing about what any
+-- other condition or action means. Those are registered into it, by the
+-- runtime's own modules and by a game's extensions.
 --
 -- Pure. No engine calls, no globals beyond the Lua standard library. Everything
 -- that reads the world arrives through a registered condition, which is why the
@@ -126,12 +126,19 @@ function Engine:setEnabled(id, enabled)
 		end
 		return
 	end
+	local wasEnabled = record.enabled
 	record.enabled = enabled
 	if enabled then
 		-- Re-arming clears whatever the trigger was waiting on. A mission that
 		-- switches a trigger back on means now, not once an old cooldown runs out.
 		record.readyFrame = self.frameNumber
 		record.armedAt = self:stamp()
+		-- Conditions that already hold count as becoming true for a trigger that
+		-- was off (issue #5295). One that is already armed keeps its answer, or a
+		-- repeating trigger enabling it would fire it on every pass.
+		if not wasEnabled then
+			record.held = false
+		end
 	end
 	self:save(record)
 end
@@ -143,7 +150,11 @@ end
 -- (issue #4147), and a host that does neither is not asked to do anything.
 function Engine:save(record)
 	if self.ctx.save then
-		self.ctx.save(record.id, record.enabled, record.readyFrame)
+		local held = nil
+		if record.onBecomingTrue then
+			held = record.held
+		end
+		self.ctx.save(record.id, record.enabled, record.readyFrame, held)
 	end
 end
 
@@ -231,6 +242,11 @@ function M.new(mission, ctx)
 			repeats = trigger["repeat"] == true,
 			cooldown = math.floor((tonumber(trigger.cooldown) or 0) * self.ctx.gameSpeed),
 			readyFrame = 0,
+			-- Fires as its conditions start to hold rather than on every pass they
+			-- do (issue #5295). `held` is whether it has fired for the stretch of
+			-- holding it is in, which is what keeps it quiet until they stop.
+			onBecomingTrue = trigger["repeat"] == true and trigger.onBecomingTrue == true,
+			held = false,
 			-- Before every stamp, so a trigger armed from the start counts whatever
 			-- the player does from the first frame.
 			armedAt = 0,
@@ -242,6 +258,7 @@ function M.new(mission, ctx)
 		if kept then
 			record.enabled = kept.enabled
 			record.readyFrame = tonumber(kept.readyFrame) or record.readyFrame
+			record.held = kept.held == true
 		end
 		self.triggers[#self.triggers + 1] = record
 		self.byId[record.id] = record
@@ -290,6 +307,10 @@ end
 
 --- Sort the triggers into event subscribers and the polled list. Rebuilt
 -- whenever a registration changes what a condition type means.
+--
+-- A trigger that fires as its conditions become true is on the polled list
+-- whatever it watches, because nothing raises an event when a condition stops
+-- holding and it is not ready again until it has seen that.
 function Engine:ensureIndex()
 	if self.index then
 		return
@@ -303,7 +324,8 @@ function Engine:ensureIndex()
 				subscribers[name] = subscribers[name] or {}
 				table.insert(subscribers[name], record)
 			end
-		else
+		end
+		if not events or record.onBecomingTrue then
 			polled[#polled + 1] = record
 		end
 	end
@@ -392,10 +414,43 @@ function Engine:fire(record)
 	else
 		record.enabled = false
 	end
+	if record.onBecomingTrue then
+		-- Asked again with this firing spent and no event, so a condition about
+		-- something happening has already stopped holding and the next time it
+		-- happens fires the trigger, with no polled tick needed in between.
+		local event = self.ctx.event
+		self.ctx.event, self.ctx.armedAt = nil, record.armedAt
+		record.held = self:holds(record)
+		self.ctx.event = event
+	end
 	self:save(record)
 
 	for _, action in ipairs(record.def.actions or {}) do
 		self:act(action)
+	end
+end
+
+--- Test one armed trigger, and fire it if it is due.
+--
+-- A cooldown delays a firing. A trigger waiting for its conditions to become true
+-- is still asked while one runs, so it sees them stop. It fires once the wait is
+-- over if they have become true again and still hold.
+function Engine:consider(record)
+	local ready = self.frameNumber >= record.readyFrame
+	if not record.onBecomingTrue then
+		if ready and self:holds(record) then
+			self:fire(record)
+		end
+		return
+	end
+
+	if not self:holds(record) then
+		if record.held then
+			record.held = false
+			self:save(record)
+		end
+	elseif ready and not record.held then
+		self:fire(record)
 	end
 end
 
@@ -421,8 +476,8 @@ function Engine:pass(event)
 
 	for _, record in ipairs(records) do
 		self.ctx.armedAt = record.armedAt
-		if record.enabled and self.frameNumber >= record.readyFrame and self:holds(record) then
-			self:fire(record)
+		if record.enabled then
+			self:consider(record)
 		end
 	end
 

@@ -167,8 +167,18 @@
 -- A runtime behind 15 reads past the field and counts those units, so "clear the
 -- base" goes on waiting for every wall in it. So a scenario using it asks for 15.
 
+-- 16 lets a repeating trigger fire once each time its conditions become true
+-- (issue #5295). One format feature:
+--
+--   * a repeating trigger may carry `onBecomingTrue = true`, and then fires only
+--     as its conditions go from not holding to holding
+--
+-- A runtime behind 16 reads past the field and fires on every pass the conditions
+-- hold, so a line meant once is said twice a second. So a scenario using it asks
+-- for 16.
+
 return {
-	version = 15,
+	version = 16,
 
 	-- The compiled mission format this runtime reads.
 	schemaVersion = 1,

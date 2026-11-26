@@ -181,7 +181,8 @@ Each trigger has:
 
 - **Armed at the start**, off for a trigger something else has to enable.
 - **Fires every time**, off for a trigger that fires once and disarms itself. Enabling it again re-arms it.
-- **Waits N seconds between firings**, for a repeating trigger. With no wait, a repeating trigger fires on every pass its conditions hold, which on the polled tick is about twice a second.
+- **Only when it becomes true**, for a repeating trigger. The trigger fires when its conditions start to hold, and is ready again only after they have stopped. Use it for "each time", such as a line of dialogue every time the player's army drops below five units. A trigger enabled while its conditions already hold fires once. See [Only when it becomes true](#only-when-it-becomes-true).
+- **Waits N seconds between firings**, for a repeating trigger. With no wait and **Only when it becomes true** off, a repeating trigger fires on every pass its conditions hold, which on the polled tick is about twice a second.
 - **Fires when**, a list of conditions with **all of these hold** or **any of these hold** over it. There is no nesting. An empty list holds under `all` and never holds under `any`. See [At the start](#at-the-start).
 - **Then**, the actions, run in the order you list them.
 - **Only from** and **Only up to**, the difficulties it runs at. See [Difficulty](#difficulty).
@@ -191,6 +192,16 @@ A trigger's name is a label. Call it what you like, call two triggers the same t
 A trigger written before names existed shows the id it was called by, which is the name it was displayed under anyway. Nothing to do.
 
 Conditions are checked two ways, and you do not choose which. A condition about a thing that happened, a unit dying or being captured, is checked when it happens. A condition about an aggregate, a count or a zone's contents or a clock, is checked on a slow tick every 15 frames. A trigger with one aggregate condition is checked on the tick.
+
+### Only when it becomes true
+
+In the saved scenario and the compiled mission this is `onBecomingTrue = true` on a repeating trigger. It needs runtime 16, and only a scenario that uses it asks for 16.
+
+- A wait delays a firing. The conditions are still checked while it runs, so if they stop and start again, the trigger fires when the wait is over. If they have stopped by then, it does not fire.
+- Enabling a trigger that was disabled makes it ready, even if its conditions never stopped. Enabling one that is already enabled does not.
+- A condition about something the player did, `command_given` or `dialogue_dismissed`, is used up by the firing. The next order or dismissal fires the trigger again.
+- A condition about an event is also checked on the polled tick, so the trigger can see it stop holding. Stopping and starting again between two checks that nothing else prompts goes unseen.
+- `/luarules reload` does not fire it again. A condition that reads something the reload loses, such as how long a zone has been held, stops holding for a while, so its trigger fires again when it next holds.
 
 ### At the start
 
@@ -206,6 +217,7 @@ An empty list on any other trigger shows what it does instead:
 | --- | --- | --- |
 | Not armed at the start | **When armed** | Fires once, on the first tick after something enables it |
 | Fires every time | **Always** | Fires on every tick, subject to its wait |
+| Fires every time, only when it becomes true | **At the start**, or **When armed** | Fires once, and once more each time it is disabled and enabled again |
 | Uses **any of these hold** | **Never** | Does not fire |
 
 ### Conditions

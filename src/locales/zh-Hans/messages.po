@@ -37132,6 +37132,10 @@ msgstr "最高难度"
 msgid "Only used when the weapon has no model."
 msgstr "仅在武器没有模型时使用。"
 
+#: src/scenario/pages/components/TriggerPanel.tsx
+msgid "Only when it becomes true"
+msgstr "仅在条件变为成立时"
+
 #: src/direct/hostingRoute.ts
 #, fuzzy
 msgid "Only when players cannot reach you directly."

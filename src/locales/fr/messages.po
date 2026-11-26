@@ -37132,6 +37132,10 @@ msgstr "Seulement jusqu’à"
 msgid "Only used when the weapon has no model."
 msgstr "Utilisé uniquement quand l’arme n’a pas de modèle."
 
+#: src/scenario/pages/components/TriggerPanel.tsx
+msgid "Only when it becomes true"
+msgstr "Seulement quand cela devient vrai"
+
 #: src/direct/hostingRoute.ts
 #, fuzzy
 msgid "Only when players cannot reach you directly."

@@ -288,9 +288,12 @@ local ACTOR_RULES_PREFIX = "coilbox_mission_actor_"
 -- knows which ones had fired. Game rules params, because the engine holds them
 -- across the reload and every other part of the runtime's state that a panel or
 -- a debrief reads is already kept there (issue #4147). The first is whether the
--- trigger is armed, 1 or 0, and the second the frame it may next fire on.
+-- trigger is armed, 1 or 0, the second the frame it may next fire on, and the
+-- third, kept only for a trigger that fires as its conditions become true, whether
+-- it has fired for conditions that still hold, 1 or 0.
 local TRIGGER_RULES_PREFIX = "coilbox_mission_trigger_"
 local TRIGGER_READY_PREFIX = "coilbox_mission_trigger_ready_"
+local TRIGGER_HELD_PREFIX = "coilbox_mission_trigger_held_"
 
 -- What a reload cannot give back, said once in the log. Each of these is a list
 -- or a clock the runtime holds in its own variables and the engine holds no copy
@@ -738,9 +741,12 @@ if gadgetHandler:IsSyncedCode() then
 			-- Which triggers have fired and which have been switched on or off is
 			-- the one piece of mission progress nothing else already mirrors, so it
 			-- is written here whenever it changes and read back by a reloaded runtime.
-			save = function(id, enabled, readyFrame)
+			save = function(id, enabled, readyFrame, held)
 				Spring.SetGameRulesParam(TRIGGER_RULES_PREFIX .. id, enabled and 1 or 0)
 				Spring.SetGameRulesParam(TRIGGER_READY_PREFIX .. id, readyFrame)
+				if held ~= nil then
+					Spring.SetGameRulesParam(TRIGGER_HELD_PREFIX .. id, held and 1 or 0)
+				end
 			end,
 			restore = published.resumed and function(id)
 				local enabled = Spring.GetGameRulesParam(TRIGGER_RULES_PREFIX .. id)
@@ -750,6 +756,7 @@ if gadgetHandler:IsSyncedCode() then
 				return {
 					enabled = enabled == 1,
 					readyFrame = Spring.GetGameRulesParam(TRIGGER_READY_PREFIX .. id),
+					held = Spring.GetGameRulesParam(TRIGGER_HELD_PREFIX .. id) == 1,
 				}
 			end or nil,
 			-- A trigger the difficulty leaves out is never armed and cannot be
