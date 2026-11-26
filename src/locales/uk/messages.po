@@ -10158,6 +10158,10 @@ msgstr ""
 msgid "About hosting your own server"
 msgstr ""
 
+#: src/deeplink/pages/ImportSection.tsx
+msgid "About importing"
+msgstr ""
+
 #: src/general/pages/SettingsSection.tsx
 msgid "About interface size"
 msgstr ""
@@ -12231,11 +12235,6 @@ msgstr "Кожен, хто вставить це в Правки юнітів �
 #, fuzzy
 msgid "Anything already installed is still on disk. unitsync said: {reason}"
 msgstr "Усе вже встановлене досі на диску. unitsync повідомив: {reason}"
-
-#: src/deeplink/pages/ImportSection.tsx
-#, fuzzy
-msgid "Anything coilbox shares goes here: {kindsSentence}."
-msgstr "Сюди йде все, чим ділиться coilbox: {kindsSentence}."
 
 #: src/lego/pages/components/PieceCollisionFields.tsx
 #, fuzzy
@@ -16656,6 +16655,10 @@ msgstr "Інструменти .cob"
 #, fuzzy
 msgid "Code"
 msgstr "Код"
+
+#: src/deeplink/pages/ImportSection.tsx
+msgid "Code, link or file"
+msgstr ""
 
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/main.tsx
@@ -28197,6 +28200,10 @@ msgstr "Він читає формат місій {installedFormat}."
 msgid "It shows the last saved scan, which may be out of date. Playing is off until a scan succeeds."
 msgstr "Показано останнє збережене сканування, яке може бути застарілим. Гра вимкнена, доки сканування не вдасться."
 
+#: src/deeplink/pages/ImportSection.tsx
+msgid "It takes {kindsSentence}."
+msgstr ""
+
 #: src/content/replayAnalysis.ts
 #, fuzzy
 msgid "It used {usedGame}, and the replay was recorded on {recordedGame}."
@@ -38337,6 +38344,10 @@ msgstr "Вставте посилання coilbox, код або вміст ек
 msgid "Paste a coilbox link, a share code, or the contents of a coilbox .json file."
 msgstr "Вставте посилання coilbox, код для поширення або вміст файлу coilbox .json."
 
+#: src/deeplink/pages/ImportSection.tsx
+msgid "Paste a coilbox link, a share code, the address of a share on the web, or the contents of an exported file. Coilbox works out what it is and asks before importing anything."
+msgstr ""
+
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 #, fuzzy
 msgid "Paste a payload a lobby showed you, a whole !bset line, or several lines copied out of a battle's mod options. Coilbox shows the Lua and, where the shape allows, turns it into an editable project."
@@ -38366,11 +38377,6 @@ msgstr "Вставте код пакета налаштування…"
 #, fuzzy
 msgid "Paste a share code or link somebody sent you."
 msgstr "Вставте код для поширення або посилання, яке вам надіслали."
-
-#: src/deeplink/pages/ImportSection.tsx
-#, fuzzy
-msgid "Paste anything coilbox made and it will work out what it is. A coilbox link, a share code, the address of a share on the web, the contents of an exported file, or the file itself. Nothing is imported until you have seen what it is and said yes."
-msgstr "Вставте будь-що, створене coilbox, і він визначить, що це. Посилання coilbox, код для поширення, адресу поширення в мережі, вміст експортованого файлу або сам файл. Нічого не імпортується, доки ви не побачите, що це, і не погодитеся."
 
 #: src/deeplink/copyLink.ts
 #, fuzzy

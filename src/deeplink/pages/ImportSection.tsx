@@ -6,6 +6,8 @@ import { ClipboardPaste, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { ChallengeCodeInput } from "@/challenge/ChallengeCodeInput";
+import { HelpPopover } from "@/components/HelpPopover";
+import { Label } from "@/components/ui/label";
 import { containerKindsSentence } from "@/container/names";
 import { nextDrawerKey } from "@/general/drawerKey";
 import { importContainerFile } from "../bindings";
@@ -40,7 +42,9 @@ export default function ImportSection() {
   const [offer, setOffer] = useState<{ text: string; line: string } | null>(
     null,
   );
-  const [chosen, setChosen] = useState<string | undefined>(undefined);
+  // The code the form is handed, from the clipboard offer or a deep link,
+  // whichever came last.
+  const [seed, setSeed] = useState<string | undefined>(undefined);
   // A fresh key for every arrival, so a form that already ran a code is never
   // handed the same code again (issue #1398). It is the same fragility, and
   // the same fix, as `nextDrawerKey` (see `../../general/drawerKey.ts`) gave
@@ -53,13 +57,13 @@ export default function ImportSection() {
   const importParams = useImportParam();
   // Remounting `ChallengeCodeInput` under a new key is what fills and submits
   // it, which is also how a deep-linked code reaches every other importer.
-  const seed = chosen ?? importParams.code;
-
   // `importParams` is a fresh object only on a genuine new arrival (see
   // `useImportParam`), so this cannot miss a repeat of the same code the way
   // comparing the code string itself would.
   useEffect(() => {
-    if (importParams.code !== undefined) setFormKey(nextDrawerKey());
+    if (importParams.code === undefined) return;
+    setSeed(importParams.code);
+    setFormKey(nextDrawerKey());
   }, [importParams]);
 
   useEffect(() => {
@@ -122,18 +126,25 @@ export default function ImportSection() {
   const kindsSentence = containerKindsSentence();
 
   return (
-    <div className="flex flex-col gap-4">
-      <p className="text-sm text-muted-foreground">
-        <Trans>
-          Paste anything coilbox made and it will work out what it is. A coilbox
-          link, a share code, the address of a share on the web, the contents of
-          an exported file, or the file itself. Nothing is imported until you
-          have seen what it is and said yes.
-        </Trans>
-      </p>
+    <section className="flex flex-col gap-3">
+      <div className="flex items-center gap-1">
+        <Label htmlFor="import-code" className="text-sm font-semibold">
+          <Trans>Code, link or file</Trans>
+        </Label>
+        <HelpPopover label={t`About importing`}>
+          <p>
+            <Trans>
+              Paste a coilbox link, a share code, the address of a share on the
+              web, or the contents of an exported file. Coilbox works out what
+              it is and asks before importing anything.
+            </Trans>
+          </p>
+          <p>{t`It takes ${kindsSentence}.`}</p>
+        </HelpPopover>
+      </div>
 
       {offer && (
-        <div className="flex items-center gap-3 rounded-lg border bg-muted/40 p-3 text-sm">
+        <div className="flex items-center gap-3 rounded-md border border-border bg-muted/40 py-2 pr-2 pl-4 text-sm">
           <ClipboardPaste
             className="size-4 shrink-0 text-muted-foreground"
             aria-hidden
@@ -141,8 +152,9 @@ export default function ImportSection() {
           <span className="grow">{offer.line}</span>
           <Button
             size="sm"
+            variant="secondary"
             onClick={() => {
-              setChosen(offer.text);
+              setSeed(offer.text);
               setFormKey(nextDrawerKey());
               setOffer(null);
             }}
@@ -150,9 +162,11 @@ export default function ImportSection() {
             <Trans>Use it</Trans>
           </Button>
           <Button
-            size="sm"
+            size="icon"
             variant="ghost"
+            className="size-8"
             aria-label={t`Dismiss the clipboard offer`}
+            title={t`Dismiss the clipboard offer`}
             onClick={() => setOffer(null)}
           >
             <X className="size-4" aria-hidden />
@@ -160,16 +174,10 @@ export default function ImportSection() {
         </div>
       )}
 
-      <div className="rounded-lg border">
+      <div className="rounded-md border border-border">
         <ChallengeCodeInput
           key={formKey}
-          // The list is back, built from the kinds a container can hold rather
-          // than written out (issue #1515). Written out is how it came to be
-          // two kinds short, and how it stayed short until somebody counted.
-          // A campaign is on it: pasting one here is answered with where a
-          // campaign goes, which is this box doing its job rather than
-          // refusing.
-          helpText={t`Anything coilbox shares goes here: ${kindsSentence}.`}
+          id="import-code"
           placeholder={t`Paste a coilbox link, a code, or an exported file's contents…`}
           submitLabel={t`Import`}
           busyLabel={t`Checking…`}
@@ -181,6 +189,6 @@ export default function ImportSection() {
       </div>
 
       <ConfirmDialog pending={pending} setPending={setPending} />
-    </div>
+    </section>
   );
 }

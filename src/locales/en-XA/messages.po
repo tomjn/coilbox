@@ -8230,6 +8230,10 @@ msgstr ""
 msgid "About hosting your own server"
 msgstr ""
 
+#: src/deeplink/pages/ImportSection.tsx
+msgid "About importing"
+msgstr ""
+
 #: src/general/pages/SettingsSection.tsx
 msgid "About interface size"
 msgstr ""
@@ -9928,10 +9932,6 @@ msgstr ""
 
 #: src/content/pages/components/states.tsx
 msgid "Anything already installed is still on disk. unitsync said: {reason}"
-msgstr ""
-
-#: src/deeplink/pages/ImportSection.tsx
-msgid "Anything coilbox shares goes here: {kindsSentence}."
 msgstr ""
 
 #: src/lego/pages/components/PieceCollisionFields.tsx
@@ -13550,6 +13550,10 @@ msgstr ""
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/multiplayer/chat/ChatPane.tsx
 msgid "Code"
+msgstr ""
+
+#: src/deeplink/pages/ImportSection.tsx
+msgid "Code, link or file"
 msgstr ""
 
 #: src/lego/pages/components/ShortcutSheet.tsx
@@ -22951,6 +22955,10 @@ msgstr ""
 msgid "It shows the last saved scan, which may be out of date. Playing is off until a scan succeeds."
 msgstr ""
 
+#: src/deeplink/pages/ImportSection.tsx
+msgid "It takes {kindsSentence}."
+msgstr ""
+
 #: src/content/replayAnalysis.ts
 msgid "It used {usedGame}, and the replay was recorded on {recordedGame}."
 msgstr ""
@@ -31184,6 +31192,10 @@ msgstr ""
 msgid "Paste a coilbox link, a share code, or the contents of a coilbox .json file."
 msgstr ""
 
+#: src/deeplink/pages/ImportSection.tsx
+msgid "Paste a coilbox link, a share code, the address of a share on the web, or the contents of an exported file. Coilbox works out what it is and asks before importing anything."
+msgstr ""
+
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 msgid "Paste a payload a lobby showed you, a whole !bset line, or several lines copied out of a battle's mod options. Coilbox shows the Lua and, where the shape allows, turns it into an editable project."
 msgstr ""
@@ -31206,10 +31218,6 @@ msgstr ""
 
 #: src/deeplink/index.ts
 msgid "Paste a share code or link somebody sent you."
-msgstr ""
-
-#: src/deeplink/pages/ImportSection.tsx
-msgid "Paste anything coilbox made and it will work out what it is. A coilbox link, a share code, the address of a share on the web, the contents of an exported file, or the file itself. Nothing is imported until you have seen what it is and said yes."
 msgstr ""
 
 #: src/deeplink/copyLink.ts

@@ -10158,6 +10158,10 @@ msgstr ""
 msgid "About hosting your own server"
 msgstr ""
 
+#: src/deeplink/pages/ImportSection.tsx
+msgid "About importing"
+msgstr ""
+
 #: src/general/pages/SettingsSection.tsx
 msgid "About interface size"
 msgstr ""
@@ -12231,11 +12235,6 @@ msgstr "任何人将其粘贴到“单位调整 → 导入”中，都会获得�
 #, fuzzy
 msgid "Anything already installed is still on disk. unitsync said: {reason}"
 msgstr "已安装的内容仍在磁盘上。unitsync 报告：{reason}"
-
-#: src/deeplink/pages/ImportSection.tsx
-#, fuzzy
-msgid "Anything coilbox shares goes here: {kindsSentence}."
-msgstr "coilbox 分享的任何内容都在这里导入：{kindsSentence}。"
 
 #: src/lego/pages/components/PieceCollisionFields.tsx
 #, fuzzy
@@ -16656,6 +16655,10 @@ msgstr "COB 工具"
 #, fuzzy
 msgid "Code"
 msgstr "验证码"
+
+#: src/deeplink/pages/ImportSection.tsx
+msgid "Code, link or file"
+msgstr ""
 
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/main.tsx
@@ -28197,6 +28200,10 @@ msgstr "它读取任务格式 {installedFormat}。"
 msgid "It shows the last saved scan, which may be out of date. Playing is off until a scan succeeds."
 msgstr "显示的是上次保存的扫描结果，可能已过期。扫描成功前无法游玩。"
 
+#: src/deeplink/pages/ImportSection.tsx
+msgid "It takes {kindsSentence}."
+msgstr ""
+
 #: src/content/replayAnalysis.ts
 #, fuzzy
 msgid "It used {usedGame}, and the replay was recorded on {recordedGame}."
@@ -38337,6 +38344,10 @@ msgstr "粘贴 coilbox 链接、分享码或导出文件的内容…"
 msgid "Paste a coilbox link, a share code, or the contents of a coilbox .json file."
 msgstr "粘贴 coilbox 链接、分享码或 coilbox .json 文件的内容。"
 
+#: src/deeplink/pages/ImportSection.tsx
+msgid "Paste a coilbox link, a share code, the address of a share on the web, or the contents of an exported file. Coilbox works out what it is and asks before importing anything."
+msgstr ""
+
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 #, fuzzy
 msgid "Paste a payload a lobby showed you, a whole !bset line, or several lines copied out of a battle's mod options. Coilbox shows the Lua and, where the shape allows, turns it into an editable project."
@@ -38366,11 +38377,6 @@ msgstr "粘贴设置包码…"
 #, fuzzy
 msgid "Paste a share code or link somebody sent you."
 msgstr "粘贴别人发给你的分享码或链接。"
-
-#: src/deeplink/pages/ImportSection.tsx
-#, fuzzy
-msgid "Paste anything coilbox made and it will work out what it is. A coilbox link, a share code, the address of a share on the web, the contents of an exported file, or the file itself. Nothing is imported until you have seen what it is and said yes."
-msgstr "粘贴任何由 coilbox 生成的内容，它都会识别出是什么。coilbox 链接、分享码、网上分享的地址、导出文件的内容，或文件本身都可以。在你看到内容并同意之前，不会导入任何东西。"
 
 #: src/deeplink/copyLink.ts
 #, fuzzy
