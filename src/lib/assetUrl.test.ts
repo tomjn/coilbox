@@ -3,6 +3,7 @@ import {
   assetUrl,
   campaignMediaUrl,
   isLocalRef,
+  markdownFilePath,
   mediaKind,
   portableAssetPath,
   scenarioMediaUrl,
@@ -76,6 +77,21 @@ describe("portableAssetPath", () => {
     expect(
       portableAssetPath("coilbox://localhost/portable/%zz.pdf"),
     ).toBeUndefined();
+  });
+});
+
+describe("markdownFilePath", () => {
+  it("undoes the percent encoding Markdown puts on a source", () => {
+    expect(markdownFilePath("images/my%20art%20%C3%A9.jpg")).toBe(
+      "images/my art é.jpg",
+    );
+    expect(markdownFilePath("images/100%25.jpg")).toBe("images/100%.jpg");
+  });
+
+  it("keeps a malformed escape as written and decodes the rest", () => {
+    // Markdown leaves `%zz` alone, so it is part of the name.
+    expect(markdownFilePath("images/my%20%zz.jpg")).toBe("images/my %zz.jpg");
+    expect(markdownFilePath("images/%FF%20.jpg")).toBe("images/%FF .jpg");
   });
 });
 

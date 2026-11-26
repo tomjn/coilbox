@@ -121,7 +121,7 @@ A [distribution profile](distribution-profile.md) can ship one or more campaigns
 
 Each file in `campaigns/` is an exported campaign, dropped in as-is: export from Campaign builder and save the resulting `.json` as `.coilbox/campaigns/<any-name>.json`. (A bare campaign document — the inner `campaign` object without the export wrapper — is also accepted.) Images are embedded in the export, so a still-image campaign is a single self-contained file.
 
-To ship **audio or video** (which can't be embedded), reference the files by relative path from `.coilbox/` — a `"local"` media reference such as `{ "kind": "local", "path": "briefings/intro.mp4" }` for a panorama, voiceover or cutscene, or `![](images/art.jpg)` inline in a Markdown briefing — and place the files under `.coilbox/` alongside the campaign. These paths resolve the same way as [distribution-profile](distribution-profile.md) welcome-screen media.
+To ship **audio or video** (which can't be embedded), reference the files by relative path from `.coilbox/` — a `"local"` media reference such as `{ "kind": "local", "path": "briefings/intro.mp4" }` for a panorama, voiceover or cutscene, or `![](images/art.jpg)` inline in a Markdown briefing — and place the files under `.coilbox/` alongside the campaign. These paths resolve the same way as [distribution-profile](distribution-profile.md) welcome-screen media. If a name in a Markdown briefing has a space in it, wrap it in angle brackets, as in `![](<images/my art.jpg>)`.
 
 Bundled campaigns show up in the Campaigns list marked read-only (no edit/delete in the builder) but otherwise play exactly like local ones, and their progress is tracked the same way.
 

@@ -4,7 +4,12 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import type { ReactNode } from "react";
 import Markdown, { type Components } from "react-markdown";
 import { useNavigate } from "react-router";
-import { assetUrl, isLocalRef, mediaKind } from "../lib/assetUrl";
+import {
+  assetUrl,
+  isLocalRef,
+  markdownFilePath,
+  mediaKind,
+} from "../lib/assetUrl";
 import { createHeadingScope, scrollToAnchor } from "../lib/markdownAnchors";
 import { GFM_PLUGINS, GFM_PROSE_CLASSES, gfmPlugins } from "../lib/markdownGfm";
 import { openBundledFile } from "./openBundledFile";
@@ -117,7 +122,11 @@ function MarkdownLink({
 const MEDIA_COMPONENTS: Components = {
   a: MarkdownLink,
   img({ src, alt, title }) {
-    const url = resolveSrc(src);
+    // Decoded here rather than in `resolveSrc`, which also takes the background
+    // name from front matter, and nothing has encoded that one.
+    const url = resolveSrc(
+      typeof src === "string" && isLocalRef(src) ? markdownFilePath(src) : src,
+    );
     if (!url) return null;
     const kind = mediaKind(url);
     if (kind === "audio") {

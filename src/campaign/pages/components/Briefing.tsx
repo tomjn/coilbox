@@ -3,7 +3,12 @@ import { cn } from "@picoframe/frame";
 import { Loader2 } from "lucide-react";
 import { createContext, useContext, useEffect, useState } from "react";
 import Markdown, { type Components } from "react-markdown";
-import { assetUrl, isLocalRef, mediaKind } from "../../../lib/assetUrl";
+import {
+  assetUrl,
+  isLocalRef,
+  markdownFilePath,
+  mediaKind,
+} from "../../../lib/assetUrl";
 import { externalOnlyLink } from "../../../lib/MarkdownLink";
 import { GFM_PLUGINS, GFM_PROSE_CLASSES } from "../../../lib/markdownGfm";
 import {
@@ -69,19 +74,6 @@ function InlineMedia({
       className="my-2 max-w-full rounded-md"
     />
   );
-}
-
-/**
- * The file a relative source names. Markdown hands the source over percent
- * encoded, and the archive holds the name as the author's file system spells it.
- */
-function gameFileName(src: string): string {
-  const path = src.startsWith("./") ? src.slice(2) : src;
-  try {
-    return decodeURIComponent(path);
-  } catch {
-    return path;
-  }
 }
 
 /** One inline file of a game campaign, which has to be read out of the archive */
@@ -154,7 +146,7 @@ function BriefingImage({
   const origin = useContext(GameOrigin);
   if (typeof src !== "string" || !src) return null;
   if (origin && isLocalRef(src)) {
-    const file = gameFileName(src);
+    const file = markdownFilePath(src.startsWith("./") ? src.slice(2) : src);
     return (
       <GameMedia
         key={file}
@@ -165,7 +157,7 @@ function BriefingImage({
       />
     );
   }
-  const url = isLocalRef(src) ? assetUrl(src) : src;
+  const url = isLocalRef(src) ? assetUrl(markdownFilePath(src)) : src;
   return (
     <InlineMedia url={url} kind={mediaKind(url)} alt={alt} title={title} />
   );

@@ -66,6 +66,29 @@ export function portableAssetPath(url: string): string | undefined {
   }
 }
 
+/**
+ * The file a relative Markdown source names. `react-markdown` hands the source
+ * over percent encoded, and a file is looked up by the name the author's file
+ * system spells it. An escape that is not valid UTF-8 stays as written, since
+ * Markdown leaves one like `%zz` alone and it is then part of the name.
+ *
+ * Only for a source that came through Markdown. Pass the result to
+ * {@link assetUrl}, which does its own encoding.
+ */
+export function markdownFilePath(src: string): string {
+  return src.replace(ENCODED_CHARACTER, (escapes) => {
+    try {
+      return decodeURIComponent(escapes);
+    } catch {
+      return escapes;
+    }
+  });
+}
+
+/** The escapes for one character: an ASCII byte, or a UTF-8 lead and the rest. */
+const ENCODED_CHARACTER =
+  /%(?:[0-7][0-9a-f]|[c-f][0-9a-f](?:%[89ab][0-9a-f])+)/gi;
+
 /** URL for a user-authored campaign's imported AV, under `campaign/<id>/<file>`. */
 export function campaignMediaUrl(campaignId: string, file: string): string {
   return schemeUrl("campaign", `${campaignId}/${file}`);
