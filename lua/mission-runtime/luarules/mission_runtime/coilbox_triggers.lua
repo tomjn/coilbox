@@ -4,8 +4,8 @@
 -- these actions". Triggers that enable and disable other triggers are what turn
 -- that list into a state machine, so this module owns enable, disable, repeat,
 -- cooldown and "only when it becomes true", and knows nothing about what any
--- other condition or action means. Those are registered into it, by the runtime's own modules and by a
--- game's extensions.
+-- other condition or action means. Those are registered into it, by the
+-- runtime's own modules and by a game's extensions.
 --
 -- Pure. No engine calls, no globals beyond the Lua standard library. Everything
 -- that reads the world arrives through a registered condition, which is why the
