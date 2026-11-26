@@ -31,6 +31,7 @@ import { campaignMediaImportData, campaignUnitsCopy } from "./bindings";
 import { withBriefingFileRefs } from "./briefingFiles";
 import { gameCampaignFileUrl, gameCampaignOrigin } from "./gameCampaigns";
 import { inlineCampaignImages, materializeCampaignImages } from "./images";
+import { slotRefs } from "./media";
 import type { Campaign, ImageRef } from "./model";
 import { ensureCampaignScenarioMedia } from "./scenarioMedia";
 import { writeCarriedCopies } from "./units";
@@ -55,32 +56,12 @@ export function copyTitle(title: string, taken: Iterable<string>): string {
   return candidate;
 }
 
-/**
- * Every media slot a campaign has, as the refs currently in them.
- *
- * The read-only twin of the field list in `mapCampaignImages` (`images.ts`),
- * which is the walker export and import share. It is written out a second time
- * here because that walker is not exported, so adding a media field to the model
- * means updating this list too. Exporting the one walker would collapse the two,
- * and that is a change to `images.ts` to make with the next change to it.
- */
-function mediaRefs(campaign: Campaign): (ImageRef | undefined)[] {
-  return [
-    campaign.icon,
-    campaign.background,
-    ...campaign.missions.flatMap((m) => [
-      m.panorama,
-      m.sideGraphic,
-      m.voiceover,
-      m.cutscene,
-    ]),
-    ...Object.values(campaign.briefingFiles ?? {}),
-  ];
-}
-
-/** How many of a campaign's media slots are filled. */
+/** How many of a campaign's media slots and briefing files are filled. */
 function mediaCount(campaign: Campaign): number {
-  return mediaRefs(campaign).filter(Boolean).length;
+  return [
+    ...slotRefs(campaign),
+    ...Object.values(campaign.briefingFiles ?? {}),
+  ].filter(Boolean).length;
 }
 
 /**

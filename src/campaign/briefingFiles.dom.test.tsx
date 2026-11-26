@@ -74,7 +74,10 @@ const BRIEFING = [
 
 /** A game of its own per case, since a read campaign is held for the session. */
 let games = 0;
-async function gameCampaign(briefing = BRIEFING): Promise<Campaign> {
+async function gameCampaign(
+  briefing = BRIEFING,
+  mission: object = {},
+): Promise<Campaign> {
   games += 1;
   gameFiles.set(
     "campaign.json",
@@ -90,6 +93,7 @@ async function gameCampaign(briefing = BRIEFING): Promise<Campaign> {
           title: "Landing",
           briefing,
           snapshot: { gameName: "Test Game", mapName: "Test Map" },
+          ...mission,
         },
       ],
     }),
@@ -236,6 +240,17 @@ describe("exporting a game's campaign", () => {
     const { leftOut } = await inlineCampaignForExport(await gameCampaign());
 
     expect(leftOut).toEqual(["ridge.jpg", "the voice.ogg"]);
+  });
+
+  it("names a voiceover and a cutscene it leaves out", async () => {
+    const { leftOut } = await inlineCampaignForExport(
+      await gameCampaign("", {
+        voiceover: { kind: "file", file: "brief.ogg" },
+        cutscene: { kind: "file", file: "intro.mp4" },
+      }),
+    );
+
+    expect(leftOut).toEqual(["brief.ogg", "intro.mp4"]);
   });
 
   it("shows a carried picture before it is stored", () => {

@@ -99,7 +99,7 @@ A campaign can be exported to a single `.json` file (Campaign builder > a campai
 
 Any campaign **images** are inlined as base64 `data:` URIs, so the file is self-contained — no separate images to send along. Each [unit copy](#units-from-the-unit-builder) is carried the same way: export puts its `unit.json` and textures into the file, and import writes them back. Import (Campaign builder > Import) reads the same file back and validates it before adding it as an editable local campaign; a malformed or unrecognised file is rejected with an inline error rather than crashing anything.
 
-A [campaign inside a game](#ship-a-campaign-inside-your-game) can name files in its Markdown briefings. Export puts those pictures into the file under `briefingFiles`, keyed by the name the briefing uses, and tells you which files it left out. Duplicate copies all of them, audio and video included.
+A [campaign inside a game](#ship-a-campaign-inside-your-game) can name files in its Markdown briefings. Export puts those pictures into the file under `briefingFiles`, keyed by the name the briefing uses. It names the files it left out, including the campaign's audio and video. Duplicate copies all of them, audio and video included.
 
 **Audio and video are not inlined** (they'd be far too large, and can't be streamed from a data URI). A single-file export of a campaign that uses imported audio/video therefore keeps references that only resolve on the machine that authored it. To distribute a campaign with audio/video, bundle it (below) and ship the media files alongside it, referenced by relative path.
 

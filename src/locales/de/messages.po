@@ -1232,7 +1232,7 @@ msgstr "{0, plural, one {Geschätzt aus # früheren Aufzeichnung dieses Spiels a
 
 #. placeholder {0}: leftOut.length
 #: src/campaign/pages/CampaignBuilderPage.tsx
-msgid "{0, plural, one {Exported {campaignTitle}, but # file its briefings use is not in the export: {files}. An export cannot carry audio, video or a file that cannot be read.} other {Exported {campaignTitle}, but # files its briefings use are not in the export: {files}. An export cannot carry audio, video or a file that cannot be read.}}"
+msgid "{0, plural, one {Exported {campaignTitle}, but # media file is not in the export: {files}. An export cannot carry audio, video or a file that cannot be read.} other {Exported {campaignTitle}, but # media files are not in the export: {files}. An export cannot carry audio, video or a file that cannot be read.}}"
 msgstr ""
 
 #. placeholder {0}: info.gameVersions.length

@@ -10,6 +10,7 @@ import {
 } from "./bindings";
 import { withBriefingFileRefs } from "./briefingFiles";
 import { gameCampaignFileDataUri, gameCampaignOrigin } from "./gameCampaigns";
+import { slotRefs } from "./media";
 import {
   type Campaign,
   type CampaignUnit,
@@ -200,8 +201,10 @@ export async function inlineCampaignImages(
 
 /**
  * A self-contained campaign for an export file: its images and unit copies
- * inline. `leftOut` names the briefing files the file does not hold, which are
- * the audio and video, too large to inline, and any that could not be read.
+ * inline. `leftOut` names the files the export does not hold, which are the
+ * audio and video, too large to inline, and any that could not be read. It
+ * covers the briefing files, and for a game's campaign its media slots too. A
+ * stored campaign's slots name files by an id the player has never seen.
  */
 export async function inlineCampaignForExport(
   campaign: Campaign,
@@ -213,14 +216,25 @@ export async function inlineCampaignForExport(
       ([, ref]) => ref.kind !== "file",
     ),
   );
+  const leftOut = new Set(
+    Object.keys(source.briefingFiles ?? {}).filter(
+      (name) => !carried.has(name),
+    ),
+  );
+  if (gameCampaignOrigin(campaign.id)) {
+    const after = slotRefs(inlined);
+    slotRefs(campaign).forEach((ref, i) => {
+      if (ref?.kind === "file" && after[i]?.kind !== "data") {
+        leftOut.add(ref.file);
+      }
+    });
+  }
   return {
     campaign: {
       ...inlined,
       briefingFiles: carried.size > 0 ? Object.fromEntries(carried) : undefined,
     },
-    leftOut: Object.keys(source.briefingFiles ?? {})
-      .filter((name) => !carried.has(name))
-      .sort(),
+    leftOut: [...leftOut].sort(),
   };
 }
 

@@ -1,6 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { campaignMediaDelete } from "./bindings";
-import type { Campaign, CampaignMission } from "./model";
+import type { Campaign, CampaignMission, ImageRef } from "./model";
 
 /**
  * Which files a campaign has imported, and which of them nothing names any more
@@ -40,6 +40,26 @@ const CAMPAIGN_SLOTS = [
   ["icon", () => t`icon`],
   ["background", () => t`background`],
 ] as const;
+
+/**
+ * Every media slot a campaign has, as the refs currently in them, in an order
+ * that holds from one copy of the document to the next.
+ *
+ * The read-only twin of the field list in `mapCampaignImages` (`images.ts`),
+ * so adding a media field to the model means updating this list too.
+ */
+export function slotRefs(campaign: Campaign): (ImageRef | undefined)[] {
+  return [
+    campaign.icon,
+    campaign.background,
+    ...campaign.missions.flatMap((m) => [
+      m.panorama,
+      m.sideGraphic,
+      m.voiceover,
+      m.cutscene,
+    ]),
+  ];
+}
 
 /**
  * The files this mission imported. Only a `file` ref is one: a `data` ref

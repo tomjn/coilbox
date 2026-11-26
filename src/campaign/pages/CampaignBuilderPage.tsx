@@ -270,8 +270,8 @@ export default function CampaignBuilderPage() {
         const files = leftOut.join(", ");
         setActionError(
           plural(leftOut.length, {
-            one: `Exported ${campaignTitle}, but # file its briefings use is not in the export: ${files}. An export cannot carry audio, video or a file that cannot be read.`,
-            other: `Exported ${campaignTitle}, but # files its briefings use are not in the export: ${files}. An export cannot carry audio, video or a file that cannot be read.`,
+            one: `Exported ${campaignTitle}, but # media file is not in the export: ${files}. An export cannot carry audio, video or a file that cannot be read.`,
+            other: `Exported ${campaignTitle}, but # media files are not in the export: ${files}. An export cannot carry audio, video or a file that cannot be read.`,
           }),
         );
       }
