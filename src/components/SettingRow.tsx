@@ -24,7 +24,7 @@ export function SettingRow({
 }: {
   id?: string;
   label: string;
-  description?: string;
+  description?: ReactNode;
   /** Why the last change failed, shown under the name until the next try. */
   error?: string | null;
   /** What the help popover says. Needs `helpLabel` to name its button. */
