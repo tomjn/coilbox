@@ -12,7 +12,13 @@
  */
 
 import { I18nProvider } from "@lingui/react";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DownloadQueueProvider } from "../../downloads/DownloadQueueProvider";
 import { i18n, loadLocale } from "../../i18n";
@@ -26,10 +32,12 @@ function fakeUpdate() {
 
 vi.mock("@tauri-apps/api/app", () => ({ getVersion: async () => "1.2.2" }));
 vi.mock("@tauri-apps/plugin-process", () => ({ relaunch: async () => {} }));
-vi.mock("@tauri-apps/plugin-updater", () => ({
-  check: async () => fakeUpdate(),
+const { check, notify } = vi.hoisted(() => ({
+  check: vi.fn(),
+  notify: vi.fn(async () => {}),
 }));
-vi.mock("../../notify/notify", () => ({ notify: async () => {} }));
+vi.mock("@tauri-apps/plugin-updater", () => ({ check }));
+vi.mock("../../notify/notify", () => ({ notify }));
 vi.mock("../../profile/profile", () => ({ isUpdaterEnabled: () => true }));
 
 // `inertReason` in the component under test hides every control in a dev
@@ -50,6 +58,7 @@ function renderSection() {
 }
 
 beforeEach(async () => {
+  check.mockImplementation(async () => fakeUpdate());
   await loadLocale("en");
 });
 
@@ -67,11 +76,11 @@ describe("UpdatesSettingsSection", () => {
     });
 
     const heading = await screen.findByText("Version 1.2.3 available");
-    const card = heading.closest("div.rounded-lg");
+    const card = heading.closest("section");
     expect(card?.className).toContain("border-primary");
     expect(card?.className).toContain("bg-primary/5");
 
-    const checkButton = screen.getByText("Check for updates").closest("button");
+    const checkButton = screen.getByText("Check now").closest("button");
     expect(checkButton?.className).not.toContain("bg-primary");
 
     const installButton = screen
@@ -87,7 +96,7 @@ describe("UpdatesSettingsSection", () => {
     });
 
     expect(await screen.findByText("Check for updates")).toBeTruthy();
-    expect(screen.getByText("Current version")).toBeTruthy();
+    expect(screen.getByText("Version")).toBeTruthy();
   });
 
   it("shows a translated string from a fixture catalog", async () => {
@@ -110,6 +119,35 @@ describe("UpdatesSettingsSection", () => {
     expect(await screen.findByText("Rechercher des mises à jour")).toBeTruthy();
     expect(screen.queryByText("Check for updates")).toBeNull();
     // Untranslated messages still show their English source.
-    expect(screen.getByText("Current version")).toBeTruthy();
+    expect(screen.getByText("Version")).toBeTruthy();
+  });
+
+  it("does not say up to date when a later check fails", async () => {
+    check.mockResolvedValueOnce(null);
+    await act(async () => {
+      renderSection();
+    });
+    expect(await screen.findByText(/^Up to date\./)).toBeTruthy();
+
+    check.mockRejectedValueOnce(new Error("network down"));
+    await act(async () => {
+      fireEvent.click(screen.getByText("Check now"));
+    });
+
+    expect(screen.getByRole("alert").textContent).toContain("network down");
+    expect(screen.queryByText(/^Up to date\./)).toBeNull();
+  });
+
+  it("notifies about a version once, however often the player checks", async () => {
+    await act(async () => {
+      renderSection();
+    });
+    await screen.findByText("Version 1.2.3 available");
+    await act(async () => {
+      fireEvent.click(screen.getByText("Check now"));
+    });
+
+    expect(check).toHaveBeenCalledTimes(2);
+    expect(notify).toHaveBeenCalledTimes(1);
   });
 });

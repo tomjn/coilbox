@@ -12793,6 +12793,10 @@ msgstr "Check for updates"
 msgid "Check it loads"
 msgstr "Check it loads"
 
+#: src/updater/pages/UpdatesSettingsSection.tsx
+msgid "Check now"
+msgstr "Check now"
+
 #: src/profile/SettingsSection.tsx
 msgid "Check profile"
 msgstr "Check profile"
@@ -15812,10 +15816,6 @@ msgstr "Current"
 #: src/account/pages/SettingsSection.tsx
 msgid "Current password"
 msgstr "Current password"
-
-#: src/updater/pages/UpdatesSettingsSection.tsx
-msgid "Current version"
-msgstr "Current version"
 
 #: src/multiplayer/battle/BonusButton.tsx
 msgid "Current: {confirmed}%."
@@ -22555,10 +22555,6 @@ msgstr "Installed"
 msgid "Installed — restart to apply the updated profile."
 msgstr "Installed — restart to apply the updated profile."
 
-#: src/updater/pages/UpdatesSettingsSection.tsx
-msgid "Installed — restart to apply."
-msgstr "Installed — restart to apply."
-
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Installed {fileName}"
 msgstr "Installed {fileName}"
@@ -22593,6 +22589,10 @@ msgstr "Installed, and {staleCount} of {fileCount, plural, one {# file differs} 
 #: src/widgets/pages/CoilboxWidgets.tsx
 msgid "Installed, and its licence notice is missing or out of date"
 msgstr "Installed, and its licence notice is missing or out of date"
+
+#: src/updater/pages/UpdatesSettingsSection.tsx
+msgid "Installed. Restart to apply."
+msgstr "Installed. Restart to apply."
 
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Installing"
@@ -23637,10 +23637,6 @@ msgstr "Last bridged"
 #: src/workshop/pages/ProjectsPage.tsx
 msgid "Last changed"
 msgstr "Last changed"
-
-#: src/updater/pages/UpdatesSettingsSection.tsx
-msgid "Last checked {lastCheckedTime}"
-msgstr "Last checked {lastCheckedTime}"
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 msgid "Last hardware ID"
@@ -45672,6 +45668,10 @@ msgstr "Up"
 msgid "Up to 30 minutes"
 msgstr "Up to 30 minutes"
 
+#: src/updater/pages/UpdatesSettingsSection.tsx
+msgid "Up to date. Last checked {lastCheckedText}"
+msgstr "Up to date. Last checked {lastCheckedText}"
+
 #: src/campaign/pages/components/MissionScenarioUpdateButton.tsx
 #: src/content/pages/components/GameCard.tsx
 #: src/content/pages/components/GameLibrarySummary.tsx
@@ -45768,12 +45768,12 @@ msgid "Updates"
 msgstr "Updates"
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
-msgid "Updates are disabled in development builds."
-msgstr "Updates are disabled in development builds."
+msgid "Updates are off in development builds."
+msgstr "Updates are off in development builds."
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
-msgid "Updates for this build are managed by its distributor."
-msgstr "Updates for this build are managed by its distributor."
+msgid "Updates for this build come from its distributor."
+msgstr "Updates for this build come from its distributor."
 
 #: src/content/pages/StatsPage.tsx
 msgid "updating…"
@@ -46112,6 +46112,7 @@ msgstr "Versatile"
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+#: src/updater/pages/UpdatesSettingsSection.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "Version"
 msgstr "Version"
@@ -46119,6 +46120,10 @@ msgstr "Version"
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Version {newVersion} available"
 msgstr "Version {newVersion} available"
+
+#: src/updater/pages/UpdatesSettingsSection.tsx
+msgid "Version {newVersion} available. Last checked {lastCheckedText}"
+msgstr "Version {newVersion} available. Last checked {lastCheckedText}"
 
 #: src/workshop/pages/components/PackagePanel.tsx
 msgid "Version {nextVersion}"
@@ -48100,10 +48105,6 @@ msgstr "You're not currently in a battle. Browse open battles to join one."
 #: src/onboarding/pages/DonePage.tsx
 msgid "You're ready"
 msgstr "You're ready"
-
-#: src/updater/pages/UpdatesSettingsSection.tsx
-msgid "You're up to date."
-msgstr "You're up to date."
 
 #: src/multiplayer/LobbyStatusButton.tsx
 msgid "You've been set away automatically while idle."
