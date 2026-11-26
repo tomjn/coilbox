@@ -32,10 +32,10 @@ type RefSlot =
 /**
  * Apply an async transform to every media ref on a campaign — its icon and
  * background, plus each mission's panorama, side graphic, voiceover and cutscene,
- * the files the briefings name and the files of each attached unit's copy — returning a new campaign. The
- * transform is told which field it's handling so it can pick the right encode
- * bounds/format; a ref it resolves to `undefined` is dropped, so one broken image
- * never sinks the whole operation.
+ * the files the briefings name and the files of each attached unit's copy,
+ * returning a new campaign. The transform is told which field it's handling so
+ * it can pick the right encode bounds and format. A ref it resolves to
+ * `undefined` is dropped, so one broken image never sinks the whole operation.
  *
  * Centralising the field list here keeps export (inline image `file` → `data`) and
  * import (materialise `data` → `file`) exhaustive: adding a media field to the model
