@@ -1,8 +1,15 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input, useSetting } from "@picoframe/frame";
-import { Globe, PackagePlus, Plus, Server, Swords, Trash2 } from "lucide-react";
-import { CheckField, Field } from "@/components/Field";
+import { Plus, Trash2 } from "lucide-react";
+import { HelpPopover } from "@/components/HelpPopover";
+import { SettingList, SettingRow } from "@/components/SettingRow";
 import { Switch } from "@/components/ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { HubAddressField } from "../../hub/pages/components/HubAddressField";
 import { AUTO_DOWNLOAD_ON_JOIN_KEY } from "../../multiplayer/battle/autoDownload";
 import { isHubEnabled } from "../../profile/profile";
@@ -10,7 +17,7 @@ import { useArchiveInstallSettings, useDownloadsConfig } from "../config";
 
 /**
  * Settings > Library > Sources (frame settings page at `/settings/sources`,
- * issue #4584). Three concerns, all persisted immediately (no Save button):
+ * issue #4584). Four concerns, all persisted immediately (no Save button):
  *  - the list of rapid masters offered on the Rapid repositories page
  *  - whether joining a battle fetches missing content on its own (issue #439)
  *  - what a game or map archive dropped on the window does: ask first or not,
@@ -60,108 +67,135 @@ export default function DownloadsSettings() {
     setCfg({ ...cfg, rapidRepos: cfg.rapidRepos.filter((r) => r.id !== id) });
 
   return (
-    <div className="space-y-8">
-      {/* Rapid masters */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            <Server size={15} /> <Trans>Rapid repositories</Trans>
-          </h2>
-          <Button variant="outline" size="sm" onClick={addRepo}>
+    <div className="flex flex-col gap-10">
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-1">
+            <h2 className="text-sm font-semibold">
+              <Trans>Rapid repositories</Trans>
+            </h2>
+            <HelpPopover label={t`About rapid repositories`}>
+              <p>
+                <Trans>
+                  A rapid repository lists games and their versions. The Rapid
+                  repositories page in Library browses and downloads from the
+                  ones here, and game updates are looked up in them.
+                </Trans>
+              </p>
+            </HelpPopover>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={addRepo}>
             <Plus /> <Trans>Add repository</Trans>
           </Button>
         </div>
         {cfg.rapidRepos.length === 0 ? (
-          <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-            <Trans>
-              No rapid repositories. Add one to browse and download games from
-              it.
-            </Trans>
+          <p className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
+            <Trans>No rapid repositories.</Trans>
           </p>
         ) : (
-          <ul className="space-y-2">
-            {cfg.rapidRepos.map((r) => (
-              <li key={r.id} className="flex items-end gap-2">
-                <Field label={t`Name`} className="flex-1">
+          <TooltipProvider>
+            <ul className="divide-y divide-border rounded-md border border-border">
+              {cfg.rapidRepos.map((r) => (
+                <li key={r.id} className="flex items-center gap-2 px-4 py-2">
                   <Input
                     value={r.name}
                     onChange={(e) => updateRepo(r.id, "name", e.target.value)}
-                    placeholder="Beyond All Reason"
+                    placeholder={t`Name`}
+                    aria-label={t`Name`}
+                    className="min-w-0 flex-1"
                   />
-                </Field>
-                <Field label={t`Master URL`} className="flex-[2]">
                   <Input
                     value={r.url}
                     onChange={(e) => updateRepo(r.id, "url", e.target.value)}
-                    placeholder="https://repos-cdn.beyondallreason.dev"
-                    className="font-mono text-xs"
+                    placeholder="https://repos.example.org"
+                    aria-label={t`Master URL`}
+                    className="min-w-0 flex-[2] font-mono text-xs"
                   />
-                </Field>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => removeRepo(r.id)}
-                  aria-label={removeLabel(r)}
-                >
-                  <Trash2 />
-                </Button>
-              </li>
-            ))}
-          </ul>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeRepo(r.id)}
+                        aria-label={removeLabel(r)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <Trans>Remove</Trans>
+                    </TooltipContent>
+                  </Tooltip>
+                </li>
+              ))}
+            </ul>
+          </TooltipProvider>
         )}
       </section>
 
-      {/* Joining a battle */}
-      <section className="space-y-3">
-        <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          <Swords size={15} /> <Trans>Joining a battle</Trans>
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold">
+          <Trans>Downloading</Trans>
         </h2>
-        <label
-          htmlFor="auto-download-on-join"
-          className="flex items-center justify-between gap-4"
-        >
-          <span className="flex flex-col">
-            <span className="text-sm font-medium">
-              <Trans>Download missing content automatically</Trans>
-            </span>
-            <span className="text-xs text-muted-foreground">
-              <Trans>
-                When you join a battle whose game or map you don't have, start
-                the download straight away instead of waiting for a click. The
-                Download button stays available to pause or retry.
-              </Trans>
-            </span>
-          </span>
-          <Switch
+        <SettingList>
+          <SettingRow
             id="auto-download-on-join"
-            checked={autoOnJoin}
-            onCheckedChange={setAutoOnJoin}
-          />
-        </label>
-      </section>
-
-      {/* A .sdz or .sd7 dropped on the window or opened with coilbox */}
-      <section className="space-y-3">
-        <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          <PackagePlus size={15} /> <Trans>Dropped archives</Trans>
-        </h2>
-        <CheckField
-          label={t`Delete the original after installing`}
-          checked={archive.move}
-          onChange={archive.setMove}
-        />
-        <CheckField
-          label={t`Install without asking`}
-          checked={archive.noPrompt}
-          onChange={archive.setNoPrompt}
-        />
+            label={t`Download missing content when joining a battle`}
+            help={
+              <p>
+                <Trans>
+                  When you join a battle whose game or map you don't have, the
+                  download starts straight away instead of waiting for a click.
+                  The Download button stays available to pause or retry.
+                </Trans>
+              </p>
+            }
+            helpLabel={t`About downloading when joining`}
+          >
+            <Switch
+              id="auto-download-on-join"
+              checked={autoOnJoin}
+              onCheckedChange={setAutoOnJoin}
+            />
+          </SettingRow>
+          <SettingRow
+            id="archive-no-prompt"
+            label={t`Install dropped archives without asking`}
+            help={
+              <p>
+                <Trans>
+                  A game or map archive dropped on the window, or opened with
+                  Coilbox, is copied to where new downloads go.
+                </Trans>
+              </p>
+            }
+            helpLabel={t`About dropped archives`}
+          >
+            <Switch
+              id="archive-no-prompt"
+              checked={archive.noPrompt}
+              onCheckedChange={archive.setNoPrompt}
+            />
+          </SettingRow>
+          <SettingRow
+            id="archive-move"
+            label={t`Delete dropped archives once installed`}
+          >
+            <Switch
+              id="archive-move"
+              checked={archive.move}
+              onCheckedChange={archive.setMove}
+            />
+          </SettingRow>
+        </SettingList>
       </section>
 
       {/* The hub, unless the profile has switched it off */}
       {isHubEnabled() && (
-        <section className="space-y-3">
-          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            <Globe size={15} /> <Trans>Coilbox hub</Trans>
+        <section className="flex flex-col gap-3">
+          <h2 className="text-sm font-semibold">
+            <Trans>Coilbox hub</Trans>
           </h2>
           <HubAddressField />
         </section>

@@ -9168,6 +9168,10 @@ msgstr "Ein Spiel läuft. Es schreibt seine Widget-Einstellungen beim Speichern 
 msgid "A game is running. The engine reads the widget when a match starts, so a change now lands in the next one."
 msgstr "Ein Spiel läuft. Die Engine liest das Widget beim Start einer Partie, daher wirkt eine Änderung jetzt erst in der nächsten."
 
+#: src/downloads/pages/SettingsSection.tsx
+msgid "A game or map archive dropped on the window, or opened with Coilbox, is copied to where new downloads go."
+msgstr ""
+
 #: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "A game saves this under a name that depends on its version."
@@ -9543,6 +9547,10 @@ msgstr "Eine Vierteldrehung. Eine Einheit zeigt in eine von vier Richtungen und 
 #, fuzzy
 msgid "A queue belongs to the base rather than to the layout, so it is converted here and nowhere else. A game names its two sides' buildings alike far more often than it names their units alike, so expect to pick most of these yourself."
 msgstr "Eine Warteschlange gehört zur Basis, nicht zum Layout, daher wird sie hier umgewandelt und nirgends sonst. Ein Spiel benennt die Gebäude seiner zwei Fraktionen weit öfter gleich als ihre Einheiten, daher müssen Sie die meisten davon wohl selbst wählen."
+
+#: src/downloads/pages/SettingsSection.tsx
+msgid "A rapid repository lists games and their versions. The Rapid repositories page in Library browses and downloads from the ones here, and game updates are looked up in them."
+msgstr ""
 
 #: src/content/pages/components/PlayerMatchFigures.tsx
 #, fuzzy
@@ -10093,6 +10101,14 @@ msgstr "Über Coilbox"
 msgid "About deleting replays"
 msgstr ""
 
+#: src/downloads/pages/SettingsSection.tsx
+msgid "About downloading when joining"
+msgstr ""
+
+#: src/downloads/pages/SettingsSection.tsx
+msgid "About dropped archives"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "About empty pieces"
@@ -10150,6 +10166,10 @@ msgstr ""
 #, fuzzy
 msgid "About proportions"
 msgstr "Über Proportionen"
+
+#: src/downloads/pages/SettingsSection.tsx
+msgid "About rapid repositories"
+msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
 msgid "About reduce motion"
@@ -10212,6 +10232,10 @@ msgstr ""
 
 #: src/content/pages/KeybindsSection.tsx
 msgid "About the game's bindings"
+msgstr ""
+
+#: src/hub/pages/components/HubAddressField.tsx
+msgid "About the hub address"
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
@@ -10960,6 +10984,7 @@ msgstr "Ein Gebäude hier hinzuzufügen, zu verschieben, zu drehen, umzuwandeln 
 msgid "Adding, moving, turning, converting or deleting a building here gives this base a copy of its own and leaves the rest where they stand."
 msgstr "Ein Gebäude hier hinzuzufügen, zu verschieben, zu drehen, umzuwandeln oder zu löschen gibt dieser Basis eine eigene Kopie und lässt die übrigen, wo sie stehen."
 
+#: src/hub/pages/components/HubAddressField.tsx
 #: src/uberstress/pages/RunPage.tsx
 #: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
@@ -16214,11 +16239,6 @@ msgstr ""
 msgid "Clear filters"
 msgstr "Filter zurücksetzen"
 
-#: src/hub/pages/components/HubAddressField.tsx
-#, fuzzy
-msgid "Clear override"
-msgstr "Überschreibung entfernen"
-
 #: src/challenge/ChallengeRecordLine.tsx
 #: src/play/PresetList.tsx
 #, fuzzy
@@ -17124,21 +17144,6 @@ msgstr "Coilbox durchsucht Ihre Inhalte noch, daher startet das Spiel mit den Wi
 #, fuzzy
 msgid "Coilbox is uploading {name} to the hub's mirror."
 msgstr "Coilbox lädt {name} auf den Spiegelserver des Hubs hoch."
-
-#: src/hub/pages/components/HubAddressField.tsx
-#, fuzzy
-msgid "Coilbox is using <0>{effective}</0>, the address your distribution set."
-msgstr "Coilbox verwendet <0>{effective}</0>, die von Ihrer Distribution gesetzte Adresse."
-
-#: src/hub/pages/components/HubAddressField.tsx
-#, fuzzy
-msgid "Coilbox is using <0>{effective}</0>, the built-in default."
-msgstr "Coilbox verwendet <0>{effective}</0>, den eingebauten Standard."
-
-#: src/hub/pages/components/HubAddressField.tsx
-#, fuzzy
-msgid "Coilbox is using <0>{effective}</0>, your own address, set below."
-msgstr "Coilbox verwendet <0>{effective}</0>, Ihre eigene Adresse, unten gesetzt."
 
 #: src/multiplayer/invite/InviteLinkHost.tsx
 #, fuzzy
@@ -20117,6 +20122,10 @@ msgstr "Alle {count} löschen"
 msgid "Delete analysis"
 msgstr "Analyse löschen"
 
+#: src/downloads/pages/SettingsSection.tsx
+msgid "Delete dropped archives once installed"
+msgstr ""
+
 #: src/content/pages/components/DeleteEngineButton.tsx
 #, fuzzy
 msgid "Delete engine {version}"
@@ -20192,7 +20201,6 @@ msgid "Delete the name {name}"
 msgstr "Den Namen {name} löschen"
 
 #: src/deeplink/ArchiveChoices.tsx
-#: src/downloads/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Delete the original after installing"
 msgstr "Original nach der Installation löschen"
@@ -21054,9 +21062,8 @@ msgid "Download map"
 msgstr "Karte herunterladen"
 
 #: src/downloads/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Download missing content automatically"
-msgstr "Fehlende Inhalte automatisch herunterladen"
+msgid "Download missing content when joining a battle"
+msgstr ""
 
 #: src/content/pages/components/SetupCard.tsx
 #, fuzzy
@@ -21132,6 +21139,7 @@ msgstr "Nach {writePath} heruntergeladen, aber die Engine führt diese Karte noc
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/downloads/pages/ActivityPage.tsx
+#: src/downloads/pages/SettingsSection.tsx
 #: src/multiplayer/chat/ChatMapCard.tsx
 #, fuzzy
 msgid "Downloading"
@@ -21454,11 +21462,6 @@ msgstr "Einheit {unit} absetzen"
 #, fuzzy
 msgid "Dropped a rank"
 msgstr "Einen Rang abgestiegen"
-
-#: src/downloads/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Dropped archives"
-msgstr "Abgelegte Archive"
 
 #: src/multiplayer/debriefing.ts
 #, fuzzy
@@ -27581,6 +27584,10 @@ msgstr "Installieren Sie eine Engine, um Wiederholungen anzusehen."
 msgid "Install at least one map first (<0>Content → Maps</0>)."
 msgstr "Installieren Sie zuerst mindestens eine Karte (<0>Inhalte → Karten</0>)."
 
+#: src/downloads/pages/SettingsSection.tsx
+msgid "Install dropped archives without asking"
+msgstr ""
+
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
 msgid "Install into game"
@@ -27621,11 +27628,6 @@ msgstr "Diese Konvertierung installieren?"
 #, fuzzy
 msgid "Install widget"
 msgstr "Widget installieren"
-
-#: src/downloads/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Install without asking"
-msgstr "Ohne Nachfrage installieren"
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
@@ -28460,11 +28462,6 @@ msgstr "Verbunden mit {parentName}: Verbinder {connectorName} an {toName}"
 msgid "Joining {roomTitle}, found on this network."
 msgstr "Trete {roomTitle} bei, in diesem Netzwerk gefunden."
 
-#: src/downloads/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Joining a battle"
-msgstr "Beim Beitritt zu einer Partie"
-
 #: src/direct/JoinRoomForm.tsx
 #, fuzzy
 msgid "Joining…"
@@ -29232,11 +29229,6 @@ msgstr "Leer lassen für eine offene Partie"
 msgid "Leave blank for an open room"
 msgstr "Leer lassen für einen offenen Raum"
 
-#: src/hub/pages/components/HubAddressField.tsx
-#, fuzzy
-msgid "Leave blank to use the default, or your distribution's address if it sets one."
-msgstr "Leer lassen, um den Standard zu verwenden, oder die Adresse Ihrer Distribution, falls sie eine setzt."
-
 #: src/multiplayer/pages/ChatPage.tsx
 #, fuzzy
 msgid "Leave channel"
@@ -29256,6 +29248,14 @@ msgstr "Lassen — weiterziehen"
 #, fuzzy
 msgid "Leave it be"
 msgstr "In Ruhe lassen"
+
+#: src/hub/pages/components/HubAddressField.tsx
+msgid "Leave it blank to use the address your distribution set."
+msgstr ""
+
+#: src/hub/pages/components/HubAddressField.tsx
+msgid "Leave it blank to use the built-in address."
+msgstr ""
 
 #: src/animation/pages/Bos2LuaPage.tsx
 #, fuzzy
@@ -34413,9 +34413,8 @@ msgid "No rapid repositories configured. Add one in <0>Sources settings</0>."
 msgstr "Keine Rapid-Repositorys eingerichtet. Fügen Sie eines in den <0>Quellen-Einstellungen</0> hinzu."
 
 #: src/downloads/pages/SettingsSection.tsx
-#, fuzzy
-msgid "No rapid repositories. Add one to browse and download games from it."
-msgstr "Keine Rapid-Repositorys. Fügen Sie eines hinzu, um Spiele daraus zu durchsuchen und herunterzuladen."
+msgid "No rapid repositories."
+msgstr ""
 
 #: src/content/pages/components/MatchStatsTable.tsx
 #, fuzzy
@@ -41570,6 +41569,7 @@ msgstr "Geremixt aus"
 #: src/content/pages/components/CompatMode.tsx
 #: src/content/pages/components/FolderRow.tsx
 #: src/content/pages/components/MissionRuntimeSection.tsx
+#: src/downloads/pages/SettingsSection.tsx
 #: src/hub/pages/ItemPage.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/BuildMenuSection.tsx
@@ -56403,6 +56403,10 @@ msgstr "{suggestedName} verwenden"
 msgid "Use a library weapon"
 msgstr "Waffe aus der Bibliothek verwenden"
 
+#: src/hub/pages/components/HubAddressField.tsx
+msgid "Use default"
+msgstr ""
+
 #: src/lego/pages/components/CollisionPanel.tsx
 #, fuzzy
 msgid "Use each piece instead"
@@ -57712,9 +57716,8 @@ msgid "When the unit dies it comes apart along its joins. A light hit throws off
 msgstr "Stirbt die Einheit, zerfällt sie entlang ihrer Verbindungen. Ein leichter Treffer sprengt einige der größten Bauteilgruppen ab, ein schwerer sprengt jedes Bauteil einzeln ab, das kleinste zuerst, und das Wrack folgt dem, was der Treffer übrig ließ. Eine Einheit ohne Verbindungen zerbricht entlang ihres Teilbaums."
 
 #: src/downloads/pages/SettingsSection.tsx
-#, fuzzy
-msgid "When you join a battle whose game or map you don't have, start the download straight away instead of waiting for a click. The Download button stays available to pause or retry."
-msgstr "Wenn Sie einer Partie beitreten, deren Spiel oder Karte Ihnen fehlt, den Download sofort starten, statt auf einen Klick zu warten. Der Download-Knopf bleibt zum Pausieren oder Wiederholen verfügbar."
+msgid "When you join a battle whose game or map you don't have, the download starts straight away instead of waiting for a click. The Download button stays available to pause or retry."
+msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayMapRail.tsx
@@ -59291,11 +59294,6 @@ msgstr "Ihre Spiele konnten nicht gelesen werden: {scanError}"
 #, fuzzy
 msgid "Your hub account"
 msgstr "Ihr Hub-Konto"
-
-#: src/hub/pages/components/HubAddressField.tsx
-#, fuzzy
-msgid "Your hub address"
-msgstr "Ihre Hub-Adresse"
 
 #: src/direct/ReachablePorts.tsx
 #, fuzzy

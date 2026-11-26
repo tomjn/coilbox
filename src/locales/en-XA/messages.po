@@ -7406,6 +7406,10 @@ msgstr ""
 msgid "A game is running. The engine reads the widget when a match starts, so a change now lands in the next one."
 msgstr ""
 
+#: src/downloads/pages/SettingsSection.tsx
+msgid "A game or map archive dropped on the window, or opened with Coilbox, is copied to where new downloads go."
+msgstr ""
+
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "A game saves this under a name that depends on its version."
 msgstr ""
@@ -7706,6 +7710,10 @@ msgstr ""
 
 #: src/blueprint/pages/components/SubstitutionPanel.tsx
 msgid "A queue belongs to the base rather than to the layout, so it is converted here and nowhere else. A game names its two sides' buildings alike far more often than it names their units alike, so expect to pick most of these yourself."
+msgstr ""
+
+#: src/downloads/pages/SettingsSection.tsx
+msgid "A rapid repository lists games and their versions. The Rapid repositories page in Library browses and downloads from the ones here, and game updates are looked up in them."
 msgstr ""
 
 #: src/content/pages/components/PlayerMatchFigures.tsx
@@ -8154,6 +8162,14 @@ msgstr ""
 msgid "About deleting replays"
 msgstr ""
 
+#: src/downloads/pages/SettingsSection.tsx
+msgid "About downloading when joining"
+msgstr ""
+
+#: src/downloads/pages/SettingsSection.tsx
+msgid "About dropped archives"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 msgid "About empty pieces"
 msgstr ""
@@ -8204,6 +8220,10 @@ msgstr ""
 
 #: src/lego/pages/components/ProportionsPanel.tsx
 msgid "About proportions"
+msgstr ""
+
+#: src/downloads/pages/SettingsSection.tsx
+msgid "About rapid repositories"
 msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
@@ -8260,6 +8280,10 @@ msgstr ""
 
 #: src/content/pages/KeybindsSection.tsx
 msgid "About the game's bindings"
+msgstr ""
+
+#: src/hub/pages/components/HubAddressField.tsx
+msgid "About the hub address"
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
@@ -8870,6 +8894,7 @@ msgstr ""
 msgid "Adding, moving, turning, converting or deleting a building here gives this base a copy of its own and leaves the rest where they stand."
 msgstr ""
 
+#: src/hub/pages/components/HubAddressField.tsx
 #: src/uberstress/pages/RunPage.tsx
 #: src/uberstress/pages/SettingsSection.tsx
 msgid "Address"
@@ -13150,10 +13175,6 @@ msgstr ""
 msgid "Clear filters"
 msgstr ""
 
-#: src/hub/pages/components/HubAddressField.tsx
-msgid "Clear override"
-msgstr ""
-
 #: src/challenge/ChallengeRecordLine.tsx
 #: src/play/PresetList.tsx
 msgid "Clear record"
@@ -13894,18 +13915,6 @@ msgstr ""
 
 #: src/hub/upload/ArchiveUploadBadge.tsx
 msgid "Coilbox is uploading {name} to the hub's mirror."
-msgstr ""
-
-#: src/hub/pages/components/HubAddressField.tsx
-msgid "Coilbox is using <0>{effective}</0>, the address your distribution set."
-msgstr ""
-
-#: src/hub/pages/components/HubAddressField.tsx
-msgid "Coilbox is using <0>{effective}</0>, the built-in default."
-msgstr ""
-
-#: src/hub/pages/components/HubAddressField.tsx
-msgid "Coilbox is using <0>{effective}</0>, your own address, set below."
 msgstr ""
 
 #: src/multiplayer/invite/InviteLinkHost.tsx
@@ -16325,6 +16334,10 @@ msgstr ""
 msgid "Delete analysis"
 msgstr ""
 
+#: src/downloads/pages/SettingsSection.tsx
+msgid "Delete dropped archives once installed"
+msgstr ""
+
 #: src/content/pages/components/DeleteEngineButton.tsx
 msgid "Delete engine {version}"
 msgstr ""
@@ -16386,7 +16399,6 @@ msgid "Delete the name {name}"
 msgstr ""
 
 #: src/deeplink/ArchiveChoices.tsx
-#: src/downloads/pages/SettingsSection.tsx
 msgid "Delete the original after installing"
 msgstr ""
 
@@ -17095,7 +17107,7 @@ msgid "Download map"
 msgstr ""
 
 #: src/downloads/pages/SettingsSection.tsx
-msgid "Download missing content automatically"
+msgid "Download missing content when joining a battle"
 msgstr ""
 
 #: src/content/pages/components/SetupCard.tsx
@@ -17158,6 +17170,7 @@ msgstr ""
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/downloads/pages/ActivityPage.tsx
+#: src/downloads/pages/SettingsSection.tsx
 #: src/multiplayer/chat/ChatMapCard.tsx
 msgid "Downloading"
 msgstr ""
@@ -17419,10 +17432,6 @@ msgstr ""
 
 #: src/multiplayer/debriefing.ts
 msgid "Dropped a rank"
-msgstr ""
-
-#: src/downloads/pages/SettingsSection.tsx
-msgid "Dropped archives"
 msgstr ""
 
 #: src/multiplayer/debriefing.ts
@@ -22406,6 +22415,10 @@ msgstr ""
 msgid "Install at least one map first (<0>Content → Maps</0>)."
 msgstr ""
 
+#: src/downloads/pages/SettingsSection.tsx
+msgid "Install dropped archives without asking"
+msgstr ""
+
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "Install into game"
 msgstr ""
@@ -22437,10 +22450,6 @@ msgstr ""
 #: src/blueprint/pages/components/WidgetPanel.tsx
 #: src/widgets/pages/CoilboxWidgets.tsx
 msgid "Install widget"
-msgstr ""
-
-#: src/downloads/pages/SettingsSection.tsx
-msgid "Install without asking"
 msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
@@ -23118,10 +23127,6 @@ msgstr ""
 msgid "Joining {roomTitle}, found on this network."
 msgstr ""
 
-#: src/downloads/pages/SettingsSection.tsx
-msgid "Joining a battle"
-msgstr ""
-
 #: src/direct/JoinRoomForm.tsx
 msgid "Joining…"
 msgstr ""
@@ -23742,10 +23747,6 @@ msgstr ""
 msgid "Leave blank for an open room"
 msgstr ""
 
-#: src/hub/pages/components/HubAddressField.tsx
-msgid "Leave blank to use the default, or your distribution's address if it sets one."
-msgstr ""
-
 #: src/multiplayer/pages/ChatPage.tsx
 msgid "Leave channel"
 msgstr ""
@@ -23760,6 +23761,14 @@ msgstr ""
 
 #: src/runlite/generate.ts
 msgid "Leave it be"
+msgstr ""
+
+#: src/hub/pages/components/HubAddressField.tsx
+msgid "Leave it blank to use the address your distribution set."
+msgstr ""
+
+#: src/hub/pages/components/HubAddressField.tsx
+msgid "Leave it blank to use the built-in address."
 msgstr ""
 
 #: src/animation/pages/Bos2LuaPage.tsx
@@ -27951,7 +27960,7 @@ msgid "No rapid repositories configured. Add one in <0>Sources settings</0>."
 msgstr ""
 
 #: src/downloads/pages/SettingsSection.tsx
-msgid "No rapid repositories. Add one to browse and download games from it."
+msgid "No rapid repositories."
 msgstr ""
 
 #: src/content/pages/components/MatchStatsTable.tsx
@@ -33765,6 +33774,7 @@ msgstr ""
 #: src/content/pages/components/CompatMode.tsx
 #: src/content/pages/components/FolderRow.tsx
 #: src/content/pages/components/MissionRuntimeSection.tsx
+#: src/downloads/pages/SettingsSection.tsx
 #: src/hub/pages/ItemPage.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/BuildMenuSection.tsx
@@ -45784,6 +45794,10 @@ msgstr ""
 msgid "Use a library weapon"
 msgstr ""
 
+#: src/hub/pages/components/HubAddressField.tsx
+msgid "Use default"
+msgstr ""
+
 #: src/lego/pages/components/CollisionPanel.tsx
 msgid "Use each piece instead"
 msgstr ""
@@ -46847,7 +46861,7 @@ msgid "When the unit dies it comes apart along its joins. A light hit throws off
 msgstr ""
 
 #: src/downloads/pages/SettingsSection.tsx
-msgid "When you join a battle whose game or map you don't have, start the download straight away instead of waiting for a click. The Download button stays available to pause or retry."
+msgid "When you join a battle whose game or map you don't have, the download starts straight away instead of waiting for a click. The Download button stays available to pause or retry."
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
@@ -48121,10 +48135,6 @@ msgstr ""
 
 #: src/hub/pages/components/AccountControl.tsx
 msgid "Your hub account"
-msgstr ""
-
-#: src/hub/pages/components/HubAddressField.tsx
-msgid "Your hub address"
 msgstr ""
 
 #: src/direct/ReachablePorts.tsx

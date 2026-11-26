@@ -9168,6 +9168,10 @@ msgstr "ゲームが実行中です。ゲームは保存時や終了時にウィ
 msgid "A game is running. The engine reads the widget when a match starts, so a change now lands in the next one."
 msgstr "ゲームが実行中です。エンジンは試合開始時にウィジェットを読み込むため、今の変更は次の試合から反映されます。"
 
+#: src/downloads/pages/SettingsSection.tsx
+msgid "A game or map archive dropped on the window, or opened with Coilbox, is copied to where new downloads go."
+msgstr ""
+
 #: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "A game saves this under a name that depends on its version."
@@ -9543,6 +9547,10 @@ msgstr "90 度回転。ユニットは 4 方向のいずれかを向き、その
 #, fuzzy
 msgid "A queue belongs to the base rather than to the layout, so it is converted here and nowhere else. A game names its two sides' buildings alike far more often than it names their units alike, so expect to pick most of these yourself."
 msgstr "キューはレイアウトではなくベースに属するため、ここでのみ変換されます。ゲームは 2 つの勢力の建物をユニットよりもずっと頻繁に同じ名前にするため、ほとんどは自分で選ぶことになります。"
+
+#: src/downloads/pages/SettingsSection.tsx
+msgid "A rapid repository lists games and their versions. The Rapid repositories page in Library browses and downloads from the ones here, and game updates are looked up in them."
+msgstr ""
 
 #: src/content/pages/components/PlayerMatchFigures.tsx
 #, fuzzy
@@ -10093,6 +10101,14 @@ msgstr "Coilbox について"
 msgid "About deleting replays"
 msgstr ""
 
+#: src/downloads/pages/SettingsSection.tsx
+msgid "About downloading when joining"
+msgstr ""
+
+#: src/downloads/pages/SettingsSection.tsx
+msgid "About dropped archives"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "About empty pieces"
@@ -10150,6 +10166,10 @@ msgstr ""
 #, fuzzy
 msgid "About proportions"
 msgstr "プロポーションについて"
+
+#: src/downloads/pages/SettingsSection.tsx
+msgid "About rapid repositories"
+msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
 msgid "About reduce motion"
@@ -10212,6 +10232,10 @@ msgstr ""
 
 #: src/content/pages/KeybindsSection.tsx
 msgid "About the game's bindings"
+msgstr ""
+
+#: src/hub/pages/components/HubAddressField.tsx
+msgid "About the hub address"
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
@@ -10960,6 +10984,7 @@ msgstr "ここで建物を追加、移動、回転、変換、削除すると、
 msgid "Adding, moving, turning, converting or deleting a building here gives this base a copy of its own and leaves the rest where they stand."
 msgstr "ここで建物を追加、移動、回転、変換、削除すると、このベースに専用のコピーが作られ、他のベースはそのままになります。"
 
+#: src/hub/pages/components/HubAddressField.tsx
 #: src/uberstress/pages/RunPage.tsx
 #: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
@@ -16214,11 +16239,6 @@ msgstr ""
 msgid "Clear filters"
 msgstr "フィルターをクリア"
 
-#: src/hub/pages/components/HubAddressField.tsx
-#, fuzzy
-msgid "Clear override"
-msgstr "上書きをクリア"
-
 #: src/challenge/ChallengeRecordLine.tsx
 #: src/play/PresetList.tsx
 #, fuzzy
@@ -17124,21 +17144,6 @@ msgstr "Coilbox はまだコンテンツをスキャンしているため、ゲ�
 #, fuzzy
 msgid "Coilbox is uploading {name} to the hub's mirror."
 msgstr "Coilbox は {name} をハブのミラーにアップロードしています。"
-
-#: src/hub/pages/components/HubAddressField.tsx
-#, fuzzy
-msgid "Coilbox is using <0>{effective}</0>, the address your distribution set."
-msgstr "Coilbox は配布元が設定したアドレス <0>{effective}</0> を使っています。"
-
-#: src/hub/pages/components/HubAddressField.tsx
-#, fuzzy
-msgid "Coilbox is using <0>{effective}</0>, the built-in default."
-msgstr "Coilbox は組み込みのデフォルト <0>{effective}</0> を使っています。"
-
-#: src/hub/pages/components/HubAddressField.tsx
-#, fuzzy
-msgid "Coilbox is using <0>{effective}</0>, your own address, set below."
-msgstr "Coilbox は下で設定した自分のアドレス <0>{effective}</0> を使っています。"
 
 #: src/multiplayer/invite/InviteLinkHost.tsx
 #, fuzzy
@@ -20117,6 +20122,10 @@ msgstr "{count} 個すべてを削除"
 msgid "Delete analysis"
 msgstr "分析を削除"
 
+#: src/downloads/pages/SettingsSection.tsx
+msgid "Delete dropped archives once installed"
+msgstr ""
+
 #: src/content/pages/components/DeleteEngineButton.tsx
 #, fuzzy
 msgid "Delete engine {version}"
@@ -20192,7 +20201,6 @@ msgid "Delete the name {name}"
 msgstr "名前 {name} を削除"
 
 #: src/deeplink/ArchiveChoices.tsx
-#: src/downloads/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Delete the original after installing"
 msgstr "インストール後に元のファイルを削除"
@@ -21054,9 +21062,8 @@ msgid "Download map"
 msgstr "マップをダウンロード"
 
 #: src/downloads/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Download missing content automatically"
-msgstr "不足しているコンテンツを自動でダウンロード"
+msgid "Download missing content when joining a battle"
+msgstr ""
 
 #: src/content/pages/components/SetupCard.tsx
 #, fuzzy
@@ -21132,6 +21139,7 @@ msgstr "{writePath} にダウンロードしましたが、エンジンはまだ
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/downloads/pages/ActivityPage.tsx
+#: src/downloads/pages/SettingsSection.tsx
 #: src/multiplayer/chat/ChatMapCard.tsx
 #, fuzzy
 msgid "Downloading"
@@ -21454,11 +21462,6 @@ msgstr "ユニット {unit} を降ろす"
 #, fuzzy
 msgid "Dropped a rank"
 msgstr "ランクが下がりました"
-
-#: src/downloads/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Dropped archives"
-msgstr "ドロップされたアーカイブ"
 
 #: src/multiplayer/debriefing.ts
 #, fuzzy
@@ -27581,6 +27584,10 @@ msgstr "リプレイを観るには、エンジンをインストールしてく
 msgid "Install at least one map first (<0>Content → Maps</0>)."
 msgstr "先にマップを 1 個以上インストールしてください（<0>コンテンツ → マップ</0>）。"
 
+#: src/downloads/pages/SettingsSection.tsx
+msgid "Install dropped archives without asking"
+msgstr ""
+
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
 msgid "Install into game"
@@ -27621,11 +27628,6 @@ msgstr "この変換結果をインストールしますか？"
 #, fuzzy
 msgid "Install widget"
 msgstr "ウィジェットをインストール"
-
-#: src/downloads/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Install without asking"
-msgstr "確認せずにインストール"
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
@@ -28460,11 +28462,6 @@ msgstr "{parentName} に接続：{connectorName} を {toName} に"
 msgid "Joining {roomTitle}, found on this network."
 msgstr "このネットワークで見つかった {roomTitle} に参加しています。"
 
-#: src/downloads/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Joining a battle"
-msgstr "試合への参加"
-
 #: src/direct/JoinRoomForm.tsx
 #, fuzzy
 msgid "Joining…"
@@ -29232,11 +29229,6 @@ msgstr "空欄にすると誰でも参加できる試合になります"
 msgid "Leave blank for an open room"
 msgstr "空欄にすると誰でも参加できるルームになります"
 
-#: src/hub/pages/components/HubAddressField.tsx
-#, fuzzy
-msgid "Leave blank to use the default, or your distribution's address if it sets one."
-msgstr "空欄にするとデフォルトを使います。配布版でアドレスが設定されている場合はそのアドレスを使います。"
-
 #: src/multiplayer/pages/ChatPage.tsx
 #, fuzzy
 msgid "Leave channel"
@@ -29256,6 +29248,14 @@ msgstr "そのままにして進む"
 #, fuzzy
 msgid "Leave it be"
 msgstr "放っておく"
+
+#: src/hub/pages/components/HubAddressField.tsx
+msgid "Leave it blank to use the address your distribution set."
+msgstr ""
+
+#: src/hub/pages/components/HubAddressField.tsx
+msgid "Leave it blank to use the built-in address."
+msgstr ""
 
 #: src/animation/pages/Bos2LuaPage.tsx
 #, fuzzy
@@ -34413,9 +34413,8 @@ msgid "No rapid repositories configured. Add one in <0>Sources settings</0>."
 msgstr "rapid リポジトリが設定されていません。<0>ソースの設定</0>で追加してください。"
 
 #: src/downloads/pages/SettingsSection.tsx
-#, fuzzy
-msgid "No rapid repositories. Add one to browse and download games from it."
-msgstr "rapid リポジトリはありません。追加すると、そこからゲームを閲覧してダウンロードできます。"
+msgid "No rapid repositories."
+msgstr ""
 
 #: src/content/pages/components/MatchStatsTable.tsx
 #, fuzzy
@@ -41570,6 +41569,7 @@ msgstr "リミックス元"
 #: src/content/pages/components/CompatMode.tsx
 #: src/content/pages/components/FolderRow.tsx
 #: src/content/pages/components/MissionRuntimeSection.tsx
+#: src/downloads/pages/SettingsSection.tsx
 #: src/hub/pages/ItemPage.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/BuildMenuSection.tsx
@@ -56403,6 +56403,10 @@ msgstr "{suggestedName} を使う"
 msgid "Use a library weapon"
 msgstr "ライブラリの武器を使う"
 
+#: src/hub/pages/components/HubAddressField.tsx
+msgid "Use default"
+msgstr ""
+
 #: src/lego/pages/components/CollisionPanel.tsx
 #, fuzzy
 msgid "Use each piece instead"
@@ -57712,9 +57716,8 @@ msgid "When the unit dies it comes apart along its joins. A light hit throws off
 msgstr "ユニットは撃破されると接合部に沿って分解します。軽い被弾ではパーツの大きなまとまりがいくつか飛び、大きな被弾では小さいものから順にすべてのパーツが 1 つずつ飛び、残骸は被弾で残ったものに従います。接合部のないユニットはピースツリーに沿って壊れます。"
 
 #: src/downloads/pages/SettingsSection.tsx
-#, fuzzy
-msgid "When you join a battle whose game or map you don't have, start the download straight away instead of waiting for a click. The Download button stays available to pause or retry."
-msgstr "ゲームやマップを持っていない試合に参加したとき、クリックを待たずにすぐダウンロードを開始します。一時停止や再試行には「ダウンロード」ボタンを使えます。"
+msgid "When you join a battle whose game or map you don't have, the download starts straight away instead of waiting for a click. The Download button stays available to pause or retry."
+msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayMapRail.tsx
@@ -59291,11 +59294,6 @@ msgstr "ゲームを読み込めませんでした：{scanError}"
 #, fuzzy
 msgid "Your hub account"
 msgstr "ハブのアカウント"
-
-#: src/hub/pages/components/HubAddressField.tsx
-#, fuzzy
-msgid "Your hub address"
-msgstr "ハブのアドレス"
 
 #: src/direct/ReachablePorts.tsx
 #, fuzzy
