@@ -189,7 +189,10 @@ function AccountDetails({
         >
           <div className="flex items-center gap-1">
             {resendSent && (
-              <span role="status" className="mr-1 text-xs text-muted-foreground">
+              <span
+                role="status"
+                className="mr-1 text-xs text-muted-foreground"
+              >
                 <Trans>Verification email sent.</Trans>
               </span>
             )}
