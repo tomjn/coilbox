@@ -49166,6 +49166,7 @@ msgstr "Esse id de expedição já é usado por uma expedição que não pôde s
 msgid "That scenario file is damaged or incomplete."
 msgstr "Esse arquivo de cenário está danificado ou incompleto."
 
+#: src/scenario/pages/ScenarioEditPage.tsx
 #: src/scenario/pages/ScenariosPage.tsx
 #, fuzzy
 msgid "That scenario isn't here any more. It may have been deleted."

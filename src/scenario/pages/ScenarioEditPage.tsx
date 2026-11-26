@@ -406,7 +406,18 @@ export default function ScenarioEditPage() {
   if (loaded && !isEditable(loaded)) {
     return <ReadOnlyScenario loaded={loaded} />;
   }
-  if (!scenario) return <NotFound backTo={BACK} label={t`scenario`} />;
+  // A bundled scenario never gets here, it is answered above, so what is left
+  // is an id that nothing in the list carries. Coilbox wrote every scenario that
+  // is not bundled, so it is gone, not waiting on a scan (issue #1521).
+  if (!scenario) {
+    return (
+      <NotFound
+        backTo={BACK}
+        label={t`scenario`}
+        message={t`That scenario isn't here any more. It may have been deleted.`}
+      />
+    );
+  }
 
   // Share: the same code, link and file the list offers (issue #1336), loaded
   // on demand so the editor does not carry the export path until it is asked

@@ -574,6 +574,32 @@ describe("Cmd+D", () => {
   });
 });
 
+describe("a scenario id nothing carries", () => {
+  it("says it may have been deleted, and does not send the author to scan the engine", () => {
+    useScenarios.mockReturnValue({
+      scenarios: [local],
+      loading: false,
+      error: null,
+      refresh: async () => {},
+    });
+    render(
+      <MemoryRouter initialEntries={["/scenario-builder/gone"]}>
+        <Routes>
+          <Route path="/scenario-builder" element={<p>The scenario list</p>} />
+          <Route path="/scenario-builder/:id" element={<ScenarioEditPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByText(
+        "That scenario isn't here any more. It may have been deleted.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Scan the engine/)).toBeNull();
+  });
+});
+
 describe("a read-only scenario's editor route", () => {
   it("offers no actions at all, because there is no editor to act on", () => {
     edit(bundled);

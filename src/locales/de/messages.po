@@ -49136,6 +49136,7 @@ msgstr "Diese Lauf-ID gehört zu einem Lauf, der nicht gelesen werden konnte, al
 msgid "That scenario file is damaged or incomplete."
 msgstr "Die Szenario-Datei ist beschädigt oder unvollständig."
 
+#: src/scenario/pages/ScenarioEditPage.tsx
 #: src/scenario/pages/ScenariosPage.tsx
 #, fuzzy
 msgid "That scenario isn't here any more. It may have been deleted."

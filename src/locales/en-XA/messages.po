@@ -40044,6 +40044,7 @@ msgstr ""
 msgid "That scenario file is damaged or incomplete."
 msgstr ""
 
+#: src/scenario/pages/ScenarioEditPage.tsx
 #: src/scenario/pages/ScenariosPage.tsx
 msgid "That scenario isn't here any more. It may have been deleted."
 msgstr ""

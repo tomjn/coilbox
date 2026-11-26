@@ -49166,6 +49166,7 @@ msgstr "Αυτό το id πορείας χρησιμοποιείται από π
 msgid "That scenario file is damaged or incomplete."
 msgstr "Αυτό το αρχείο σεναρίου είναι κατεστραμμένο ή ελλιπές."
 
+#: src/scenario/pages/ScenarioEditPage.tsx
 #: src/scenario/pages/ScenariosPage.tsx
 #, fuzzy
 msgid "That scenario isn't here any more. It may have been deleted."

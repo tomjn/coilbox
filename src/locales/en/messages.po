@@ -40045,6 +40045,7 @@ msgstr "That run id is taken by a run that could not be read, so nothing was sav
 msgid "That scenario file is damaged or incomplete."
 msgstr "That scenario file is damaged or incomplete."
 
+#: src/scenario/pages/ScenarioEditPage.tsx
 #: src/scenario/pages/ScenariosPage.tsx
 msgid "That scenario isn't here any more. It may have been deleted."
 msgstr "That scenario isn't here any more. It may have been deleted."
