@@ -600,6 +600,11 @@ msgstr ""
 msgid "{0, plural, one {# file is more than one folder down, which no game loads:} other {# files are more than one folder down, which no game loads:}}"
 msgstr ""
 
+#. placeholder {0}: c.files
+#: src/content/pages/StorageSection.tsx
+msgid "{0, plural, one {# file} other {# files}}"
+msgstr ""
+
 #. placeholder {0}: finished.unknown
 #: src/content/pages/components/ReplayEventLayers.tsx
 msgid "{0, plural, one {# finished unit has no definition in the installed game and is not drawn.} other {# finished units have no definition in the installed game and are not drawn.}}"
@@ -652,6 +657,11 @@ msgstr ""
 #. placeholder {0}: unknown.length
 #: src/profile/health.ts
 msgid "{0, plural, one {# link icon unknown} other {# link icons unknown}}"
+msgstr ""
+
+#. placeholder {0}: usage.sets
+#: src/content/pages/StorageSection.tsx
+msgid "{0, plural, one {# list} other {# lists}}"
 msgstr ""
 
 #. placeholder {0}: -streak
@@ -814,7 +824,9 @@ msgid "{0, plural, one {# replay matches, {matchBytes}.} other {# replays match,
 msgstr ""
 
 #. placeholder {0}: set.members.length
+#. placeholder {0}: usage.replays
 #: src/content/pages/components/ReplaySetsManager.tsx
+#: src/content/pages/StorageSection.tsx
 msgid "{0, plural, one {# replay} other {# replays}}"
 msgstr ""
 
@@ -2342,7 +2354,7 @@ msgid "{file} from {who} did not match its checksum"
 msgstr ""
 
 #: src/content/caches.ts
-msgid "{fileCount, plural, one {Can reclaim # file ({size}).} other {Can reclaim # files ({size}).}}"
+msgid "{fileCount, plural, one {Can clear # file ({size}).} other {Can clear # files ({size}).}}"
 msgstr ""
 
 #: src/content/caches.ts
@@ -3266,6 +3278,10 @@ msgstr ""
 
 #: src/blueprint/pack.ts
 msgid "{list}, because the substitutes cover different ground."
+msgstr ""
+
+#: src/content/pages/StorageSection.tsx
+msgid "{lists} for {replays}"
 msgstr ""
 
 #: src/multiplayer/battle/BattleGameCard.tsx
@@ -5015,7 +5031,7 @@ msgid "{replacedCount, plural, one {replaced # blueprint} other {replaced # blue
 msgstr ""
 
 #: src/content/pages/components/BulkDeleteReplaysPanel.tsx
-msgid "{replayCount, plural, one {Pick a filter. This root has # replay.} other {Pick a filter. This root has # replays.}}"
+msgid "{replayCount, plural, one {Pick a filter. This folder has # replay.} other {Pick a filter. This folder has # replays.}}"
 msgstr ""
 
 #: src/downloads/downloadGame.ts
@@ -5192,10 +5208,6 @@ msgstr ""
 
 #: src/multiplayer/store.tsx
 msgid "{serverName} refused the password for {username}"
-msgstr ""
-
-#: src/content/pages/StorageSection.tsx
-msgid "{sets, plural, one {# unit list is} other {# unit lists are}} kept for {replays, plural, one {# replay} other {# replays}}, using {size}. They let a replay name its units after its game is updated or removed, and each goes when the last replay that uses it is deleted."
 msgstr ""
 
 #: src/animation/pages/Bos2LuaPage.tsx
@@ -6268,7 +6280,7 @@ msgid "{used} is already used to: {name}"
 msgstr ""
 
 #: src/content/pages/components/ReplayTracksStorage.tsx
-msgid "{usedSize} used of {limitSize}"
+msgid "{usedSize} used of {limitSize}, {trackCount}"
 msgstr ""
 
 #: src/multiplayer/chat/ConversationSidebar.tsx
@@ -7931,6 +7943,10 @@ msgstr ""
 msgid "A unit is already called {name} or {unitName}. Choose another roster name."
 msgstr ""
 
+#: src/content/pages/StorageSection.tsx
+msgid "A unit list lets a replay name its units after its game is updated or removed. One is kept the first time a replay's build orders are read, or when a replay is analysed."
+msgstr ""
+
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 msgid "A unit render or emblem, for example. Image transparency is kept; a video loops muted."
 msgstr ""
@@ -8118,6 +8134,10 @@ msgstr ""
 msgid "About banking"
 msgstr ""
 
+#: src/content/pages/StorageSection.tsx
+msgid "About caches"
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 msgid "About calling a function"
 msgstr ""
@@ -8128,6 +8148,10 @@ msgstr ""
 
 #: src/general/pages/AboutCoilbox.tsx
 msgid "About Coilbox"
+msgstr ""
+
+#: src/content/pages/StorageSection.tsx
+msgid "About deleting replays"
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
@@ -8188,6 +8212,10 @@ msgstr ""
 
 #: src/content/pages/components/ReplayTracksStorage.tsx
 msgid "About replay tracks"
+msgstr ""
+
+#: src/content/pages/StorageSection.tsx
+msgid "About replay unit lists"
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
@@ -11342,6 +11370,14 @@ msgstr ""
 msgid "Branded"
 msgstr ""
 
+#: src/content/storageLabels.ts
+msgid "Branding catalog"
+msgstr ""
+
+#: src/content/storageLabels.ts
+msgid "Branding images"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 msgid "Break"
 msgstr ""
@@ -11906,10 +11942,6 @@ msgstr ""
 
 #: src/content/pages/StorageSection.tsx
 msgid "Caches"
-msgstr ""
-
-#: src/content/caches.ts
-msgid "Caches are already empty - nothing to reclaim."
 msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
@@ -13070,6 +13102,7 @@ msgstr ""
 #: src/blueprint/pages/components/EquivalentsPanel.tsx
 #: src/blueprint/pages/components/LeavingPack.tsx
 #: src/content/pages/components/DateFilter.tsx
+#: src/content/pages/components/ReclaimCachesButton.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/MeasureReadout.tsx
 #: src/multiplayer/NoteButton.tsx
@@ -13106,6 +13139,10 @@ msgstr ""
 
 #: src/startbox/StartBoxEditor.tsx
 msgid "Clear ally {letter}'s start box"
+msgstr ""
+
+#: src/content/pages/components/ReclaimCachesButton.tsx
+msgid "Clear caches"
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
@@ -13643,6 +13680,10 @@ msgstr ""
 
 #: src/play/PlayProvider.tsx
 msgid "Coilbox could not write your widget settings for {game}"
+msgstr ""
+
+#: src/content/pages/StorageSection.tsx
+msgid "Coilbox data"
 msgstr ""
 
 #: src/hub/pages/ItemPage.tsx
@@ -14570,11 +14611,11 @@ msgid "Contains a semicolon"
 msgstr ""
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
-#: src/content/pages/StorageSection.tsx
 msgid "Content"
 msgstr ""
 
 #: src/content/index.ts
+#: src/content/pages/StorageSection.tsx
 msgid "Content folders"
 msgstr ""
 
@@ -16312,6 +16353,10 @@ msgstr ""
 msgid "Delete preset"
 msgstr ""
 
+#: src/content/pages/StorageSection.tsx
+msgid "Delete replays"
+msgstr ""
+
 #: src/startbox/StartBoxPresetsPopover.tsx
 msgid "Delete saved layout {number}"
 msgstr ""
@@ -16334,10 +16379,6 @@ msgstr ""
 
 #: src/content/pages/components/ClearUnfinishedButton.tsx
 msgid "Delete the empty replays that games left when they did not finish recording"
-msgstr ""
-
-#: src/content/pages/components/BulkDeleteReplaysPanel.tsx
-msgid "Delete the matching replays"
 msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
@@ -16396,6 +16437,10 @@ msgstr ""
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 msgid "Delete this copy? It cannot be undone."
+msgstr ""
+
+#: src/content/pages/components/DeleteEngineButton.tsx
+msgid "Delete this engine"
 msgstr ""
 
 #: src/content/pages/components/DeleteReplayButton.tsx
@@ -18107,6 +18152,7 @@ msgstr ""
 
 #: src/content/index.ts
 #: src/content/pages/StorageSection.tsx
+#: src/content/storageLabels.ts
 msgid "Engines"
 msgstr ""
 
@@ -18297,6 +18343,10 @@ msgstr ""
 
 #: src/content/pages/GamesPage.tsx
 msgid "Every installed game is up to date."
+msgstr ""
+
+#: src/content/pages/StorageSection.tsx
+msgid "Every launch uses this engine. Set another as preferred on the Engines page to delete it."
 msgstr ""
 
 #: src/content/pages/components/MatchStatsChart.tsx
@@ -18777,6 +18827,10 @@ msgstr ""
 msgid "Faction for the new AI"
 msgstr ""
 
+#: src/content/storageLabels.ts
+msgid "Faction logos"
+msgstr ""
+
 #. placeholder {0}: describeError(e)
 #: src/hub/assets/pictureSweep.ts
 msgid "Faction logos were not sent. {0}"
@@ -18985,7 +19039,6 @@ msgid "File size"
 msgstr ""
 
 #: src/content/mapCompatReport.ts
-#: src/content/pages/StorageSection.tsx
 msgid "Files"
 msgstr ""
 
@@ -19139,7 +19192,7 @@ msgid "Finding maps…"
 msgstr ""
 
 #: src/content/pages/StorageSection.tsx
-msgid "Finish or cancel downloads before reclaiming space"
+msgid "Finish or cancel downloads first"
 msgstr ""
 
 #: src/hub/pages/components/HeaderAccount.tsx
@@ -20136,6 +20189,10 @@ msgstr ""
 msgid "Game and engine not installed"
 msgstr ""
 
+#: src/content/storageLabels.ts
+msgid "Game and map info"
+msgstr ""
+
 #: src/content/pages/components/MissingContentNotice.tsx
 msgid "Game and map not installed"
 msgstr ""
@@ -20170,6 +20227,10 @@ msgstr ""
 
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 msgid "Game for the new project"
+msgstr ""
+
+#: src/content/storageLabels.ts
+msgid "Game headers"
 msgstr ""
 
 #: src/content/matchStatsImage.ts
@@ -20343,6 +20404,7 @@ msgstr ""
 #: src/content/pages/MatchupPage.tsx
 #: src/content/pages/PlayerDossierPage.tsx
 #: src/content/pages/StatsPage.tsx
+#: src/content/storageLabels.ts
 #: src/lego/pages/ProjectsPage.tsx
 #: src/packs/pages/components/ExportPackForm.tsx
 msgid "Games"
@@ -20437,10 +20499,6 @@ msgstr ""
 
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 msgid "Generated test game"
-msgstr ""
-
-#: src/content/pages/StorageSection.tsx
-msgid "Generated thumbnails, headers, icons and branding art. All regenerate on demand, so clearing them only frees disk space."
 msgstr ""
 
 #: src/mapconv/pages/components/AssetPreview.tsx
@@ -24918,6 +24976,14 @@ msgstr ""
 msgid "Map style"
 msgstr ""
 
+#: src/content/storageLabels.ts
+msgid "Map thumbnails"
+msgstr ""
+
+#: src/content/pages/StorageSection.tsx
+msgid "Map thumbnails, game headers, unit icons and branding art. Coilbox makes them again when it needs them, so clearing them only frees disk space."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapCard.tsx
 msgid "Map view"
 msgstr ""
@@ -24983,6 +25049,7 @@ msgstr ""
 #: src/content/pages/components/MapNotInstalled.tsx
 #: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/MapsPage.tsx
+#: src/content/storageLabels.ts
 #: src/packs/pages/components/ExportPackForm.tsx
 msgid "Maps"
 msgstr ""
@@ -25260,6 +25327,10 @@ msgstr ""
 
 #: src/lego/pages/components/ModelViewport.tsx
 msgid "Measure between two points ({measureKey})"
+msgstr ""
+
+#: src/content/pages/StorageSection.tsx
+msgid "Measure the folders again"
 msgstr ""
 
 #: src/lego/pages/components/AimPointPanel.tsx
@@ -27040,7 +27111,7 @@ msgid "No content folders found yet. Rescan to detect standard locations, or add
 msgstr ""
 
 #: src/content/pages/StorageSection.tsx
-msgid "No content folders to measure yet. Add one in Content folders."
+msgid "No content folders to measure yet. Add one in <0>Content folders</0>."
 msgstr ""
 
 #: src/content/pages/components/PlayerMatchFigures.tsx
@@ -27940,12 +28011,12 @@ msgstr ""
 msgid "No replays in “{activeSetName}” match the filters."
 msgstr ""
 
-#: src/content/pages/ReplaysPage.tsx
-msgid "No replays match “{filterText}”."
+#: src/content/pages/StorageSection.tsx
+msgid "No replays in your content folders."
 msgstr ""
 
-#: src/content/pages/components/BulkDeleteReplaysPanel.tsx
-msgid "No replays match the filters"
+#: src/content/pages/ReplaysPage.tsx
+msgid "No replays match “{filterText}”."
 msgstr ""
 
 #: src/content/pages/ReplaysPage.tsx
@@ -28308,10 +28379,6 @@ msgstr ""
 msgid "No unit limit"
 msgstr ""
 
-#: src/content/pages/StorageSection.tsx
-msgid "No unit lists are kept yet. One is kept the first time a replay's build orders are read against its installed game, or when a replay is analysed."
-msgstr ""
-
 #: src/workshop/pages/components/UnitList.tsx
 msgid "No unit matches \"\"."
 msgstr ""
@@ -28483,6 +28550,10 @@ msgstr ""
 
 #: src/play/pages/components/EngineOverrideField.tsx
 msgid "none installed"
+msgstr ""
+
+#: src/content/pages/StorageSection.tsx
+msgid "None kept yet"
 msgstr ""
 
 #: src/lego/pages/components/ImportResult.tsx
@@ -30189,6 +30260,14 @@ msgstr ""
 msgid "Open slot"
 msgstr ""
 
+#: src/content/pages/StorageSection.tsx
+msgid "Open the {name} folder"
+msgstr ""
+
+#: src/content/pages/StorageSection.tsx
+msgid "Open the {version} folder"
+msgstr ""
+
 #: src/deeplink/actions.ts
 msgid "Open the battle list."
 msgstr ""
@@ -30202,10 +30281,12 @@ msgid "Open the build the hub has"
 msgstr ""
 
 #: src/content/pages/components/EngineRow.tsx
+#: src/content/pages/StorageSection.tsx
 msgid "Open the engine's folder"
 msgstr ""
 
 #: src/content/pages/components/FolderRow.tsx
+#: src/content/pages/StorageSection.tsx
 msgid "Open the folder"
 msgstr ""
 
@@ -30561,6 +30642,7 @@ msgstr ""
 #: src/content/pages/components/ArchiveTypeBadge.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/content/storageLabels.ts
 #: src/runlite/pages/components/ArsenalOverlay.tsx
 msgid "Other"
 msgstr ""
@@ -31245,6 +31327,10 @@ msgstr ""
 
 #: src/lego/pages/components/WeaponsSection.tsx
 msgid "Pick a weapon"
+msgstr ""
+
+#: src/content/pages/StorageSection.tsx
+msgid "Pick an age or tick a box to choose replays, then delete them in one go. Each filter narrows the choice further. Coilbox shows the total before anything is deleted."
 msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
@@ -31938,6 +32024,7 @@ msgid "Pre-seed accounts so a load test can run with registration off."
 msgstr ""
 
 #: src/content/pages/components/EngineRow.tsx
+#: src/content/pages/StorageSection.tsx
 msgid "Preferred"
 msgstr ""
 
@@ -32659,6 +32746,10 @@ msgstr ""
 msgid "Rapid package"
 msgstr ""
 
+#: src/content/storageLabels.ts
+msgid "Rapid pool"
+msgstr ""
+
 #: src/downloads/index.ts
 #: src/downloads/pages/ExplorerPage.tsx
 #: src/downloads/pages/SettingsSection.tsx
@@ -33211,14 +33302,9 @@ msgstr ""
 msgid "Recent"
 msgstr ""
 
-#: src/content/pages/components/ReclaimCachesButton.tsx
 #: src/content/pages/components/ReclaimSpaceButton.tsx
 #: src/scenario/pages/components/ReclaimClipsForm.tsx
 msgid "Reclaim"
-msgstr ""
-
-#: src/content/pages/components/ReclaimCachesButton.tsx
-msgid "Reclaim caches"
 msgstr ""
 
 #: src/scenario/pages/ScenarioBuilderPage.tsx
@@ -33227,14 +33313,6 @@ msgstr ""
 
 #: src/scenario/pages/ScenarioBuilderPage.tsx
 msgid "Reclaim dialogue clips"
-msgstr ""
-
-#: src/content/pages/components/ReclaimSpaceButton.tsx
-msgid "Reclaim orphaned rapid pool data"
-msgstr ""
-
-#: src/content/pages/components/ReclaimSpaceButton.tsx
-msgid "Reclaim space"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -33837,6 +33915,10 @@ msgstr ""
 msgid "Remove operator"
 msgstr ""
 
+#: src/content/pages/components/ReclaimSpaceButton.tsx
+msgid "Remove pool files no package uses"
+msgstr ""
+
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "Remove server"
 msgstr ""
@@ -34194,10 +34276,6 @@ msgstr ""
 msgid "Replay analysis is turned off in this distribution."
 msgstr ""
 
-#: src/content/pages/StorageSection.tsx
-msgid "Replay cleanup"
-msgstr ""
-
 #: src/content/pages/ReplayDetailPage.tsx
 msgid "Replay deleted"
 msgstr ""
@@ -34208,6 +34286,10 @@ msgstr ""
 
 #: src/content/pages/ReplaysPage.tsx
 msgid "Replay map"
+msgstr ""
+
+#: src/content/storageLabels.ts
+msgid "Replay map pictures"
 msgstr ""
 
 #: src/career/pages/CareerPage.tsx
@@ -34234,6 +34316,10 @@ msgstr ""
 msgid "Replay unit lists"
 msgstr ""
 
+#: src/content/storageLabels.ts
+msgid "Replay unit totals"
+msgstr ""
+
 #: src/content/pages/ReplaysPage.tsx
 msgid "replays"
 msgstr ""
@@ -34243,6 +34329,7 @@ msgstr ""
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/content/pages/ReplaysPage.tsx
 #: src/content/pages/StatsPage.tsx
+#: src/content/storageLabels.ts
 #: src/play/index.ts
 msgid "Replays"
 msgstr ""
@@ -34681,24 +34768,8 @@ msgstr ""
 msgid "Return to the running match"
 msgstr ""
 
-#: src/content/pages/StorageSection.tsx
-msgid "Reveal {categoryLabel} folder"
-msgstr ""
-
-#: src/content/pages/StorageSection.tsx
-msgid "Reveal {enginePath}"
-msgstr ""
-
-#: src/content/pages/StorageSection.tsx
-msgid "Reveal {firstPath}"
-msgstr ""
-
 #: src/content/pages/components/DuplicateContent.tsx
 msgid "Reveal {folder}"
-msgstr ""
-
-#: src/content/pages/StorageSection.tsx
-msgid "Reveal in file manager"
 msgstr ""
 
 #: src/animation/pages/CobPage.tsx
@@ -34707,10 +34778,6 @@ msgstr ""
 
 #: src/i18n/frameStrings.ts
 msgid "Reveal sidebar"
-msgstr ""
-
-#: src/content/pages/StorageSection.tsx
-msgid "Reveal the {engineVersion} folder"
 msgstr ""
 
 #. placeholder {0}: copy.path
@@ -35430,6 +35497,10 @@ msgstr ""
 
 #: src/play/pages/SavegamesPage.tsx
 msgid "savegames"
+msgstr ""
+
+#: src/content/storageLabels.ts
+msgid "Saves"
 msgstr ""
 
 #: src/content/pages/components/MatchStatsImageButton.tsx
@@ -37693,7 +37764,6 @@ msgstr ""
 #: src/content/pages/components/ArchiveModelPreview.tsx
 #: src/content/pages/components/UnitModelPanel.tsx
 #: src/content/pages/GameUnitPage.tsx
-#: src/content/pages/StorageSection.tsx
 #: src/lego/pages/components/CollisionPanel.tsx
 #: src/lego/pages/components/DetailPanel.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
@@ -37706,10 +37776,6 @@ msgstr ""
 
 #: src/lego/pages/components/ProportionsPanel.tsx
 msgid "Size {sizeText}"
-msgstr ""
-
-#: src/content/pages/components/ReclaimCachesButton.tsx
-msgid "Size and clear the generated-image and info caches"
 msgstr ""
 
 #: src/lego/pages/components/BuildPictureDrawer.tsx
@@ -39938,6 +40004,10 @@ msgstr ""
 
 #: src/animation/pages/CobPage.tsx
 msgid "The bytes that were written, sixteen to a line."
+msgstr ""
+
+#: src/content/caches.ts
+msgid "The caches are already empty."
 msgstr ""
 
 #: src/conquest/pages/GalaxyPage.tsx
@@ -42500,6 +42570,10 @@ msgstr ""
 msgid "They are no longer one of your friends."
 msgstr ""
 
+#: src/content/pages/StorageSection.tsx
+msgid "They are not a cache. Each goes when the last replay that uses it is deleted."
+msgstr ""
+
 #: src/direct/share.ts
 msgid "They can join this room and chat. They cannot start the game, because the room gives everybody in it {announced}, which nothing outside your network can dial."
 msgstr ""
@@ -43018,10 +43092,6 @@ msgstr ""
 
 #: src/multiplayer/admin/StaffSection.tsx
 msgid "This is your own account"
-msgstr ""
-
-#: src/content/pages/StorageSection.tsx
-msgid "This is your preferred engine, the one every launch uses. Set another as preferred first."
 msgstr ""
 
 #: src/deeplink/parse.ts
@@ -43996,6 +44066,10 @@ msgstr ""
 
 #: src/play/pages/components/MapCard.tsx
 msgid "Tidal strength"
+msgstr ""
+
+#: src/content/pages/components/ReclaimSpaceButton.tsx
+msgid "Tidy rapid pool"
 msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
@@ -45012,6 +45086,10 @@ msgstr ""
 msgid "unit {place}"
 msgstr ""
 
+#: src/content/storageLabels.ts
+msgid "Unit build icons"
+msgstr ""
+
 #: src/lego/index.ts
 msgid "unit builder"
 msgstr ""
@@ -45091,6 +45169,10 @@ msgstr ""
 #: src/content/pages/UnitReferencePage.tsx
 #: src/workshop/pages/ReferencePage.tsx
 msgid "Unit reference"
+msgstr ""
+
+#: src/content/storageLabels.ts
+msgid "Unit renders"
 msgstr ""
 
 #: src/content/engineSettingText.ts

@@ -19,7 +19,7 @@ describe("cache reclaim helpers", () => {
   it("summarizes empty vs populated, dry-run vs applied", () => {
     expect(summarizeCaches(summary({}))).toMatch(/already empty/);
     expect(summarizeCaches(summary({ totalBytes: 2048, totalFiles: 3 }))).toBe(
-      "Can reclaim 3 files (2.0 KB).",
+      "Can clear 3 files (2.0 KB).",
     );
     expect(
       summarizeCaches(

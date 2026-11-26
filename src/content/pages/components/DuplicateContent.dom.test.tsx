@@ -103,7 +103,9 @@ const report: DuplicateReport = {
 describe("DuplicateContent", () => {
   it("lists each duplicate with its copies and the space it takes", async () => {
     h.report = report;
-    render(<DuplicateContent roots={["/a", "/b"]} version={0} />);
+    render(
+      <DuplicateContent roots={["/a", "/b"]} version={0} onOpen={() => {}} />,
+    );
 
     expect(await screen.findByText("Tabula.sd7")).toBeTruthy();
     expect(h.calls).toEqual([["/a", "/b"]]);
@@ -120,22 +122,24 @@ describe("DuplicateContent", () => {
 
   it("says so when there are no duplicates", async () => {
     h.report = { groups: [], wastedBytes: 0 };
-    render(<DuplicateContent roots={["/a"]} version={0} />);
+    render(<DuplicateContent roots={["/a"]} version={0} onOpen={() => {}} />);
     expect(await screen.findByText("No duplicates found.")).toBeTruthy();
   });
 
   it("shows the error when the report fails", async () => {
     h.fail = "boom";
-    render(<DuplicateContent roots={["/a"]} version={0} />);
+    render(<DuplicateContent roots={["/a"]} version={0} onOpen={() => {}} />);
     expect(await screen.findByText(/boom/)).toBeTruthy();
   });
 
   it("keeps a report read this session, so coming back is free", async () => {
     h.report = { groups: [], wastedBytes: 0 };
-    const first = render(<DuplicateContent roots={["/a"]} version={0} />);
+    const first = render(
+      <DuplicateContent roots={["/a"]} version={0} onOpen={() => {}} />,
+    );
     await screen.findByText("No duplicates found.");
     first.unmount();
-    render(<DuplicateContent roots={["/a"]} version={0} />);
+    render(<DuplicateContent roots={["/a"]} version={0} onOpen={() => {}} />);
     await screen.findByText("No duplicates found.");
     expect(h.calls).toHaveLength(1);
   });
@@ -146,21 +150,29 @@ describe("DuplicateContent", () => {
     h.gate = new Promise<void>((resolve) => {
       release = resolve;
     });
-    const first = render(<DuplicateContent roots={["/a"]} version={0} />);
+    const first = render(
+      <DuplicateContent roots={["/a"]} version={0} onOpen={() => {}} />,
+    );
     clearDuplicateReportCache();
     release();
     await screen.findByText("No duplicates found.");
     first.unmount();
     h.gate = null;
 
-    render(<DuplicateContent roots={["/a"]} version={0} />);
+    render(<DuplicateContent roots={["/a"]} version={0} onOpen={() => {}} />);
     await screen.findByText("No duplicates found.");
     expect(h.calls).toHaveLength(2);
   });
 
   it("reads a path with a newline in it as one folder", async () => {
     h.report = { groups: [], wastedBytes: 0 };
-    render(<DuplicateContent roots={["/a\nb", "/c"]} version={0} />);
+    render(
+      <DuplicateContent
+        roots={["/a\nb", "/c"]}
+        version={0}
+        onOpen={() => {}}
+      />,
+    );
     await screen.findByText("No duplicates found.");
     expect(h.calls).toEqual([["/a\nb", "/c"]]);
   });
@@ -168,11 +180,11 @@ describe("DuplicateContent", () => {
   it("reads again when the version changes", async () => {
     h.report = { groups: [], wastedBytes: 0 };
     const { rerender } = render(
-      <DuplicateContent roots={["/a"]} version={0} />,
+      <DuplicateContent roots={["/a"]} version={0} onOpen={() => {}} />,
     );
     await screen.findByText("No duplicates found.");
     clearDuplicateReportCache();
-    rerender(<DuplicateContent roots={["/a"]} version={1} />);
+    rerender(<DuplicateContent roots={["/a"]} version={1} onOpen={() => {}} />);
     await vi.waitFor(() => expect(h.calls).toHaveLength(2));
   });
 });

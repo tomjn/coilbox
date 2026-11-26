@@ -4,6 +4,7 @@
  * player opens, with or without content folders, and not only exported.
  */
 import { cleanup, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => ({
@@ -66,7 +67,11 @@ afterEach(() => {
 describe("the Storage page", () => {
   it("shows the track total beside the other storage, with a content folder", async () => {
     h.roots = [{ id: "r", path: "/games", exists: true, engines: [] }];
-    render(<StorageSection />);
+    render(
+      <MemoryRouter>
+        <StorageSection />
+      </MemoryRouter>,
+    );
 
     expect(await screen.findByText(/0 B used of 450 MB/)).toBeTruthy();
     expect(
@@ -75,7 +80,11 @@ describe("the Storage page", () => {
   });
 
   it("shows it with no content folders too, since tracks are not in one", async () => {
-    render(<StorageSection />);
+    render(
+      <MemoryRouter>
+        <StorageSection />
+      </MemoryRouter>,
+    );
 
     expect(screen.getByText(/no content folders to measure/i)).toBeTruthy();
     expect(await screen.findByText(/0 B used of 450 MB/)).toBeTruthy();

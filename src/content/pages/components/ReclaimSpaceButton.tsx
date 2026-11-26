@@ -7,6 +7,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { describeError } from "@/i18n/uiError";
 import { notify } from "@/notify/notify";
 import { contentPruneRapidPool, type PruneSummary } from "../../bindings";
@@ -19,16 +24,20 @@ const msg = (e: unknown): string => describeError(e);
  * rapid pool (orphaned blobs + `.incomplete` leftovers), previews what would be
  * removed, and deletes only on an explicit confirm. Disabled while a download is
  * in flight (pruning refcounts against on-disk `.sdp` files and must not race a
- * blob being written).
+ * blob being written). A disabled button gets no pointer events, so the reason
+ * is a tooltip on a wrapper. Needs a `<TooltipProvider>` above it.
  */
 export function ReclaimSpaceButton({
   rootPath,
   canPrune,
   blockReason,
+  onReclaimed,
 }: {
   rootPath: string;
   canPrune: boolean;
-  blockReason?: string;
+  blockReason: string;
+  /** Re-read the breakdown, whose rapid pool figure just changed. */
+  onReclaimed: () => void;
 }) {
   const { t } = useLingui();
   const [open, setOpen] = useState(false);
@@ -69,6 +78,7 @@ export function ReclaimSpaceButton({
       });
       void notify({ title: summarize(summary), level: "success" });
       setOpen(false);
+      onReclaimed();
     } catch (e) {
       setError(msg(e));
     } finally {
@@ -76,20 +86,33 @@ export function ReclaimSpaceButton({
     }
   };
 
+  const button = (
+    <Button type="button" variant="outline" size="sm" disabled={!canPrune}>
+      <HardDrive className="size-4" />
+      <Trans>Tidy rapid pool</Trans>
+    </Button>
+  );
+
+  if (!canPrune) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          {/* biome-ignore lint/a11y/noNoninteractiveTabindex: focus shows why the button is off */}
+          <span tabIndex={0}>{button}</span>
+        </TooltipTrigger>
+        <TooltipContent>{blockReason}</TooltipContent>
+      </Tooltip>
+    );
+  }
+
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={!canPrune}
-          title={canPrune ? t`Reclaim orphaned rapid pool data` : blockReason}
-        >
-          <HardDrive className="size-4" />
-          <Trans>Reclaim space</Trans>
-        </Button>
-      </PopoverTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>{button}</PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent>{t`Remove pool files no package uses`}</TooltipContent>
+      </Tooltip>
       <PopoverContent align="end" className="w-80">
         {loading ? (
           <p className="flex items-center gap-2 text-sm text-muted-foreground">

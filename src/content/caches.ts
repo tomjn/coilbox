@@ -8,14 +8,14 @@ import { plural, t } from "@lingui/core/macro";
 import { formatBytes } from "@/lib/format";
 import type { CacheReclaimSummary } from "./bindings";
 
-/** True when a summary found nothing to reclaim. */
+/** True when a summary found nothing to clear. */
 export function isEmpty(s: CacheReclaimSummary): boolean {
   return s.totalBytes === 0 && s.totalFiles === 0;
 }
 
 /** One-line description of what a reclaim (dry-run or applied) covers. */
 export function summarizeCaches(s: CacheReclaimSummary): string {
-  if (isEmpty(s)) return t`Caches are already empty - nothing to reclaim.`;
+  if (isEmpty(s)) return t`The caches are already empty.`;
   const fileCount = s.totalFiles;
   const size = formatBytes(s.totalBytes);
   return s.applied
@@ -24,8 +24,8 @@ export function summarizeCaches(s: CacheReclaimSummary): string {
         other: `Cleared # files (${size}).`,
       })
     : plural(fileCount, {
-        one: `Can reclaim # file (${size}).`,
-        other: `Can reclaim # files (${size}).`,
+        one: `Can clear # file (${size}).`,
+        other: `Can clear # files (${size}).`,
       });
 }
 

@@ -9,7 +9,6 @@ import { describeError } from "@/i18n/uiError";
 import { formatBytes } from "@/lib/format";
 import {
   contentDuplicateReport,
-  contentOpenPath,
   type DuplicateCopy,
   type DuplicateGroup,
   type DuplicateReport,
@@ -50,14 +49,17 @@ export function clearDuplicateReportCache(): void {
  *
  * `roots` are the content folder paths. `version` changes when the section's
  * Refresh is pressed or something is deleted, and the caller clears the cache
- * first so the folders are read again.
+ * first so the folders are read again. `onOpen` shows a folder in the file
+ * manager.
  */
 export function DuplicateContent({
   roots,
   version,
+  onOpen,
 }: {
   roots: string[];
   version: number;
+  onOpen: (path: string) => void;
 }) {
   const rootKey = JSON.stringify(roots);
   const [state, setState] = useState<State>({ status: "loading" });
@@ -89,7 +91,7 @@ export function DuplicateContent({
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        <h2 className="text-sm font-semibold">
           <Trans>Duplicate content</Trans>
         </h2>
         {state.status === "ready" && state.report.groups.length > 0 && (
@@ -121,11 +123,12 @@ export function DuplicateContent({
           <Trans>No duplicates found.</Trans>
         </p>
       ) : (
-        <ul className="flex flex-col gap-3">
+        <ul className="divide-y divide-border rounded-md border border-border">
           {state.report.groups.map((group) => (
             <GroupRow
               key={`${group.kind}:${group.category}:${group.name}`}
               group={group}
+              onOpen={onOpen}
             />
           ))}
         </ul>
@@ -134,11 +137,17 @@ export function DuplicateContent({
   );
 }
 
-function GroupRow({ group }: { group: DuplicateGroup }) {
+function GroupRow({
+  group,
+  onOpen,
+}: {
+  group: DuplicateGroup;
+  onOpen: (path: string) => void;
+}) {
   return (
-    <li className="flex flex-col gap-2 rounded-lg border border-border/50 p-3">
+    <li className="flex flex-col gap-1.5 px-4 py-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="break-all font-medium">{group.name}</span>
+        <span className="break-all text-sm font-medium">{group.name}</span>
         <GroupBadge group={group} />
         <span className="ml-auto tabular-nums text-sm">
           {group.wastedBytes > 0 ? formatBytes(group.wastedBytes) : null}
@@ -146,7 +155,7 @@ function GroupRow({ group }: { group: DuplicateGroup }) {
       </div>
       <ul className="flex flex-col gap-1">
         {group.copies.map((copy) => (
-          <CopyRow key={copy.path} copy={copy} />
+          <CopyRow key={copy.path} copy={copy} onOpen={onOpen} />
         ))}
       </ul>
     </li>
@@ -175,7 +184,13 @@ function GroupBadge({ group }: { group: DuplicateGroup }) {
   );
 }
 
-function CopyRow({ copy }: { copy: DuplicateCopy }) {
+function CopyRow({
+  copy,
+  onOpen,
+}: {
+  copy: DuplicateCopy;
+  onOpen: (path: string) => void;
+}) {
   const { t } = useLingui();
   const folder = parentFolder(copy.path);
   return (
@@ -197,9 +212,7 @@ function CopyRow({ copy }: { copy: DuplicateCopy }) {
         variant="ghost"
         size="sm"
         title={t`Reveal ${folder}`}
-        onClick={() => {
-          contentOpenPath({ path: folder }).catch(() => {});
-        }}
+        onClick={() => onOpen(folder)}
       >
         <FolderOpen className="size-4" />
         <span className="sr-only">

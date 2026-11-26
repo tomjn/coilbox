@@ -734,6 +734,11 @@ msgstr "{0, plural, one {# felt} other {# felt}}"
 msgid "{0, plural, one {# file is more than one folder down, which no game loads:} other {# files are more than one folder down, which no game loads:}}"
 msgstr "{0, plural, one {# fil ligger mer enn én mappe ned, noe ingen spill laster:} other {# filer ligger mer enn én mappe ned, noe ingen spill laster:}}"
 
+#. placeholder {0}: c.files
+#: src/content/pages/StorageSection.tsx
+msgid "{0, plural, one {# file} other {# files}}"
+msgstr ""
+
 #. placeholder {0}: finished.unknown
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
@@ -797,6 +802,11 @@ msgstr "{0, plural, one {# er skrevet slik den ble skrevet inn, og spillet kan l
 #, fuzzy
 msgid "{0, plural, one {# link icon unknown} other {# link icons unknown}}"
 msgstr "{0, plural, one {# lenkeikon er ukjent} other {# lenkeikoner er ukjente}}"
+
+#. placeholder {0}: usage.sets
+#: src/content/pages/StorageSection.tsx
+msgid "{0, plural, one {# list} other {# lists}}"
+msgstr ""
 
 #. placeholder {0}: -streak
 #: src/content/pages/StatsPage.tsx
@@ -987,7 +997,9 @@ msgid "{0, plural, one {# replay matches, {matchBytes}.} other {# replays match,
 msgstr "{0, plural, one {# reprise passer, {matchBytes}.} other {# repriser passer, {matchBytes}.}}"
 
 #. placeholder {0}: set.members.length
+#. placeholder {0}: usage.replays
 #: src/content/pages/components/ReplaySetsManager.tsx
+#: src/content/pages/StorageSection.tsx
 #, fuzzy
 msgid "{0, plural, one {# replay} other {# replays}}"
 msgstr "{0, plural, one {# reprise} other {# repriser}}"
@@ -2869,9 +2881,8 @@ msgid "{file} from {who} did not match its checksum"
 msgstr "{file} fra {who} samsvarte ikke med sjekksummen"
 
 #: src/content/caches.ts
-#, fuzzy
-msgid "{fileCount, plural, one {Can reclaim # file ({size}).} other {Can reclaim # files ({size}).}}"
-msgstr "{fileCount, plural, one {Kan frigjøre # fil ({size}).} other {Kan frigjøre # filer ({size}).}}"
+msgid "{fileCount, plural, one {Can clear # file ({size}).} other {Can clear # files ({size}).}}"
+msgstr ""
 
 #: src/content/caches.ts
 #, fuzzy
@@ -4021,6 +4032,10 @@ msgstr "{lines, plural, one {# linje} other {# linjer}}"
 #, fuzzy
 msgid "{list}, because the substitutes cover different ground."
 msgstr "{list}, fordi erstatningene dekker ulikt terreng."
+
+#: src/content/pages/StorageSection.tsx
+msgid "{lists} for {replays}"
+msgstr ""
 
 #: src/multiplayer/battle/BattleGameCard.tsx
 #, fuzzy
@@ -6201,9 +6216,8 @@ msgid "{replacedCount, plural, one {replaced # blueprint} other {replaced # blue
 msgstr "{replacedCount, plural, one {erstattet # blåkopi} other {erstattet # blåkopier}}"
 
 #: src/content/pages/components/BulkDeleteReplaysPanel.tsx
-#, fuzzy
-msgid "{replayCount, plural, one {Pick a filter. This root has # replay.} other {Pick a filter. This root has # replays.}}"
-msgstr "{replayCount, plural, one {Velg et filter. Denne mappen har # reprise.} other {Velg et filter. Denne mappen har # repriser.}}"
+msgid "{replayCount, plural, one {Pick a filter. This folder has # replay.} other {Pick a filter. This folder has # replays.}}"
+msgstr ""
 
 #: src/downloads/downloadGame.ts
 #, fuzzy
@@ -6424,11 +6438,6 @@ msgstr "{serverName} avviste innloggingen for {username}"
 #, fuzzy
 msgid "{serverName} refused the password for {username}"
 msgstr "{serverName} avviste passordet for {username}"
-
-#: src/content/pages/StorageSection.tsx
-#, fuzzy
-msgid "{sets, plural, one {# unit list is} other {# unit lists are}} kept for {replays, plural, one {# replay} other {# replays}}, using {size}. They let a replay name its units after its game is updated or removed, and each goes when the last replay that uses it is deleted."
-msgstr "{sets, plural, one {# enhetsliste er} other {# enhetslister er}} lagret for {replays, plural, one {# reprise} other {# repriser}}, og bruker {size}. De lar en reprise navngi enhetene sine etter at spillet er oppdatert eller fjernet, og hver fjernes når den siste reprisen som bruker den, slettes."
 
 #: src/animation/pages/Bos2LuaPage.tsx
 #: src/animation/pages/CobPage.tsx
@@ -7765,9 +7774,8 @@ msgid "{used} is already used to: {name}"
 msgstr "{used} brukes allerede til: {name}"
 
 #: src/content/pages/components/ReplayTracksStorage.tsx
-#, fuzzy
-msgid "{usedSize} used of {limitSize}"
-msgstr "{usedSize} brukt av {limitSize}"
+msgid "{usedSize} used of {limitSize}, {trackCount}"
+msgstr ""
 
 #: src/multiplayer/chat/ConversationSidebar.tsx
 #: src/multiplayer/store.tsx
@@ -9829,6 +9837,10 @@ msgstr "En enhetsdefinisjon som coilbox ikke har registrert at det skrev, fantes
 msgid "A unit is already called {name} or {unitName}. Choose another roster name."
 msgstr "En enhet heter allerede {name} eller {unitName}. Velg et annet troppnavn."
 
+#: src/content/pages/StorageSection.tsx
+msgid "A unit list lets a replay name its units after its game is updated or removed. One is kept the first time a replay's build orders are read, or when a replay is analysed."
+msgstr ""
+
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #, fuzzy
 msgid "A unit render or emblem, for example. Image transparency is kept; a video loops muted."
@@ -10059,6 +10071,10 @@ msgstr ""
 msgid "About banking"
 msgstr "Om krenging"
 
+#: src/content/pages/StorageSection.tsx
+msgid "About caches"
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
 msgid "About calling a function"
@@ -10073,6 +10089,10 @@ msgstr "Om å klikke på hver del"
 #, fuzzy
 msgid "About Coilbox"
 msgstr "Om Coilbox"
+
+#: src/content/pages/StorageSection.tsx
+msgid "About deleting replays"
+msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -10140,6 +10160,10 @@ msgstr ""
 #, fuzzy
 msgid "About replay tracks"
 msgstr "Om reprisespor"
+
+#: src/content/pages/StorageSection.tsx
+msgid "About replay unit lists"
+msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -14021,6 +14045,14 @@ msgstr "gren"
 msgid "Branded"
 msgstr "Med merkevare"
 
+#: src/content/storageLabels.ts
+msgid "Branding catalog"
+msgstr ""
+
+#: src/content/storageLabels.ts
+msgid "Branding images"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "Break"
@@ -14717,11 +14749,6 @@ msgstr "Etter enhet"
 #, fuzzy
 msgid "Caches"
 msgstr "Hurtigbuffere"
-
-#: src/content/caches.ts
-#, fuzzy
-msgid "Caches are already empty - nothing to reclaim."
-msgstr "Hurtigbufferne er allerede tomme – ingenting å frigjøre."
 
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
@@ -16134,6 +16161,7 @@ msgstr "Opprydding…"
 #: src/blueprint/pages/components/EquivalentsPanel.tsx
 #: src/blueprint/pages/components/LeavingPack.tsx
 #: src/content/pages/components/DateFilter.tsx
+#: src/content/pages/components/ReclaimCachesButton.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/MeasureReadout.tsx
 #: src/multiplayer/NoteButton.tsx
@@ -16178,6 +16206,10 @@ msgstr "Fjern alle spor"
 #, fuzzy
 msgid "Clear ally {letter}'s start box"
 msgstr "Tøm startområdet til alliert {letter}"
+
+#: src/content/pages/components/ReclaimCachesButton.tsx
+msgid "Clear caches"
+msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 #: src/hub/pages/BrowsePage.tsx
@@ -16831,6 +16863,10 @@ msgstr "Coilbox kunne ikke se om du er logget inn."
 #, fuzzy
 msgid "Coilbox could not write your widget settings for {game}"
 msgstr "Coilbox kunne ikke skrive widgetinnstillingene dine for {game}"
+
+#: src/content/pages/StorageSection.tsx
+msgid "Coilbox data"
+msgstr ""
 
 #: src/hub/pages/ItemPage.tsx
 #, fuzzy
@@ -17979,12 +18015,12 @@ msgid "Contains a semicolon"
 msgstr "Inneholder et semikolon"
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
-#: src/content/pages/StorageSection.tsx
 #, fuzzy
 msgid "Content"
 msgstr "Innhold"
 
 #: src/content/index.ts
+#: src/content/pages/StorageSection.tsx
 #, fuzzy
 msgid "Content folders"
 msgstr "Innholdsmapper"
@@ -20120,6 +20156,10 @@ msgstr "Slett punkt"
 msgid "Delete preset"
 msgstr "Slett forhåndsinnstilling"
 
+#: src/content/pages/StorageSection.tsx
+msgid "Delete replays"
+msgstr ""
+
 #: src/startbox/StartBoxPresetsPopover.tsx
 #, fuzzy
 msgid "Delete saved layout {number}"
@@ -20149,11 +20189,6 @@ msgstr "Slett varselet for {description}"
 #, fuzzy
 msgid "Delete the empty replays that games left when they did not finish recording"
 msgstr "Slett de tomme reprisene spill etterlot da de ikke fullførte opptaket"
-
-#: src/content/pages/components/BulkDeleteReplaysPanel.tsx
-#, fuzzy
-msgid "Delete the matching replays"
-msgstr "Slett reprisene som passer"
 
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
@@ -20224,6 +20259,10 @@ msgstr "Slett denne samlingen. Undersamlingene flyttes opp til dens egen forelde
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 msgid "Delete this copy? It cannot be undone."
+msgstr ""
+
+#: src/content/pages/components/DeleteEngineButton.tsx
+msgid "Delete this engine"
 msgstr ""
 
 #: src/content/pages/components/DeleteReplayButton.tsx
@@ -22310,6 +22349,7 @@ msgstr "Ukjent motor"
 
 #: src/content/index.ts
 #: src/content/pages/StorageSection.tsx
+#: src/content/storageLabels.ts
 #, fuzzy
 msgid "Engines"
 msgstr "Motorer"
@@ -22548,6 +22588,10 @@ msgstr "Alle installerte motorer er prøvd, og ingen gjenskapte kampen. Velg en 
 #, fuzzy
 msgid "Every installed game is up to date."
 msgstr "Alle installerte spill er oppdatert."
+
+#: src/content/pages/StorageSection.tsx
+msgid "Every launch uses this engine. Set another as preferred on the Engines page to delete it."
+msgstr ""
 
 #: src/content/pages/components/MatchStatsChart.tsx
 #, fuzzy
@@ -23139,6 +23183,10 @@ msgstr "Fraksjonsemblem"
 msgid "Faction for the new AI"
 msgstr "Fraksjon for den nye KI-en"
 
+#: src/content/storageLabels.ts
+msgid "Faction logos"
+msgstr ""
+
 #. placeholder {0}: describeError(e)
 #: src/hub/assets/pictureSweep.ts
 #, fuzzy
@@ -23394,7 +23442,6 @@ msgid "File size"
 msgstr "Filstørrelse"
 
 #: src/content/mapCompatReport.ts
-#: src/content/pages/StorageSection.tsx
 #, fuzzy
 msgid "Files"
 msgstr "Filer"
@@ -23586,9 +23633,8 @@ msgid "Finding maps…"
 msgstr "Leter etter kart…"
 
 #: src/content/pages/StorageSection.tsx
-#, fuzzy
-msgid "Finish or cancel downloads before reclaiming space"
-msgstr "Fullfør eller avbryt nedlastinger før du frigjør plass"
+msgid "Finish or cancel downloads first"
+msgstr ""
 
 #: src/hub/pages/components/HeaderAccount.tsx
 #: src/onboarding/pages/HubPage.tsx
@@ -24814,6 +24860,10 @@ msgstr "Spill-KI-er (Lua)"
 msgid "Game and engine not installed"
 msgstr "Spill og motor ikke installert"
 
+#: src/content/storageLabels.ts
+msgid "Game and map info"
+msgstr ""
+
 #: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Game and map not installed"
@@ -24858,6 +24908,10 @@ msgstr "Spill for det dekodede prosjektet"
 #, fuzzy
 msgid "Game for the new project"
 msgstr "Spill for det nye prosjektet"
+
+#: src/content/storageLabels.ts
+msgid "Game headers"
+msgstr ""
 
 #: src/content/matchStatsImage.ts
 #, fuzzy
@@ -25067,6 +25121,7 @@ msgstr "spill"
 #: src/content/pages/MatchupPage.tsx
 #: src/content/pages/PlayerDossierPage.tsx
 #: src/content/pages/StatsPage.tsx
+#: src/content/storageLabels.ts
 #: src/lego/pages/ProjectsPage.tsx
 #: src/packs/pages/components/ExportPackForm.tsx
 #, fuzzy
@@ -25183,11 +25238,6 @@ msgstr "generert himmel"
 #, fuzzy
 msgid "Generated test game"
 msgstr "Generert testspill"
-
-#: src/content/pages/StorageSection.tsx
-#, fuzzy
-msgid "Generated thumbnails, headers, icons and branding art. All regenerate on demand, so clearing them only frees disk space."
-msgstr "Genererte miniatyrbilder, toppbilder, ikoner og merkevaregrafikk. Alt lages på nytt ved behov, så å tømme dem frigjør bare diskplass."
 
 #: src/mapconv/pages/components/AssetPreview.tsx
 #, fuzzy
@@ -30709,6 +30759,14 @@ msgstr "Kartstørrelser"
 msgid "Map style"
 msgstr "Kartstil"
 
+#: src/content/storageLabels.ts
+msgid "Map thumbnails"
+msgstr ""
+
+#: src/content/pages/StorageSection.tsx
+msgid "Map thumbnails, game headers, unit icons and branding art. Coilbox makes them again when it needs them, so clearing them only frees disk space."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapCard.tsx
 #, fuzzy
 msgid "Map view"
@@ -30787,6 +30845,7 @@ msgstr "kart"
 #: src/content/pages/components/MapNotInstalled.tsx
 #: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/MapsPage.tsx
+#: src/content/storageLabels.ts
 #: src/packs/pages/components/ExportPackForm.tsx
 #, fuzzy
 msgid "Maps"
@@ -31129,6 +31188,10 @@ msgstr "Mål mellom to punkter"
 #, fuzzy
 msgid "Measure between two points ({measureKey})"
 msgstr "Mål mellom to punkter ({measureKey})"
+
+#: src/content/pages/StorageSection.tsx
+msgid "Measure the folders again"
+msgstr ""
 
 #: src/lego/pages/components/AimPointPanel.tsx
 #, fuzzy
@@ -33321,9 +33384,8 @@ msgid "No content folders found yet. Rescan to detect standard locations, or add
 msgstr "Fant ingen innholdsmapper ennå. Skann på nytt for å finne standardplasseringer, eller legg til en manuelt."
 
 #: src/content/pages/StorageSection.tsx
-#, fuzzy
-msgid "No content folders to measure yet. Add one in Content folders."
-msgstr "Ingen innholdsmapper å måle ennå. Legg til en under Innholdsmapper."
+msgid "No content folders to measure yet. Add one in <0>Content folders</0>."
+msgstr ""
 
 #: src/content/pages/components/PlayerMatchFigures.tsx
 #, fuzzy
@@ -34438,15 +34500,14 @@ msgstr "Fant ingen repriser. Se på et spill, eller legg .sdfz-filer i demos-map
 msgid "No replays in “{activeSetName}” match the filters."
 msgstr "Ingen repriser i «{activeSetName}» passer til filtrene."
 
+#: src/content/pages/StorageSection.tsx
+msgid "No replays in your content folders."
+msgstr ""
+
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "No replays match “{filterText}”."
 msgstr "Ingen repriser passer til «{filterText}»."
-
-#: src/content/pages/components/BulkDeleteReplaysPanel.tsx
-#, fuzzy
-msgid "No replays match the filters"
-msgstr "Ingen repriser passer til filtrene"
 
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
@@ -34896,11 +34957,6 @@ msgstr "Ingen enhet i dette spillet tegnes med denne modellen, så den er et kar
 msgid "No unit limit"
 msgstr "Ingen enhetsgrense"
 
-#: src/content/pages/StorageSection.tsx
-#, fuzzy
-msgid "No unit lists are kept yet. One is kept the first time a replay's build orders are read against its installed game, or when a replay is analysed."
-msgstr "Ingen enhetslister er lagret ennå. En lagres første gang byggeordrene i en reprise leses mot det installerte spillet, eller når en reprise analyseres."
-
 #: src/workshop/pages/components/UnitList.tsx
 #, fuzzy
 msgid "No unit matches \"\"."
@@ -35110,6 +35166,10 @@ msgstr "fant ingen"
 
 #: src/play/pages/components/EngineOverrideField.tsx
 msgid "none installed"
+msgstr ""
+
+#: src/content/pages/StorageSection.tsx
+msgid "None kept yet"
 msgstr ""
 
 #: src/lego/pages/components/ImportResult.tsx
@@ -37223,6 +37283,14 @@ msgstr "Åpne oppsett"
 msgid "Open slot"
 msgstr "Åpen plass"
 
+#: src/content/pages/StorageSection.tsx
+msgid "Open the {name} folder"
+msgstr ""
+
+#: src/content/pages/StorageSection.tsx
+msgid "Open the {version} folder"
+msgstr ""
+
 #: src/deeplink/actions.ts
 #, fuzzy
 msgid "Open the battle list."
@@ -37238,10 +37306,12 @@ msgid "Open the build the hub has"
 msgstr ""
 
 #: src/content/pages/components/EngineRow.tsx
+#: src/content/pages/StorageSection.tsx
 msgid "Open the engine's folder"
 msgstr ""
 
 #: src/content/pages/components/FolderRow.tsx
+#: src/content/pages/StorageSection.tsx
 msgid "Open the folder"
 msgstr ""
 
@@ -37681,6 +37751,7 @@ msgstr "annet"
 #: src/content/pages/components/ArchiveTypeBadge.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/content/storageLabels.ts
 #: src/runlite/pages/components/ArsenalOverlay.tsx
 #, fuzzy
 msgid "Other"
@@ -38526,6 +38597,10 @@ msgstr "Velg en variabel for {label}"
 #, fuzzy
 msgid "Pick a weapon"
 msgstr "Velg et våpen"
+
+#: src/content/pages/StorageSection.tsx
+msgid "Pick an age or tick a box to choose replays, then delete them in one go. Each filter narrows the choice further. Coilbox shows the total before anything is deleted."
+msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
 #, fuzzy
@@ -39378,6 +39453,7 @@ msgid "Pre-seed accounts so a load test can run with registration off."
 msgstr "Opprett kontoer på forhånd slik at en belastningstest kan kjøre med registrering av."
 
 #: src/content/pages/components/EngineRow.tsx
+#: src/content/pages/StorageSection.tsx
 #, fuzzy
 msgid "Preferred"
 msgstr "Foretrukket"
@@ -40265,6 +40341,10 @@ msgstr "Rapid-indeks {refreshed} fra {hosts}"
 msgid "Rapid package"
 msgstr "Rapid-pakke"
 
+#: src/content/storageLabels.ts
+msgid "Rapid pool"
+msgstr ""
+
 #: src/downloads/index.ts
 #: src/downloads/pages/ExplorerPage.tsx
 #: src/downloads/pages/SettingsSection.tsx
@@ -40943,17 +41023,11 @@ msgstr "mottatt"
 msgid "Recent"
 msgstr "Nylig"
 
-#: src/content/pages/components/ReclaimCachesButton.tsx
 #: src/content/pages/components/ReclaimSpaceButton.tsx
 #: src/scenario/pages/components/ReclaimClipsForm.tsx
 #, fuzzy
 msgid "Reclaim"
 msgstr "Frigjør"
-
-#: src/content/pages/components/ReclaimCachesButton.tsx
-#, fuzzy
-msgid "Reclaim caches"
-msgstr "Frigjør hurtigbuffere"
 
 #: src/scenario/pages/ScenarioBuilderPage.tsx
 #, fuzzy
@@ -40964,16 +41038,6 @@ msgstr "Frigjør klipp"
 #, fuzzy
 msgid "Reclaim dialogue clips"
 msgstr "Frigjør replikklipp"
-
-#: src/content/pages/components/ReclaimSpaceButton.tsx
-#, fuzzy
-msgid "Reclaim orphaned rapid pool data"
-msgstr "Frigjør foreldreløse data i rapid-poolen"
-
-#: src/content/pages/components/ReclaimSpaceButton.tsx
-#, fuzzy
-msgid "Reclaim space"
-msgstr "Frigjør plass"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -41708,6 +41772,10 @@ msgstr "Fjern mål {position}"
 msgid "Remove operator"
 msgstr "Fjern operatør"
 
+#: src/content/pages/components/ReclaimSpaceButton.tsx
+msgid "Remove pool files no package uses"
+msgstr ""
+
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Remove server"
@@ -42150,11 +42218,6 @@ msgstr "Reprisens alder"
 msgid "Replay analysis is turned off in this distribution."
 msgstr "Repriseanalyse er slått av i denne distribusjonen."
 
-#: src/content/pages/StorageSection.tsx
-#, fuzzy
-msgid "Replay cleanup"
-msgstr "Opprydding i repriser"
-
 #: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
 msgid "Replay deleted"
@@ -42169,6 +42232,10 @@ msgstr "Reprisefakta"
 #, fuzzy
 msgid "Replay map"
 msgstr "Reprisekart"
+
+#: src/content/storageLabels.ts
+msgid "Replay map pictures"
+msgstr ""
 
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
@@ -42200,6 +42267,10 @@ msgstr "Reprisespor"
 msgid "Replay unit lists"
 msgstr "Enhetslister for repriser"
 
+#: src/content/storageLabels.ts
+msgid "Replay unit totals"
+msgstr ""
+
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "replays"
@@ -42210,6 +42281,7 @@ msgstr "repriser"
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/content/pages/ReplaysPage.tsx
 #: src/content/pages/StatsPage.tsx
+#: src/content/storageLabels.ts
 #: src/play/index.ts
 #, fuzzy
 msgid "Replays"
@@ -42742,30 +42814,10 @@ msgstr "Tilbake til kartet"
 msgid "Return to the running match"
 msgstr "Tilbake til kampen som pågår"
 
-#: src/content/pages/StorageSection.tsx
-#, fuzzy
-msgid "Reveal {categoryLabel} folder"
-msgstr "Vis {categoryLabel}-mappen"
-
-#: src/content/pages/StorageSection.tsx
-#, fuzzy
-msgid "Reveal {enginePath}"
-msgstr "Vis {enginePath}"
-
-#: src/content/pages/StorageSection.tsx
-#, fuzzy
-msgid "Reveal {firstPath}"
-msgstr "Vis {firstPath}"
-
 #: src/content/pages/components/DuplicateContent.tsx
 #, fuzzy
 msgid "Reveal {folder}"
 msgstr "Vis {folder}"
-
-#: src/content/pages/StorageSection.tsx
-#, fuzzy
-msgid "Reveal in file manager"
-msgstr "Vis i filbehandleren"
 
 #: src/animation/pages/CobPage.tsx
 #, fuzzy
@@ -42776,11 +42828,6 @@ msgstr "Vis i mappe"
 #, fuzzy
 msgid "Reveal sidebar"
 msgstr "Vis sidepanelet"
-
-#: src/content/pages/StorageSection.tsx
-#, fuzzy
-msgid "Reveal the {engineVersion} folder"
-msgstr "Vis {engineVersion}-mappen"
 
 #. placeholder {0}: copy.path
 #: src/content/pages/components/DuplicateContent.tsx
@@ -43667,6 +43714,10 @@ msgstr "Lagret spill"
 #, fuzzy
 msgid "savegames"
 msgstr "lagrede spill"
+
+#: src/content/storageLabels.ts
+msgid "Saves"
+msgstr ""
 
 #: src/content/pages/components/MatchStatsImageButton.tsx
 #, fuzzy
@@ -46452,7 +46503,6 @@ msgstr "Seks bein"
 #: src/content/pages/components/ArchiveModelPreview.tsx
 #: src/content/pages/components/UnitModelPanel.tsx
 #: src/content/pages/GameUnitPage.tsx
-#: src/content/pages/StorageSection.tsx
 #: src/lego/pages/components/CollisionPanel.tsx
 #: src/lego/pages/components/DetailPanel.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
@@ -46468,11 +46518,6 @@ msgstr "Størrelse"
 #, fuzzy
 msgid "Size {sizeText}"
 msgstr "Størrelse {sizeText}"
-
-#: src/content/pages/components/ReclaimCachesButton.tsx
-#, fuzzy
-msgid "Size and clear the generated-image and info caches"
-msgstr "Mål og tøm hurtigbufferne for genererte bilder og info"
 
 #: src/lego/pages/components/BuildPictureDrawer.tsx
 #, fuzzy
@@ -49225,6 +49270,10 @@ msgstr "Bytene i filen, seksten per linje."
 #, fuzzy
 msgid "The bytes that were written, sixteen to a line."
 msgstr "Bytene som ble skrevet, seksten per linje."
+
+#: src/content/caches.ts
+msgid "The caches are already empty."
+msgstr ""
 
 #: src/conquest/pages/GalaxyPage.tsx
 #, fuzzy
@@ -52408,6 +52457,10 @@ msgstr "Disse teksturene er for store for en kode eller finnes ikke i Coilboxs t
 msgid "They are no longer one of your friends."
 msgstr "Vedkommende er ikke lenger en av vennene dine."
 
+#: src/content/pages/StorageSection.tsx
+msgid "They are not a cache. Each goes when the last replay that uses it is deleted."
+msgstr ""
+
 #: src/direct/share.ts
 #, fuzzy
 msgid "They can join this room and chat. They cannot start the game, because the room gives everybody in it {announced}, which nothing outside your network can dial."
@@ -53056,11 +53109,6 @@ msgstr "Dette er for stort til å deles. Coilbox ville nektet å importere det."
 #, fuzzy
 msgid "This is your own account"
 msgstr "Dette er din egen konto"
-
-#: src/content/pages/StorageSection.tsx
-#, fuzzy
-msgid "This is your preferred engine, the one every launch uses. Set another as preferred first."
-msgstr "Dette er den foretrukne motoren din, den hver oppstart bruker. Sett en annen som foretrukket først."
 
 #: src/deeplink/parse.ts
 #, fuzzy
@@ -54273,6 +54321,10 @@ msgstr "Tidevannsproduksjon"
 #, fuzzy
 msgid "Tidal strength"
 msgstr "Tidevannsstyrke"
+
+#: src/content/pages/components/ReclaimSpaceButton.tsx
+msgid "Tidy rapid pool"
+msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
 #, fuzzy
@@ -55526,6 +55578,10 @@ msgstr "Enhet {def}"
 msgid "unit {place}"
 msgstr "enhet {place}"
 
+#: src/content/storageLabels.ts
+msgid "Unit build icons"
+msgstr ""
+
 #: src/lego/index.ts
 #, fuzzy
 msgid "unit builder"
@@ -55626,6 +55682,10 @@ msgstr "enhetsplassering"
 #, fuzzy
 msgid "Unit reference"
 msgstr "Enhetsreferanse"
+
+#: src/content/storageLabels.ts
+msgid "Unit renders"
+msgstr ""
 
 #: src/content/engineSettingText.ts
 msgid "Unit reply volume"

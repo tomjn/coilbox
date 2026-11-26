@@ -1,9 +1,9 @@
 import { plural } from "@lingui/core/macro";
-import { Plural, Trans, useLingui } from "@lingui/react/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
-import { CircleHelp, Loader2, Trash2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { Field } from "@/components/Field";
+import { SettingRow } from "@/components/SettingRow";
 import {
   Popover,
   PopoverContent,
@@ -26,7 +26,7 @@ const msg = (e: unknown): string => describeError(e);
 
 /**
  * What recorded tracks take on disk, the limit on it, and a button that
- * removes them all (#3787).
+ * removes them all (#3787). Two `<SettingRow>`s, for a `<SettingList>`.
  *
  * The total comes from the same answer as the replay badges, so the two agree.
  * Lowering the limit removes nothing by itself: the next recording that is
@@ -59,94 +59,69 @@ export function ReplayTracksStorage() {
   const limitSize = budgetBytes === null ? "..." : formatBytes(budgetBytes);
   const over = budgetBytes !== null && totalBytes > budgetBytes;
 
+  const trackCount = plural(tracks.size, { one: "# track", other: "# tracks" });
+  const summary = t`${usedSize} used of ${limitSize}, ${trackCount}`;
+
   return (
-    <section className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-1">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            <Trans>Replay tracks</Trans>
-          </h2>
-          <TracksHelp />
-        </div>
+    <>
+      <SettingRow
+        label={t`Replay tracks`}
+        description={summary}
+        error={over ? t`Over the limit until the next recording` : null}
+        help={<TracksHelp />}
+        helpLabel={t`About replay tracks`}
+      >
         <ClearTracksButton count={tracks.size} bytes={totalBytes} />
-      </div>
-      <p className="flex flex-wrap items-baseline gap-x-2 text-sm tabular-nums">
-        <span>
-          <Trans>
-            {usedSize} used of {limitSize}
-          </Trans>
-        </span>
-        <span className="text-muted-foreground">
-          <Plural value={tracks.size} one="# track" other="# tracks" />
-        </span>
-        {over && (
-          <span className="text-destructive">
-            <Trans>Over the limit until the next recording</Trans>
-          </span>
-        )}
-      </p>
-      <div className="max-w-xs">
-        <Field label={t`Disk space for tracks (MB)`}>
-          <Input
-            type="number"
-            inputMode="numeric"
-            min={1}
-            step={1}
-            disabled={budgetBytes === null}
-            value={shown}
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={commit}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") commit();
-            }}
-          />
-        </Field>
-      </div>
-    </section>
+      </SettingRow>
+      <SettingRow
+        id="replay-track-budget"
+        label={t`Disk space for tracks (MB)`}
+      >
+        <Input
+          id="replay-track-budget"
+          className="w-28"
+          type="number"
+          inputMode="numeric"
+          min={1}
+          step={1}
+          disabled={budgetBytes === null}
+          value={shown}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+          }}
+        />
+      </SettingRow>
+    </>
   );
 }
 
+/** What the help popover beside "Replay tracks" says. */
 function TracksHelp() {
-  const { t } = useLingui();
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-6 shrink-0 text-muted-foreground"
-          aria-label={t`About replay tracks`}
-        >
-          <CircleHelp className="size-3.5" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        align="start"
-        aria-label={t`About replay tracks`}
-        className="flex w-96 max-w-[calc(100vw-2rem)] flex-col gap-2 p-3 text-xs"
-      >
-        <p>
-          <Trans>
-            A track is a recording of a replay's match. It can always be made
-            again from the replay.
-          </Trans>
-        </p>
-        <p>
-          <Trans>
-            When a new track is stored and the tracks take more than the limit,
-            the least recently watched are removed until they fit. Tracks that
-            are out of date go first. The new track is never removed, so a track
-            larger than the limit is kept and every other one goes.
-          </Trans>
-        </p>
-        <p>
-          <Trans>
-            Lowering the limit removes nothing by itself. It applies when the
-            next track is stored.
-          </Trans>
-        </p>
-      </PopoverContent>
-    </Popover>
+    <>
+      <p>
+        <Trans>
+          A track is a recording of a replay's match. It can always be made
+          again from the replay.
+        </Trans>
+      </p>
+      <p>
+        <Trans>
+          When a new track is stored and the tracks take more than the limit,
+          the least recently watched are removed until they fit. Tracks that are
+          out of date go first. The new track is never removed, so a track
+          larger than the limit is kept and every other one goes.
+        </Trans>
+      </p>
+      <p>
+        <Trans>
+          Lowering the limit removes nothing by itself. It applies when the next
+          track is stored.
+        </Trans>
+      </p>
+    </>
   );
 }
 
