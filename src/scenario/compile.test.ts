@@ -624,6 +624,25 @@ describe("a group's start state", () => {
   });
 });
 
+describe("a group's name", () => {
+  const group = {
+    id: "wave",
+    team: "ai",
+    units: [{ def: "armpw", count: 1 }],
+    pos: { x: 1, z: 1 },
+    orders: [],
+    dormant: false,
+  };
+
+  it("stays in the editor, so naming a group changes nothing emitted", () => {
+    const named = compileScenario(
+      build({ groups: [{ ...group, name: "Ridge patrol" }] }),
+    );
+
+    expect(named).toBe(compileScenario(build({ groups: [group] })));
+  });
+});
+
 describe("a hunt order", () => {
   const group = {
     id: "hunters",

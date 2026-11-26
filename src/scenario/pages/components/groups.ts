@@ -381,13 +381,25 @@ export function drapePoints(
  * author can read, so everything that offers one offers a name instead.
  * -------------------------------------------------------------------------- */
 
-/** What a group is called: its place in the document, which is the only thing
- *  distinguishing two groups of the same units. */
-export function groupLabel(groups: ScenarioGroup[], id: string): string {
-  const at = groups.findIndex((group) => group.id === id);
-  if (at < 0) return t`a group that is gone`;
+/** What a group with no name of its own is called: its place in the document,
+ *  counting from one. */
+export function unnamedGroupLabel(at: number): string {
   const position = at + 1;
   return t`Group ${position}`;
+}
+
+/** What each group is called: the name its author gave it, or its place in the
+ *  document, made unique when two share a name. */
+export function groupLabels(groups: ScenarioGroup[]): string[] {
+  return uniqueLabels(
+    groups.map((group, at) => group.name?.trim() || unnamedGroupLabel(at)),
+  );
+}
+
+/** What one group is called, as {@link groupLabels} calls it. */
+export function groupLabel(groups: ScenarioGroup[], id: string): string {
+  const at = groups.findIndex((group) => group.id === id);
+  return at < 0 ? t`a group that is gone` : groupLabels(groups)[at];
 }
 
 /**
@@ -474,7 +486,8 @@ export function buildingTargets(
  * cannot guard itself.
  *
  * An actor goes by its display name when it has one, because a named character
- * is exactly the sort of thing a mission tells a group to escort.
+ * is exactly the sort of thing a mission tells a group to escort. A group goes
+ * by its name as {@link groupLabels} reads it.
  */
 export function targetOptions(
   scenario: Pick<Scenario, "actors" | "groups" | "bases" | "blueprints">,
@@ -499,11 +512,9 @@ export function targetOptions(
       description: t`building · ${def}`,
     };
   });
+  const names = groupLabels(scenario.groups);
   const groups = scenario.groups
-    .map((group) => ({
-      group,
-      label: groupLabel(scenario.groups, group.id),
-    }))
+    .map((group, i) => ({ group, label: names[i] }))
     .filter(({ group }) => group.id !== exceptGroup)
     .map(({ group, label }) => {
       const units = groupSize(group);

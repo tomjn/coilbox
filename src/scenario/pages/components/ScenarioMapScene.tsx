@@ -60,6 +60,7 @@ import {
   pathLineKey,
   removeGroup,
   targetOptions,
+  unnamedGroupLabel,
 } from "./groups";
 import { type MapStep, type MapThings, moveOnMap } from "./mapKeyboard";
 import { EDITOR_MODES, ZONES_MODE_ID } from "./modes";
@@ -566,6 +567,7 @@ export const ScenarioMapScene = forwardRef<
     <GroupControls
       key={pickedGroup.id}
       group={pickedGroup}
+      fallbackName={unnamedGroupLabel(scenario.groups.indexOf(pickedGroup))}
       participants={teamOwners(scenario)}
       units={gameUnits.units}
       unitsLoading={gameUnits.loading}

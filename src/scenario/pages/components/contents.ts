@@ -25,7 +25,7 @@ import {
 } from "../../model";
 import {
   baseLabels,
-  groupLabel,
+  groupLabels,
   groupSize,
   parsePathKey,
   uniqueLabels,
@@ -100,8 +100,8 @@ function baseSpan(
  * actors, then groups, then bases, then zones.
  *
  * An actor goes by its display name when it has one, the way every other picker
- * in the editor offers one, and a group by its place in the document, which is
- * the only thing telling two of the same apart. A base goes by the layout it
+ * in the editor offers one, and a group by its name as `groupLabels` reads it,
+ * which is its place in the document until it has one. A base goes by the layout it
  * places (issue #1423), numbered only when two bases place the same one. A
  * zone goes by the name it was given, which is what a trigger names it by.
  *
@@ -129,11 +129,12 @@ export function sceneContents(
     span: 0,
     team: actor.team,
   }));
-  const groups = scenario.groups.map<ContentEntry>((group) => ({
+  const groupNames = groupLabels(scenario.groups);
+  const groups = scenario.groups.map<ContentEntry>((group, i) => ({
     key: placementKey("group", group.id, 0),
     kind: "group",
     id: group.id,
-    label: groupLabel(scenario.groups, group.id),
+    label: groupNames[i],
     detail: groupDetail(group),
     pos: group.pos,
     span: groupSpan(group),

@@ -155,6 +155,10 @@ export type GroupUnit = { def: string; count: number };
 /** A block of units spawned and ordered together, addressed by one id. */
 export type ScenarioGroup = {
   id: string;
+  /** What the editor's pickers call this group. The mission never carries it, so
+   *  nothing in game shows it. Absent is a group known by its place in the
+   *  list. */
+  name?: string;
   /** A `setup.participants` id. */
   team: string;
   units: GroupUnit[];
@@ -720,8 +724,10 @@ function parseGroup(g: Record<string, unknown>): ScenarioGroup | null {
   if (gid === undefined || team === undefined || !pos || !units || !orders) {
     return null;
   }
+  const name = str(g.name)?.trim();
   return {
     id: gid,
+    ...(name ? { name } : {}),
     team,
     units,
     pos,
