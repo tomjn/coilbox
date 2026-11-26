@@ -1,9 +1,8 @@
-import { Trans, useLingui } from "@lingui/react/macro";
+import { useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Loader2, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
+import { SettingRow } from "@/components/SettingRow";
 import {
   Select,
   SelectContent,
@@ -12,6 +11,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type {
   EngineConfigSetting,
   EngineConfigWriteResult,
@@ -32,7 +37,8 @@ import type {
  *
  * The committed value is owned by the parent (updated on a successful write).
  * The field keeps only a transient `draft` while editing, and reverts it if the
- * write fails. Label and control share the parent grid via `contents`.
+ * write fails. It is one `<SettingRow>`, so it goes in a `<SettingList>`, and
+ * its Reset button needs a `TooltipProvider` above it.
  */
 export function EngineSettingField({
   setting: s,
@@ -67,65 +73,58 @@ export function EngineSettingField({
     }
   }
 
-  const defaultValue = s.default || t`empty`;
-  const reset = writable && changed && (
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      className="h-7 gap-1 px-2 text-xs text-muted-foreground"
-      title={t`Reset to engine default (${defaultValue})`}
-      disabled={saving}
-      onClick={() => commit(s.default)}
-    >
-      <RotateCcw className="size-3" />
-      <Trans>Reset</Trans>
-    </Button>
-  );
-
-  const status = saving ? (
-    <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
-  ) : err ? (
-    <span className="truncate text-xs text-destructive" title={err}>
-      {err}
-    </span>
-  ) : null;
-
-  const label = (
-    <div className="flex flex-col gap-0.5 py-1">
-      <Label htmlFor={id} className="font-normal text-muted-foreground">
-        {s.label}
-      </Label>
-      {s.hint && (
-        <span className="text-xs leading-snug text-muted-foreground">
-          {s.hint}
-        </span>
-      )}
-    </div>
-  );
+  const defaultValue =
+    s.type === "enum"
+      ? (s.options?.find((o) => o.value === s.default)?.label ?? s.default)
+      : s.type === "bool"
+        ? s.default === "1"
+          ? t`On`
+          : t`Off`
+        : s.default || t`empty`;
+  const resetLabel = t`Reset to engine default (${defaultValue})`;
 
   return (
-    <div className="contents">
-      {label}
-      <div className="flex min-w-0 items-center gap-2">
-        <div className="flex min-w-0 flex-1 items-center">
-          <Control
-            setting={s}
-            id={id}
-            draft={draft}
-            setDraft={setDraft}
-            commit={commit}
-            disabled={disabled}
-          />
-        </div>
-        {/* Held open whether or not there is a Reset to put in it, so a row
-            that is at its default lines up with one that is not. */}
-        <div className="flex w-24 shrink-0 items-center justify-end gap-1">
-          {status}
-          {reset}
-        </div>
+    <SettingRow
+      id={id}
+      label={s.label}
+      helpLabel={t`About ${s.label}`}
+      help={s.hint && <p>{s.hint}</p>}
+      error={err}
+    >
+      <div className="flex w-56 min-w-0 items-center justify-end">
+        <Control
+          setting={s}
+          id={id}
+          draft={draft}
+          setDraft={setDraft}
+          commit={commit}
+          disabled={disabled}
+        />
       </div>
-    </div>
+      {/* Held open whether or not there is a Reset to put in it, so a row
+          that is at its default lines up with one that is not. */}
+      <div className="ml-1 flex size-8 shrink-0 items-center justify-center">
+        {saving ? (
+          <Loader2 className="size-4 animate-spin text-muted-foreground" />
+        ) : writable && changed ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground hover:text-foreground"
+                aria-label={resetLabel}
+                onClick={() => commit(s.default)}
+              >
+                <RotateCcw className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{resetLabel}</TooltipContent>
+          </Tooltip>
+        ) : null}
+      </div>
+    </SettingRow>
   );
 }
 
@@ -146,7 +145,7 @@ function Control({
 }) {
   if (s.type === "bool") {
     return (
-      <Checkbox
+      <Switch
         id={id}
         checked={s.value === "1"}
         disabled={disabled}
@@ -190,7 +189,7 @@ function Control({
     const current = Number(draft);
     const value = Number.isFinite(current) ? current : (s.min ?? 0);
     return (
-      <div className="flex min-w-0 flex-1 items-center gap-3">
+      <div className="flex w-full min-w-0 items-center gap-3">
         <Slider
           id={id}
           min={min}
@@ -215,6 +214,10 @@ function Control({
     <Input
       id={id}
       type={s.type === "number" ? "number" : "text"}
+      // Several of these are fractions, such as an edge scroll width of 0.02,
+      // which the default step of 1 would mark invalid.
+      step={s.type === "number" ? "any" : undefined}
+      className="w-full"
       value={draft}
       placeholder={s.default}
       min={s.min}

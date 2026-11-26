@@ -8572,6 +8572,10 @@ msgstr "Від 0 до 1."
 msgid "0 to 1. At 0, the unit misjudges target speed by up to double or half. At 1, it predicts speed perfectly. leadLimit can still cap how far it leads."
 msgstr "Від 0 до 1. При 0 юніт помиляється у швидкості цілі аж до подвійної чи половинної. При 1 він передбачає швидкість ідеально. leadLimit усе одно може обмежити упередження."
 
+#: src/content/engineSettingText.ts
+msgid "0 uses your desktop resolution."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "0.5 in each channel means no change; 1.0 is twice as bright."
@@ -8598,6 +8602,10 @@ msgstr "1 цілиться в ближній край об’єму зіткне
 msgid "1 to 2 hours"
 msgstr "Від 1 до 2 годин"
 
+#: src/content/engineSettingText.ts
+msgid "16 samples"
+msgstr ""
+
 #: src/content/libraryMaps.ts
 #: src/content/mapAggregate.ts
 #, fuzzy
@@ -8618,6 +8626,10 @@ msgstr "2 – Швидко"
 #, fuzzy
 msgid "2 — Fast (compare last N tiles)"
 msgstr "2 – Швидко (порівнювати останні N плиток)"
+
+#: src/content/engineSettingText.ts
+msgid "2 samples"
+msgstr ""
 
 #: src/mapconv/pages/SettingsSection.tsx
 #, fuzzy
@@ -8665,6 +8677,10 @@ msgstr "4 (висока якість, швидко) – добрий типов�
 msgid "4 corners"
 msgstr "4 кути"
 
+#: src/content/engineSettingText.ts
+msgid "4 samples"
+msgstr ""
+
 #: src/startbox/presets.ts
 #, fuzzy
 msgid "4 sides"
@@ -8689,6 +8705,10 @@ msgstr "65536 одиниць кута .cob – повний оберт."
 #, fuzzy
 msgid "65536 COB angle units is a full turn. Only used when turret is off."
 msgstr "65536 одиниць кута .cob – повний оберт. Використовується лише тоді, коли turret вимкнено."
+
+#: src/content/engineSettingText.ts
+msgid "8 samples"
+msgstr ""
 
 #: src/lego/pages/components/ImportResult.tsx
 #, fuzzy
@@ -9969,6 +9989,11 @@ msgstr "Покинути Шлях війни"
 msgid "Abandoning…"
 msgstr "Покидання…"
 
+#. placeholder {0}: s.label
+#: src/content/pages/components/EngineSettingField.tsx
+msgid "About {0}"
+msgstr ""
+
 #: src/multiplayer/relayPing.ts
 #, fuzzy
 msgid "About {ms} ms to the relay."
@@ -10419,6 +10444,10 @@ msgstr "актор або будівля"
 #, fuzzy
 msgid "Actors"
 msgstr "Актори"
+
+#: src/content/engineSettingText.ts
+msgid "Adaptive"
+msgstr ""
 
 #: src/content/pages/components/KeyBindingEditor.tsx
 #: src/lego/pages/components/BuildMenuSection.tsx
@@ -10892,6 +10921,10 @@ msgstr "Адміни"
 #, fuzzy
 msgid "Advanced"
 msgstr "Додатково"
+
+#: src/content/engineSettingText.ts
+msgid "Advanced map shading"
+msgstr ""
 
 #: src/mapconv/pages/CompilePage.tsx
 #: src/uberstress/pages/RunPage.tsx
@@ -11863,6 +11896,10 @@ msgstr "Відповідь дано: {spot}."
 #, fuzzy
 msgid "Anti-air"
 msgstr "Протиповітряна оборона"
+
+#: src/content/engineSettingText.ts
+msgid "Anti-aliasing"
+msgstr ""
 
 #: src/multiplayer/admin/ChannelsSection.tsx
 #, fuzzy
@@ -13164,6 +13201,10 @@ msgstr "базова назва для .smf/.smt (без розширення)"
 msgid "Bases"
 msgstr "Бази"
 
+#: src/content/engineSettingText.ts
+msgid "Basic"
+msgstr ""
+
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #, fuzzy
 msgid "battle"
@@ -13262,6 +13303,10 @@ msgstr "Пароль матчу"
 #, fuzzy
 msgid "Battle room"
 msgstr "Кімната"
+
+#: src/content/engineSettingText.ts
+msgid "Battle volume"
+msgstr ""
 
 #: src/conquest/pages/components/BattleOverlay.tsx
 #: src/conquest/pages/GalaxyPage.tsx
@@ -13725,6 +13770,10 @@ msgstr "Бонус"
 #, fuzzy
 msgid "Bonus for every AI"
 msgstr "Бонус для кожного ШІ"
+
+#: src/content/engineSettingText.ts
+msgid "Borderless window"
+msgstr ""
 
 #: src/animation/index.ts
 #: src/animation/pages/Bos2LuaPage.tsx
@@ -14490,6 +14539,10 @@ msgstr "Маркований список"
 msgid "Bumped from {bumpedFrom} automatically. Two players on different builds of the same name is a sync error, so the number always moves on rather than being typed in."
 msgstr "Автоматично піднято з {bumpedFrom}. Два гравці на різних збірках з однаковою назвою – це помилка синхронізації, тому номер завжди йде далі, а не вводиться вручну."
 
+#: src/content/engineSettingText.ts
+msgid "Bumpmapped"
+msgstr ""
+
 #: src/profile/health.ts
 #, fuzzy
 msgid "Bundle or download the game archive (.sdz/.sd7). {scanned}"
@@ -14627,6 +14680,10 @@ msgstr "Камера"
 msgid "Camera angle"
 msgstr "Кут камери"
 
+#: src/content/engineSettingText.ts
+msgid "Camera mode"
+msgstr ""
+
 #: src/content/index.ts
 #, fuzzy
 msgid "Camera mode, edge scrolling and the mouse."
@@ -14704,6 +14761,10 @@ msgstr "Завершені кампанії"
 #, fuzzy
 msgid "Campaigns guide"
 msgstr "Посібник із кампаній"
+
+#: src/content/engineSettingText.ts
+msgid "Can also be changed during a game."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -20719,6 +20780,10 @@ msgstr "Двері"
 msgid "Double click to fill the view"
 msgstr "Двічі клацніть, щоб заповнити вигляд"
 
+#: src/content/engineSettingText.ts
+msgid "Double-click time"
+msgstr ""
+
 #: src/challenge/SubstitutedMapNote.tsx
 #: src/content/pages/components/FilePreview.tsx
 #: src/content/pages/components/MapNotInstalled.tsx
@@ -21233,6 +21298,10 @@ msgstr "Малює слід на землі позаду юніта під ча�
 msgid "Draws the bones of the selected units in game."
 msgstr "Малює кістки вибраних юнітів у грі."
 
+#: src/content/engineSettingText.ts
+msgid "Draws the cursor outside the game, so it stays responsive at a low frame rate. Some drivers do not support it in fullscreen."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Draws the projectile even outside sight."
@@ -21380,6 +21449,14 @@ msgstr "Тривалість"
 #, fuzzy
 msgid "Duration: {duration}"
 msgstr "Тривалість: {duration}"
+
+#: src/content/engineSettingText.ts
+msgid "Dynamic"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Dynamic edge scroll"
+msgstr ""
 
 #: src/conquest/galaxy3d/GalaxyView.tsx
 #, fuzzy
@@ -21572,6 +21649,10 @@ msgstr "Економіка й міцність"
 #, fuzzy
 msgid "Edge"
 msgstr "Край"
+
+#: src/content/engineSettingText.ts
+msgid "Edge scroll width"
+msgstr ""
 
 #: src/campaign/index.ts
 #: src/campaign/pages/CampaignEditPage.tsx
@@ -23104,6 +23185,10 @@ msgstr "Якщо не задано, використовується розмі�
 msgid "Falls under gravity"
 msgstr "Падає під дією гравітації"
 
+#: src/content/engineSettingText.ts
+msgid "Fast, skipping terrain"
+msgstr ""
+
 #: src/content/replayMapView/timelineKeys.ts
 #, fuzzy
 msgid "Faster"
@@ -24060,6 +24145,10 @@ msgstr "Для юніта, що розвертається на місці, – 
 msgid "For Blender"
 msgstr "Для Blender"
 
+#: src/content/engineSettingText.ts
+msgid "For borderless fullscreen, turn this off and Borderless window on."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "For most weapons, base impulse equals the damage dealt. For melee weapons it's the attacker's mass instead."
@@ -24199,6 +24288,14 @@ msgstr "Чотири ноги"
 msgid "Four views ({key})"
 msgstr "Чотири вигляди ({key})"
 
+#: src/content/engineSettingText.ts
+msgid "FPS"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "FPS camera FOV"
+msgstr ""
+
 #: src/placement/PlacementSurface.tsx
 #, fuzzy
 msgid "Frame"
@@ -24265,6 +24362,7 @@ msgstr "Вписати мапу"
 msgid "Frame the selection"
 msgstr "Вписати виділене"
 
+#: src/content/engineSettingText.ts
 #: src/lego/pages/components/JoinedTo.tsx
 #, fuzzy
 msgid "Free"
@@ -24516,6 +24614,7 @@ msgstr "Передні колеса кермують"
 msgid "Fuchsia"
 msgstr "Фуксія"
 
+#: src/content/engineSettingText.ts
 #: src/lego/pages/components/ScanSkeletons.tsx
 #: src/multiplayer/battles/BattleFilterPopover.tsx
 #, fuzzy
@@ -24532,6 +24631,7 @@ msgstr "Уся межа (типово)"
 msgid "Full motion"
 msgstr "Повна анімація"
 
+#: src/content/engineSettingText.ts
 #: src/general/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Fullscreen"
@@ -24966,6 +25066,10 @@ msgstr "Збирання сценарію та його кліпів діало�
 msgid "General"
 msgstr "Загальне"
 
+#: src/content/engineSettingText.ts
+msgid "General volume"
+msgstr ""
+
 #: src/lego/pages/components/GenerateDrawer.tsx
 #: src/lego/pages/components/RosterDrawer.tsx
 #: src/lego/pages/ProjectsPage.tsx
@@ -25327,6 +25431,10 @@ msgstr "Земля"
 msgid "Ground ambient"
 msgstr "Фонове освітлення ґрунту"
 
+#: src/content/engineSettingText.ts
+msgid "Ground detail"
+msgstr ""
+
 #: src/mapconv/pages/components/MapinfoOptions.tsx
 #, fuzzy
 msgid "Ground diffuse"
@@ -25479,6 +25587,10 @@ msgstr "Кріпиться до"
 #, fuzzy
 msgid "Hard"
 msgstr "Складна"
+
+#: src/content/engineSettingText.ts
+msgid "Hardware cursor"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -25864,6 +25976,10 @@ msgstr "Сховати відомості про юніт"
 msgid "hideSettings id ''{id}'' matches nothing"
 msgstr "hideSettings id \"{id}\" ні з чим не збігається"
 
+#: src/content/engineSettingText.ts
+msgid "High (4096)"
+msgstr ""
+
 #: src/lego/pages/components/ShapeFields.tsx
 #, fuzzy
 msgid "High at back"
@@ -25883,6 +25999,10 @@ msgstr "Верхній кінець"
 #, fuzzy
 msgid "Higher is less accurate. 0 is perfect. Improves with the firing unit's experience."
 msgstr "Більше значення – менша точність. 0 – ідеальна. Покращується з досвідом юніта, що стріляє."
+
+#: src/content/engineSettingText.ts
+msgid "Higher is sharper and slower."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -26497,6 +26617,10 @@ msgstr "Скільки попереднього нахилу зберігати,
 #, fuzzy
 msgid "How much of the protected direction's ability to move builds up each frame, in the modes that let it move."
 msgstr "Скільки здатності до руху в захищеному напрямку накопичується щокадру в режимах, що дозволяють рух."
+
+#: src/content/engineSettingText.ts
+msgid "How much of the screen edge scrolls the camera, as a share of the screen."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -27133,6 +27257,10 @@ msgstr "У грі"
 #, fuzzy
 msgid "In game widget"
 msgstr "Віджет у грі"
+
+#: src/content/engineSettingText.ts
+msgid "In milliseconds."
+msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -29726,6 +29854,10 @@ msgstr "Спорядження"
 msgid "Loadouts"
 msgstr "Спорядження"
 
+#: src/content/engineSettingText.ts
+msgid "Lobbies replace this with your lobby name, so it shows up in replays and when the engine is started on its own."
+msgstr ""
+
 #: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Lobby port"
@@ -30081,6 +30213,10 @@ msgstr "Поразка, {change} {category}"
 msgid "Lost, and it counted toward no rating"
 msgstr "Поразка, що не вплинула на жоден рейтинг"
 
+#: src/content/engineSettingText.ts
+msgid "Low (1024)"
+msgstr ""
+
 #: src/lego/pages/components/ShapeFields.tsx
 #: src/placement/TerrainControls.tsx
 #, fuzzy
@@ -30091,6 +30227,10 @@ msgstr "Нижній край"
 #, fuzzy
 msgid "Low end must be between 0 and the height."
 msgstr "Нижній край має бути між 0 і висотою."
+
+#: src/content/engineSettingText.ts
+msgid "Low values make cliffs look jagged."
+msgstr ""
 
 #: src/workshop/pages/components/EquipWeaponPopover.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
@@ -30675,6 +30815,7 @@ msgstr "Маса"
 msgid "Master URL"
 msgstr "URL master"
 
+#: src/content/engineSettingText.ts
 #: src/sound/SoundSettings.tsx
 #, fuzzy
 msgid "Master volume"
@@ -30833,6 +30974,14 @@ msgstr "Макс. руль висоти"
 msgid "Max height (-maxh)"
 msgstr "Макс. висота (-maxh)"
 
+#: src/content/engineSettingText.ts
+msgid "Max nano particles"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Max particles"
+msgstr ""
+
 #: src/lego/banking.ts
 #, fuzzy
 msgid "Max pitch"
@@ -30849,6 +30998,10 @@ msgstr "Макс. гравців"
 #, fuzzy
 msgid "Max rudder"
 msgstr "Макс. руль напрямку"
+
+#: src/content/engineSettingText.ts
+msgid "Max simultaneous sounds"
+msgstr ""
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
@@ -30926,6 +31079,10 @@ msgstr "медіана {median}"
 #, fuzzy
 msgid "Medium"
 msgstr "Середній"
+
+#: src/content/engineSettingText.ts
+msgid "Medium (2048)"
+msgstr ""
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -31132,6 +31289,10 @@ msgstr "Середина"
 #, fuzzy
 msgid "Middle drag"
 msgstr "Перетягування середньою"
+
+#: src/content/engineSettingText.ts
+msgid "Middle-click scroll speed"
+msgstr ""
 
 #: src/content/pages/components/AchievementsSection.tsx
 #, fuzzy
@@ -31967,6 +32128,10 @@ msgstr "Музика"
 msgid "Music source"
 msgstr "Джерело музики"
 
+#: src/content/engineSettingText.ts
+msgid "Music volume"
+msgstr ""
+
 #: src/sound/SoundSettings.tsx
 #, fuzzy
 msgid "Music was turned off because the last attempt to play it stopped Coilbox responding."
@@ -32456,6 +32621,10 @@ msgstr "Потрібні зображення мапи та дані про ви
 #, fuzzy
 msgid "Negative values mean no limit."
 msgstr "Від’ємні значення означають відсутність обмеження."
+
+#: src/content/engineSettingText.ts
+msgid "Negative values scroll the other way."
+msgstr ""
 
 #: src/lego/pages/components/ExportDrawer.tsx
 #, fuzzy
@@ -33307,7 +33476,6 @@ msgid "No engines found in your content folders."
 msgstr "У ваших папках вмісту не знайдено рушіїв."
 
 #: src/content/pages/components/BrowserToolbar.tsx
-#: src/content/pages/EngineConfigPage.tsx
 #: src/content/pages/KeybindsSection.tsx
 #, fuzzy
 msgid "No engines found in your content folders. Add a folder in <0>Content folders</0> or install one from <1>Engines</1>."
@@ -36123,6 +36291,8 @@ msgstr "з {conquestsFinished} завершених"
 msgid "off"
 msgstr "вимкнено"
 
+#: src/content/engineSettingText.ts
+#: src/content/pages/components/EngineSettingField.tsx
 #: src/play/modOptions.ts
 #: src/profile/SettingsSection.tsx
 #, fuzzy
@@ -36143,6 +36313,10 @@ msgstr "Вимкнено, доки ви не ввімкнете. Коли вві
 #, fuzzy
 msgid "Off, a unit can fire out of the transport carrying it (its firebase) without exploding early. Useful for marines shooting from inside a bunker."
 msgstr "Вимкнено: юніт може стріляти з транспорту, що його везе (його вогневої бази), не вибухаючи передчасно. Корисно для піхоти, що стріляє зсередини бункера."
+
+#: src/content/engineSettingText.ts
+msgid "Off, and not loaded"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -36294,6 +36468,8 @@ msgstr "Старіші доріжки буде видалено, щоб не п�
 msgid "Oldest"
 msgstr "Найстаріші"
 
+#: src/content/engineSettingText.ts
+#: src/content/pages/components/EngineSettingField.tsx
 #: src/play/modOptions.ts
 #: src/profile/SettingsSection.tsx
 #: src/widgets/pages/WidgetsPage.tsx
@@ -37557,6 +37733,10 @@ msgstr "Загалом"
 msgid "Overclocked Reactor"
 msgstr "Розігнаний реактор"
 
+#: src/content/engineSettingText.ts
+msgid "Overhead"
+msgstr ""
+
 #: src/lego/generateChecked.ts
 #: src/lego/problems.ts
 #, fuzzy
@@ -37579,6 +37759,7 @@ msgid "Overrides the map's gravity for ballistic weapons and missiles; missiles 
 msgstr "Перевизначає гравітацію мапи для балістичної зброї та ракет; на ракети діє лише після закінчення flightTime. 0 вимикає перевизначення й використовує гравітацію мапи."
 
 #: src/career/pages/CareerPage.tsx
+#: src/content/engineSettingText.ts
 #: src/content/pages/GameDetailPage.tsx
 #: src/content/pages/MapDetailPage.tsx
 #, fuzzy
@@ -38825,6 +39006,7 @@ msgstr "Гравець {slot}"
 msgid "Player lookup"
 msgstr "Пошук гравця"
 
+#: src/content/engineSettingText.ts
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
 msgid "Player name"
@@ -40958,6 +41140,14 @@ msgstr "Переграти бій із цими налаштуваннями"
 msgid "Refight: {mapName}"
 msgstr "Переграти бій: {mapName}"
 
+#: src/content/engineSettingText.ts
+msgid "Reflective"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Reflective and refractive"
+msgstr ""
+
 #: src/lego/pages/components/TextureBuilderPanel.tsx
 #, fuzzy
 msgid "Reflectivity (greyscale, optional)"
@@ -42077,7 +42267,6 @@ msgstr "Пересканування…"
 msgid "Resend verification email"
 msgstr "Надіслати лист підтвердження ще раз"
 
-#: src/content/pages/components/EngineSettingField.tsx
 #: src/content/pages/components/KeyBindingEditor.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
@@ -42247,6 +42436,14 @@ msgstr "Змінити розмір робочої області"
 #, fuzzy
 msgid "Resize this panel"
 msgstr "Змінити розмір цієї панелі"
+
+#: src/content/engineSettingText.ts
+msgid "Resolution height"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Resolution width"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -42727,6 +42924,10 @@ msgstr "Назва складу"
 #, fuzzy
 msgid "Rosters"
 msgstr "Склади"
+
+#: src/content/engineSettingText.ts
+msgid "Rotatable overhead"
+msgstr ""
 
 #: src/lego/pages/components/ModelViewport.tsx
 #, fuzzy
@@ -43758,6 +43959,10 @@ msgstr "Скрипт імпортовано"
 msgid "Scroll"
 msgstr "Прокрутити"
 
+#: src/content/engineSettingText.ts
+msgid "Scroll faster the closer the pointer is to the edge."
+msgstr ""
+
 #: src/components/ui/message-scroller.tsx
 #, fuzzy
 msgid "Scroll to end"
@@ -43767,6 +43972,10 @@ msgstr "Прокрутити в кінець"
 #, fuzzy
 msgid "Scroll to start"
 msgstr "Прокрутити на початок"
+
+#: src/content/engineSettingText.ts
+msgid "Scroll wheel speed"
+msgstr ""
 
 #: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
@@ -45113,6 +45322,14 @@ msgstr "Шейдери скомпільовано"
 msgid "Shading map"
 msgstr "Карта затінення"
 
+#: src/content/engineSettingText.ts
+msgid "Shadow detail"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Shadows"
+msgstr ""
+
 #: src/content/index.ts
 #, fuzzy
 msgid "Shadows, water, particles and anti-aliasing."
@@ -46436,6 +46653,10 @@ msgstr "Згладити текстуру (-smooth)"
 msgid "Smoothing angle"
 msgstr "Кут згладжування"
 
+#: src/content/engineSettingText.ts
+msgid "Smooths jagged edges. Costly at high sample counts."
+msgstr ""
+
 #: src/lego/pages/components/ModelViewport.tsx
 #, fuzzy
 msgid "Snapped to \"{snappedTo}\". Hold Alt to place freely"
@@ -46850,6 +47071,10 @@ msgstr "Точки, найбільший проміжок"
 #, fuzzy
 msgid "Spread of individual projectiles within one burst, using the same angle transform as accuracy."
 msgstr "Розкид окремих снарядів у межах однієї черги з тим самим перетворенням кута, що й accuracy."
+
+#: src/content/engineSettingText.ts
+msgid "Spring"
+msgstr ""
 
 #: src/mapconv/pages/DecompilePage.tsx
 #, fuzzy
@@ -47982,6 +48207,10 @@ msgstr "Симетрія: новий елемент отримує двійни�
 msgid "Synced"
 msgstr "Синхронізовано"
 
+#: src/content/engineSettingText.ts
+msgid "Syncs frames to your monitor. Adaptive drops the sync when the frame rate falls below it."
+msgstr ""
+
 #: src/content/pages/components/ReplayTimelineDock.tsx
 #: src/general/pages/SettingsSection.tsx
 #: src/i18n/frameStrings.ts
@@ -48272,6 +48501,10 @@ msgstr "Команда 1 – це команда з меншим номером 
 #, fuzzy
 msgid "Team count"
 msgstr "Кількість команд"
+
+#: src/content/engineSettingText.ts
+msgid "Team highlight"
+msgstr ""
 
 #: src/multiplayer/battle/GameTypePresetsControls.tsx
 #, fuzzy
@@ -54963,6 +55196,10 @@ msgstr "uberstress"
 msgid "Uberstress"
 msgstr "Uberstress"
 
+#: src/content/engineSettingText.ts
+msgid "UI volume"
+msgstr ""
+
 #: src/content/pages/components/ReplayRoster.tsx
 #, fuzzy
 msgid "Unassigned"
@@ -55304,6 +55541,10 @@ msgstr "розміщення юнітів"
 #, fuzzy
 msgid "Unit reference"
 msgstr "Довідник юнітів"
+
+#: src/content/engineSettingText.ts
+msgid "Unit reply volume"
+msgstr ""
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #: src/multiplayer/battle/BattleOptionsDrawer.tsx
@@ -56372,6 +56613,10 @@ msgstr "Вертикально"
 msgid "Vertices"
 msgstr "Вершини"
 
+#: src/content/engineSettingText.ts
+msgid "Very high (8192)"
+msgstr ""
+
 #: src/runlite/pages/components/RunHud.tsx
 #, fuzzy
 msgid "Veteran"
@@ -56523,6 +56768,10 @@ msgstr "Голосування розпочато"
 #, fuzzy
 msgid "Vote to start"
 msgstr "Голосувати за початок"
+
+#: src/content/engineSettingText.ts
+msgid "VSync"
+msgstr ""
 
 #: src/lego/scriptMarks.ts
 #, fuzzy
@@ -56832,6 +57081,10 @@ msgstr "Глибина води"
 #, fuzzy
 msgid "Water opacity"
 msgstr "Непрозорість води"
+
+#: src/content/engineSettingText.ts
+msgid "Water rendering"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -57911,6 +58164,14 @@ msgstr "проміжок {window} неможливо прочитати: {messag
 #, fuzzy
 msgid "Window of match time"
 msgstr "Проміжок часу матчу"
+
+#: src/content/engineSettingText.ts
+msgid "Windowed height"
+msgstr ""
+
+#: src/content/engineSettingText.ts
+msgid "Windowed width"
+msgstr ""
 
 #: src/multiplayer/battles/WindowsFirewall.tsx
 #, fuzzy

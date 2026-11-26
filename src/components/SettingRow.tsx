@@ -19,11 +19,14 @@ export function SettingRow({
   description,
   help,
   helpLabel,
+  error,
   children,
 }: {
   id?: string;
   label: string;
   description?: string;
+  /** Why the last change failed, shown under the name until the next try. */
+  error?: string | null;
   /** What the help popover says. Needs `helpLabel` to name its button. */
   help?: ReactNode;
   helpLabel?: string;
@@ -50,6 +53,14 @@ export function SettingRow({
             className="mt-0.5 text-xs text-muted-foreground"
           >
             {description}
+          </p>
+        )}
+        {error && (
+          <p
+            role="alert"
+            className="mt-0.5 select-text break-words text-xs text-destructive"
+          >
+            {error}
           </p>
         )}
       </div>
