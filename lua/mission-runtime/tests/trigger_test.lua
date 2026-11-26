@@ -281,7 +281,7 @@ check("a repeating trigger fires again once its cooldown is up",
 	marks(fired) == "once,again,slowly,again,again,slowly", marks(fired))
 
 --------------------------------------------------------------------------------
--- Triggers as a state machine.
+-- Firing only when the conditions become true (issue #5295).
 --------------------------------------------------------------------------------
 
 local function enable(id)
@@ -291,6 +291,183 @@ end
 local function disable(id)
 	return { type = "disable_trigger", params = { trigger = id } }
 end
+
+--- A repeating trigger that fires as its conditions start to hold.
+local function rising(id, list, fields)
+	local built = { ["repeat"] = true, onBecomingTrue = true, conditions = conditions("all", list), actions = { probe(id) } }
+	for key, value in pairs(fields or {}) do
+		built[key] = value
+	end
+	return trigger(id, built)
+end
+
+--- Run the next `count` polled ticks.
+local nextFrame
+local function ticks(running, count)
+	for _ = 1, count do
+		nextFrame = nextFrame + TRIGGERS.POLL_FRAMES
+		running:frame(nextFrame)
+	end
+end
+
+engine, fired, logs, held = build({ rising("edge", { flag("a") }) })
+nextFrame = 0
+
+ticks(engine, 1)
+check("it stays quiet while the conditions do not hold", #fired == 0, marks(fired))
+held.a = true
+ticks(engine, 1)
+check("it fires when they start to hold", marks(fired) == "edge", marks(fired))
+ticks(engine, 3)
+check("it stays quiet while they go on holding", marks(fired) == "edge", marks(fired))
+held.a = nil
+ticks(engine, 1)
+check("it stays quiet when they stop", marks(fired) == "edge", marks(fired))
+held.a = true
+ticks(engine, 2)
+check("it fires again once they come back", marks(fired) == "edge,edge", marks(fired))
+
+engine, fired, logs, held = build({
+	trigger("gate", { conditions = conditions("all", { flag("open") }), actions = { enable("late") } }),
+	rising("late", { flag("a") }, { enabled = false }),
+	trigger("shut", { conditions = conditions("all", { flag("shut") }), actions = { disable("late") } }),
+	trigger("nudge", {
+		["repeat"] = true,
+		conditions = conditions("all", { flag("nudge") }),
+		actions = { enable("late") },
+	}),
+})
+nextFrame = 0
+
+held.a = true
+ticks(engine, 2)
+check("a disabled one does not fire while its conditions hold", #fired == 0, marks(fired))
+held.open = true
+ticks(engine, 3)
+check("enabled while its conditions already hold, it fires once", marks(fired) == "late", marks(fired))
+held.nudge = true
+ticks(engine, 2)
+check("enabling one that is already armed does not fire it again", marks(fired) == "late", marks(fired))
+held.nudge, held.shut = nil, true
+ticks(engine, 1)
+held.nudge = true
+ticks(engine, 2)
+check("disabled and enabled again while they hold, it fires once more",
+	marks(fired) == "late,late", marks(fired))
+
+engine, fired = build({
+	trigger("plain", { conditions = conditions("all", { flag("a") }), onBecomingTrue = true, actions = { probe("plain") } }),
+})
+nextFrame = 0
+ticks(engine, 1)
+check("on a fire-once trigger the option changes nothing", engine:isEnabled("plain") == true)
+
+-- A one second cooldown, which is two polled ticks.
+engine, fired, logs, held = build({ rising("cooled", { flag("a") }, { cooldown = 1 }) })
+nextFrame = 0
+
+held.a = true
+ticks(engine, 1)
+held.a = nil
+ticks(engine, 1)
+held.a = true
+ticks(engine, 1)
+check("becoming true inside the cooldown fires once it is up", marks(fired) == "cooled,cooled", marks(fired))
+ticks(engine, 3)
+check("and only once", marks(fired) == "cooled,cooled", marks(fired))
+
+engine, fired, logs, held = build({ rising("brief", { flag("a") }, { cooldown = 2 }) })
+nextFrame = 0
+
+held.a = true
+ticks(engine, 1)
+held.a = nil
+ticks(engine, 1)
+held.a = true
+ticks(engine, 1)
+check("a cooldown still holds the next firing back", marks(fired) == "brief", marks(fired))
+held.a = nil
+ticks(engine, 4)
+check("conditions that stop before the cooldown is up fire nothing", marks(fired) == "brief", marks(fired))
+
+-- Event-driven conditions send nothing when they stop holding, so the polled tick
+-- has to notice, or the trigger would never be ready again.
+engine, fired, logs, held = build({ rising("rung", { chime("a") }) })
+nextFrame = 0
+
+held.a = true
+engine:event("ding")
+engine:event("ding")
+check("an event-driven one fires once while its conditions hold", marks(fired) == "rung", marks(fired))
+held.a = nil
+ticks(engine, 1)
+held.a = true
+engine:event("ding")
+check("and again once the polled tick has seen them stop", marks(fired) == "rung,rung", marks(fired))
+
+engine, fired, logs, held = build({ rising("quiet", { chime("a") }) })
+nextFrame = 0
+held.a = true
+ticks(engine, 2)
+check("an event-driven one whose conditions already hold fires with no event", marks(fired) == "quiet", marks(fired))
+
+-- A condition about something happening is spent by the firing, so the next time
+-- it happens is a new one even with no polled tick between the two.
+engine, fired, logs, held = build({
+	rising("again", { { type = "rang", params = {} } }),
+})
+local lastRing = 0
+engine:addCondition("rang", {
+	events = { "ding" },
+	test = function(_, ctx)
+		return lastRing > ctx.armedAt
+	end,
+})
+lastRing = engine:stamp()
+engine:event("ding")
+lastRing = engine:stamp()
+engine:event("ding")
+check("a condition spent by the firing fires it again the next time", marks(fired) == "again,again", marks(fired))
+
+-- The same state loaded again, as `/luarules reload` does it.
+do
+	local kept, holding, count = {}, true, 0
+	local function loaded()
+		local running = TRIGGERS.new({ triggers = { rising("kept", { flag("a") }) } }, {
+			save = function(id, enabled, readyFrame, wasHeld)
+				kept[id] = { enabled = enabled, readyFrame = readyFrame, held = wasHeld }
+			end,
+			restore = function(id)
+				return kept[id]
+			end,
+		})
+		running:addCondition("flag", {
+			test = function()
+				return holding
+			end,
+		})
+		running:addAction("probe", function()
+			count = count + 1
+		end)
+		return running
+	end
+
+	nextFrame = 0
+	ticks(loaded(), 1)
+	local after = loaded()
+	ticks(after, 2)
+	check("a reload does not fire it again for conditions that have not changed", count == 1, count)
+	holding = false
+	ticks(after, 1)
+	after = loaded()
+	holding = true
+	ticks(after, 1)
+	check("and one that had stopped holding fires after a reload when they come back", count == 2, count)
+end
+
+--------------------------------------------------------------------------------
+-- Triggers as a state machine.
+--------------------------------------------------------------------------------
 
 engine, fired, logs, held = build({
 	trigger("gate", {
