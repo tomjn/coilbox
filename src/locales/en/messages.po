@@ -981,6 +981,11 @@ msgstr "{0, plural, one {# win} other {# wins}}"
 msgid "{0, plural, one {# wreck} other {# wrecks}}"
 msgstr "{0, plural, one {# wreck} other {# wrecks}}"
 
+#. placeholder {0}: home.entries.length
+#: src/home/config.ts
+msgid "{0, plural, one {# zone} other {# zones}}"
+msgstr "{0, plural, one {# zone} other {# zones}}"
+
 #. placeholder {0}: group.paletteModels.length
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "{0, plural, one {across # model} other {across # models}}"
@@ -1645,8 +1650,8 @@ msgid "{campaignCount, plural, one {In campaign} other {In # campaigns}}"
 msgstr "{campaignCount, plural, one {In campaign} other {In # campaigns}}"
 
 #: src/profile/health.ts
-msgid "{campaignFailureCount} campaign(s) failed to load"
-msgstr "{campaignFailureCount} campaign(s) failed to load"
+msgid "{campaignFailureCount, plural, one {# campaign failed to load} other {# campaigns failed to load}}"
+msgstr "{campaignFailureCount, plural, one {# campaign failed to load} other {# campaigns failed to load}}"
 
 #: src/lego/pages/components/PieceTree.tsx
 msgid "{carriedName} onto {ontoName}"
@@ -2221,16 +2226,20 @@ msgid "{energy} energy"
 msgstr "{energy} energy"
 
 #: src/profile/health.ts
-msgid "{engines} engine(s) found, games not scanned yet"
-msgstr "{engines} engine(s) found, games not scanned yet"
+msgid "{engines, plural, one {# engine found, games not scanned yet} other {# engines found, games not scanned yet}}"
+msgstr "{engines, plural, one {# engine found, games not scanned yet} other {# engines found, games not scanned yet}}"
 
 #: src/profile/health.ts
-msgid "{engines} engine(s) found, games scan failed"
-msgstr "{engines} engine(s) found, games scan failed"
+msgid "{engines, plural, one {# engine found, games scan failed} other {# engines found, games scan failed}}"
+msgstr "{engines, plural, one {# engine found, games scan failed} other {# engines found, games scan failed}}"
 
 #: src/profile/health.ts
-msgid "{engines} engine(s), {games} game(s) found"
-msgstr "{engines} engine(s), {games} game(s) found"
+msgid "{engines, plural, one {# engine} other {# engines}}"
+msgstr "{engines, plural, one {# engine} other {# engines}}"
+
+#: src/profile/health.ts
+msgid "{engineText}, {gameText} found"
+msgstr "{engineText}, {gameText} found"
 
 #: src/scenario/pages/components/mapKeyboard.ts
 msgid "{entryLabel}, {where}, {def}"
@@ -2319,8 +2328,8 @@ msgid "{failureCount, plural, one {# analysis failed} other {# analyses failed}}
 msgstr "{failureCount, plural, one {# analysis failed} other {# analyses failed}}"
 
 #: src/profile/health.ts
-msgid "{failureCount} language pack(s) were not used"
-msgstr "{failureCount} language pack(s) were not used"
+msgid "{failureCount, plural, one {# language pack was not used} other {# language packs were not used}}"
+msgstr "{failureCount, plural, one {# language pack was not used} other {# language packs were not used}}"
 
 #: src/placement/preview.ts
 msgid "{far, plural, one {# square {way}} other {# squares {way}}}"
@@ -2546,6 +2555,7 @@ msgstr "{game}: sent {covered} of them, {left, plural, one {# unit} other {# uni
 
 #: src/campaign/listing.ts
 #: src/packs/pages/components/ImportPackForm.tsx
+#: src/profile/health.ts
 msgid "{gameCount, plural, one {# game} other {# games}}"
 msgstr "{gameCount, plural, one {# game} other {# games}}"
 
@@ -2556,10 +2566,6 @@ msgstr "{gameCount, plural, one {Game} other {Games}}"
 #: src/play/pages/components/GamePickerGrid.tsx
 msgid "{gameCount, plural, one {Search # game…} other {Search # games…}}"
 msgstr "{gameCount, plural, one {Search # game…} other {Search # games…}}"
-
-#: src/profile/health.ts
-msgid "{gameCount} game(s), {mapCount} map(s), {engineText}"
-msgstr "{gameCount} game(s), {mapCount} map(s), {engineText}"
 
 #: src/workshop/pages/UnitPage.tsx
 msgid "{gameLabel} has been updated since this project was written. Open <0>Checks</0> to read what changed underneath it and what can be done about each one."
@@ -2781,12 +2787,17 @@ msgid "{gameNameShown} has no {stored} class, so the engine drops this unit at l
 msgstr "{gameNameShown} has no {stored} class, so the engine drops this unit at load. Pick another."
 
 #: src/career/pages/CareerPage.tsx
+#: src/profile/health.ts
 msgid "{games, plural, one {# game} other {# games}}"
 msgstr "{games, plural, one {# game} other {# games}}"
 
 #: src/packs/pages/components/ImportPackForm.tsx
 msgid "{gamesText} and {mapsText} ready."
 msgstr "{gamesText} and {mapsText} ready."
+
+#: src/profile/health.ts
+msgid "{gameText}, {mapText}, {engineText}"
+msgstr "{gameText}, {mapText}, {engineText}"
 
 #: src/content/pages/GameDetailPage.tsx
 msgid "{generated} It is not offered anywhere a game is picked, which is why you will not find it in Singleplayer or in a scenario's setup."
@@ -3208,8 +3219,8 @@ msgid "{layerNames} draw events from an analysis."
 msgstr "{layerNames} draw events from an analysis."
 
 #: src/home/config.ts
-msgid "{layout}, {zoneCount} zone(s), {tracking}"
-msgstr "{layout}, {zoneCount} zone(s), {tracking}"
+msgid "{layout}, {zones}, {tracking}"
+msgstr "{layout}, {zones}, {tracking}"
 
 #: src/scenario/launch.ts
 #: src/workshop/pages/components/PackagePanel.tsx
@@ -3656,6 +3667,7 @@ msgstr "{many, select, systems {Vast (56 systems)} locations {Vast (56 locations
 
 #: src/multiplayer/pages/MatchmakingPage.tsx
 #: src/packs/pages/components/ImportPackForm.tsx
+#: src/profile/health.ts
 msgid "{mapCount, plural, one {# map} other {# maps}}"
 msgstr "{mapCount, plural, one {# map} other {# maps}}"
 
@@ -4916,8 +4928,8 @@ msgid "{primary} primary · {secondary} secondary"
 msgstr "{primary} primary · {secondary} secondary"
 
 #: src/profile/health.ts
-msgid "{problemCount} problem(s) in the bundled content"
-msgstr "{problemCount} problem(s) in the bundled content"
+msgid "{problemCount, plural, one {# problem in the bundled content} other {# problems in the bundled content}}"
+msgstr "{problemCount, plural, one {# problem in the bundled content} other {# problems in the bundled content}}"
 
 #: src/lego/pages/components/BuildPictureDrawer.tsx
 msgid "{projectName} as it will look on a build menu"
@@ -5071,13 +5083,13 @@ msgstr "{roleId, select, buildarm_nano {nano emit point} aim {aim point} flare {
 msgid "{rootCount, plural, one {{sideName} has no usable start unit in {gameName}, so the unit limit is based on the # mobile unit that can build and that no other unit builds or morphs into.} other {{sideName} has no usable start unit in {gameName}, so the unit limit is based on the # mobile units that can build and that no other unit builds or morphs into.}}"
 msgstr "{rootCount, plural, one {{sideName} has no usable start unit in {gameName}, so the unit limit is based on the # mobile unit that can build and that no other unit builds or morphs into.} other {{sideName} has no usable start unit in {gameName}, so the unit limit is based on the # mobile units that can build and that no other unit builds or morphs into.}}"
 
+#: src/profile/health.ts
+msgid "{rootCount, plural, one {# content folder, {portableRoots} portable} other {# content folders, {portableRoots} portable}}"
+msgstr "{rootCount, plural, one {# content folder, {portableRoots} portable} other {# content folders, {portableRoots} portable}}"
+
 #: src/lego/model.ts
 msgid "{rootCount, plural, one {# piece has no parent, but a model has one root.} other {# pieces have no parent, but a model has one root.}}"
 msgstr "{rootCount, plural, one {# piece has no parent, but a model has one root.} other {# pieces have no parent, but a model has one root.}}"
-
-#: src/profile/health.ts
-msgid "{rootCount} content folder(s), {portableRoots} portable"
-msgstr "{rootCount} content folder(s), {portableRoots} portable"
 
 #: src/workshop/pages/components/AssetPicker.tsx
 msgid "{rowCap} of {total}. Search to narrow it."
@@ -5103,6 +5115,10 @@ msgstr "{s, plural, one {# seat is left open} other {# seats are left open}}"
 msgid "{sameCount, plural, one {Show # identical row} other {Show # identical rows}}"
 msgstr "{sameCount, plural, one {Show # identical row} other {Show # identical rows}}"
 
+#: src/profile/health.ts
+msgid "{scanRootCount, plural, one {Scanned # content folder: {scanRootPaths}.} other {Scanned # content folders: {scanRootPaths}.}}"
+msgstr "{scanRootCount, plural, one {Scanned # content folder: {scanRootPaths}.} other {Scanned # content folders: {scanRootPaths}.}}"
+
 #: src/uberstress/pages/HistoryPage.tsx
 msgid "{scenario} p99 trend"
 msgstr "{scenario} p99 trend"
@@ -5112,8 +5128,8 @@ msgid "{scenarioCount, plural, one {No scenarios match. The only scenario is sti
 msgstr "{scenarioCount, plural, one {No scenarios match. The only scenario is still here.} other {No scenarios match. All # are still here.}}"
 
 #: src/profile/health.ts
-msgid "{scenarioFailureCount} scenario(s) failed to load"
-msgstr "{scenarioFailureCount} scenario(s) failed to load"
+msgid "{scenarioFailureCount, plural, one {# scenario failed to load} other {# scenarios failed to load}}"
+msgstr "{scenarioFailureCount, plural, one {# scenario failed to load} other {# scenarios failed to load}}"
 
 #: src/scenario/pages/ScenarioEditPage.tsx
 msgid "{scenarioName} as mission.lua"
@@ -7301,10 +7317,6 @@ msgstr "a different size from this page's map"
 msgid "a different size from this page's map, so it is left out"
 msgstr "a different size from this page's map, so it is left out"
 
-#: src/profile/SettingsSection.tsx
-msgid "A distribution profile is active (loaded from <0>{source}</0>). It reskins and narrows this build:"
-msgstr "A distribution profile is active (loaded from <0>{source}</0>). It reskins and narrows this build:"
-
 #: src/content/pages/components/ReplayMapUnits.tsx
 msgid "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off."
 msgstr "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off."
@@ -7356,6 +7368,10 @@ msgstr "A function of its own"
 #: src/content/pages/components/AiRecordSection.tsx
 msgid "A game against several different AIs shows on each one's row. Games from campaign, Conquest and Warpath are not counted."
 msgstr "A game against several different AIs shows on each one's row. Games from campaign, Conquest and Warpath are not counted."
+
+#: src/profile/SettingsSection.tsx
+msgid "A game can ship its own build of Coilbox with a profile.json beside the app. The profile renames Coilbox, hides features and settings, and limits which games show. This page lists what the loaded profile changed."
+msgstr "A game can ship its own build of Coilbox with a profile.json beside the app. The profile renames Coilbox, hides features and settings, and limits which games show. This page lists what the loaded profile changed."
 
 #: src/conquest/pages/components/BattleOverlayParts.tsx
 msgid "A game is already running"
@@ -7694,8 +7710,8 @@ msgid "A preset pack's address must be https."
 msgstr "A preset pack's address must be https."
 
 #: src/profile/SettingsSection.tsx
-msgid "A profile is already there: <0/>. Edit that file, then restart Coilbox to pick it up."
-msgstr "A profile is already there: <0/>. Edit that file, then restart Coilbox to pick it up."
+msgid "A profile is already there: {path}. Edit that file, then restart Coilbox to pick it up."
+msgstr "A profile is already there: {path}. Edit that file, then restart Coilbox to pick it up."
 
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 msgid "A project cannot be moved to another game."
@@ -8155,6 +8171,10 @@ msgstr "About caches"
 msgid "About calling a function"
 msgstr "About calling a function"
 
+#: src/profile/SettingsSection.tsx
+msgid "About checking the profile"
+msgstr "About checking the profile"
+
 #: src/lego/pages/components/CollisionPanel.tsx
 msgid "About clicking on each piece"
 msgstr "About clicking on each piece"
@@ -8163,9 +8183,17 @@ msgstr "About clicking on each piece"
 msgid "About Coilbox"
 msgstr "About Coilbox"
 
+#: src/profile/SettingsSection.tsx
+msgid "About creating a profile"
+msgstr "About creating a profile"
+
 #: src/content/pages/StorageSection.tsx
 msgid "About deleting replays"
 msgstr "About deleting replays"
+
+#: src/profile/SettingsSection.tsx
+msgid "About distribution profiles"
+msgstr "About distribution profiles"
 
 #: src/downloads/pages/SettingsSection.tsx
 msgid "About downloading when joining"
@@ -8250,6 +8278,10 @@ msgstr "About reconnecting"
 #: src/general/pages/SettingsSection.tsx
 msgid "About reduce motion"
 msgstr "About reduce motion"
+
+#: src/profile/SettingsSection.tsx
+msgid "About reloading the profile"
+msgstr "About reloading the profile"
 
 #: src/content/pages/components/ReplayTracksStorage.tsx
 msgid "About replay tracks"
@@ -10360,10 +10392,6 @@ msgstr "Author a sequence of skirmish missions from your saved presets. Local ca
 #: src/campaign/pages/CampaignsPage.tsx
 msgid "Authored sequences of skirmish missions. Play a campaign mission by mission, tracking your progress as you go."
 msgstr "Authored sequences of skirmish missions. Play a campaign mission by mission, tracking your progress as you go."
-
-#: src/profile/SettingsSection.tsx
-msgid "Authoring"
-msgstr "Authoring"
 
 #: src/profile/SettingsSection.tsx
 msgid "Authoring tools"
@@ -12716,9 +12744,17 @@ msgstr "chat scenarios"
 msgid "Cheapest"
 msgstr "Cheapest"
 
+#: src/profile/SettingsSection.tsx
+msgid "Check"
+msgstr "Check"
+
 #: src/account/pages/SettingsSection.tsx
 msgid "Check {address} for the verification code."
 msgstr "Check {address} for the verification code."
+
+#: src/profile/SettingsSection.tsx
+msgid "Check again"
+msgstr "Check again"
 
 #: src/game-updates/pages/GameUpdatesSection.tsx
 #: src/updater/pages/UpdatesSettingsSection.tsx
@@ -12728,6 +12764,10 @@ msgstr "Check for updates"
 #: src/lego/pages/components/TestDrawer.tsx
 msgid "Check it loads"
 msgstr "Check it loads"
+
+#: src/profile/SettingsSection.tsx
+msgid "Check profile"
+msgstr "Check profile"
 
 #: src/multiplayer/battle/useBattleLaunch.ts
 msgid "Check the host's address"
@@ -12858,6 +12898,10 @@ msgstr "Checks"
 #: src/content/unitFieldNotes.ts
 msgid "Checks its muzzle every frame"
 msgstr "Checks its muzzle every frame"
+
+#: src/profile/SettingsSection.tsx
+msgid "Checks the profile, content folders and bundled content, and lists anything a player would trip over. Mistakes that fail quietly, such as a hidden id that matches nothing, only show up here."
+msgstr "Checks the profile, content folders and bundled content, and lists anything a player would trip over. Mistakes that fail quietly, such as a hidden id that matches nothing, only show up here."
 
 #: src/content/pages/ArchiveDetailPage.tsx
 #: src/content/pages/GameDetailPage.tsx
@@ -15546,6 +15590,7 @@ msgstr "Crater strength multiplier"
 
 #: src/campaign/pages/CampaignBuilderPage.tsx
 #: src/content/pages/components/ReplaySetPicker.tsx
+#: src/profile/SettingsSection.tsx
 #: src/scenario/pages/ScenarioBuilderPage.tsx
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
@@ -16886,7 +16931,6 @@ msgid "Distribute {axisName}: equal gaps, ends stay. Needs 3 pieces."
 msgstr "Distribute {axisName}: equal gaps, ends stay. Needs 3 pieces."
 
 #: src/profile/index.ts
-#: src/profile/SettingsSection.tsx
 msgid "Distribution profile"
 msgstr "Distribution profile"
 
@@ -17021,10 +17065,6 @@ msgstr "Download & install"
 msgid "Download & Install"
 msgstr "Download & Install"
 
-#: src/profile/health.ts
-msgid "Download + data folders are writable"
-msgstr "Download + data folders are writable"
-
 #: src/onboarding/pages/GamesPage.tsx
 msgid "Download a game"
 msgstr "Download a game"
@@ -17057,6 +17097,10 @@ msgstr "Download an engine to play"
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Download an import"
 msgstr "Download an import"
+
+#: src/profile/health.ts
+msgid "Download and data folders are writable"
+msgstr "Download and data folders are writable"
 
 #: src/home/continue.ts
 msgid "Download and start"
@@ -17095,6 +17139,10 @@ msgstr "Download failed: {downloadError}"
 #: src/content/pages/components/ReplayEventList.tsx
 msgid "Download failed: {reason}"
 msgstr "Download failed: {reason}"
+
+#: src/profile/health.ts
+msgid "Download folder not checked, as this is not a portable install"
+msgstr "Download folder not checked, as this is not a portable install"
 
 #: src/content/pages/components/MissingContentNotice.tsx
 #: src/scenario/pages/ScenariosPage.tsx
@@ -20986,7 +21034,6 @@ msgstr "health"
 #: src/lego/pages/components/WorthSection.tsx
 #: src/lego/unitStats.ts
 #: src/lego/unitValueControls.ts
-#: src/profile/HealthChecklist.tsx
 #: src/workshop/randomMod.ts
 #: src/workshop/unitReference.ts
 msgid "Health"
@@ -24225,6 +24272,10 @@ msgstr "Loaded {loadedName}"
 msgid "Loaded {loadedName}, with parts missing"
 msgstr "Loaded {loadedName}, with parts missing"
 
+#: src/profile/SettingsSection.tsx
+msgid "Loaded from"
+msgstr "Loaded from"
+
 #: src/play/pages/SkirmishPage.tsx
 msgid "Loaded the preset \"{loadedName}\"."
 msgstr "Loaded the preset \"{loadedName}\"."
@@ -27174,10 +27225,6 @@ msgstr "No direct messages. Use + to message an online user."
 msgid "No distribution profile loaded"
 msgstr "No distribution profile loaded"
 
-#: src/profile/SettingsSection.tsx
-msgid "No distribution profile loaded — standard Coilbox."
-msgstr "No distribution profile loaded — standard Coilbox."
-
 #: src/multiplayer/admin/EmailDomainsSection.tsx
 msgid "No domains are blocked."
 msgstr "No domains are blocked."
@@ -29505,6 +29552,10 @@ msgstr "nothing, a mark is not an edit"
 #: src/workshop/compatibility.ts
 msgid "nothing, the weapon stays in the library"
 msgstr "nothing, the weapon stays in the library"
+
+#: src/profile/SettingsSection.tsx
+msgid "Nothing, this is standard Coilbox"
+msgstr "Nothing, this is standard Coilbox"
 
 #: src/notify/NotificationsSettings.tsx
 msgid "Notification sound"
@@ -32262,6 +32313,10 @@ msgstr "Problems with this unit's weapons"
 msgid "Produced whether or not the unit is switched on."
 msgstr "Produced whether or not the unit is switched on."
 
+#: src/profile/SettingsSection.tsx
+msgid "Profile"
+msgstr "Profile"
+
 #: src/profile/health.ts
 msgid "Profile failed to load"
 msgstr "Profile failed to load"
@@ -32799,14 +32854,14 @@ msgstr "Rating"
 msgid "Raw text"
 msgstr "Raw text"
 
+#: src/profile/SettingsSection.tsx
+msgid "Re-reads .coilbox/profile.json and applies it to this window, so editing a profile does not need a restart. You stay on this page, but anything in progress elsewhere resets."
+msgstr "Re-reads .coilbox/profile.json and applies it to this window, so editing a profile does not need a restart. You stay on this page, but anything in progress elsewhere resets."
+
 #: src/animation/pages/CobPage.tsx
 #: src/uberstress/pages/HistoryPage.tsx
 msgid "Re-run"
 msgstr "Re-run"
-
-#: src/profile/SettingsSection.tsx
-msgid "Re-run validation"
-msgstr "Re-run validation"
 
 #: src/content/pages/components/FolderRow.tsx
 msgid "Re-scan"
@@ -33697,6 +33752,7 @@ msgstr "Relief"
 #: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #: src/play/pages/EngineLogSection.tsx
+#: src/profile/SettingsSection.tsx
 msgid "Reload"
 msgstr "Reload"
 
@@ -33707,10 +33763,6 @@ msgstr "Reload into the sandbox"
 #: src/profile/SettingsSection.tsx
 msgid "Reload profile"
 msgstr "Reload profile"
-
-#: src/profile/SettingsSection.tsx
-msgid "Reload re-reads .coilbox/profile.json and applies it to this window, so editing a profile does not need an app restart. You stay on this page, but anything in progress elsewhere resets."
-msgstr "Reload re-reads .coilbox/profile.json and applies it to this window, so editing a profile does not need an app restart. You stay on this page, but anything in progress elsewhere resets."
 
 #: src/multiplayer/admin/MaintenanceSection.tsx
 msgid "Reload the server's code?"
@@ -34632,8 +34684,8 @@ msgid "Rest & repair"
 msgstr "Rest & repair"
 
 #: src/profile/SettingsSection.tsx
-msgid "Restart Coilbox"
-msgstr "Restart Coilbox"
+msgid "Restart"
+msgstr "Restart"
 
 #: src/game-updates/pages/GameUpdatesSection.tsx
 #: src/updater/pages/UpdatesSettingsSection.tsx
@@ -34709,6 +34761,10 @@ msgstr "Result"
 #: src/runlite/pages/components/EncounterOverlay.tsx
 msgid "Result detected from the replay."
 msgstr "Result detected from the replay."
+
+#: src/profile/HealthChecklist.tsx
+msgid "Results"
+msgstr "Results"
 
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/play/pages/SavegamesPage.tsx
@@ -35647,10 +35703,6 @@ msgstr "Scanned {done} of {total} units."
 #: src/content/pages/components/FolderRow.tsx
 msgid "Scanned {scannedAt}"
 msgstr "Scanned {scannedAt}"
-
-#: src/profile/health.ts
-msgid "Scanned {scanRootCount} content folder(s): {scanRootPaths}."
-msgstr "Scanned {scanRootCount} content folder(s): {scanRootPaths}."
 
 #: src/lego/pages/components/ScanSkeletons.tsx
 msgid "Scanned units"
@@ -38499,10 +38551,6 @@ msgstr "start {number}"
 msgid "Start a conquest"
 msgstr "Start a conquest"
 
-#: src/profile/SettingsSection.tsx
-msgid "Start a distribution profile from how Coilbox is set up right now. It is written to .coilbox/profile.json beside the app, and never overwrites a profile that is already there."
-msgstr "Start a distribution profile from how Coilbox is set up right now. It is written to .coilbox/profile.json beside the app, and never overwrites a profile that is already there."
-
 #: src/multiplayer/chat/PartySection.tsx
 msgid "Start a party"
 msgstr "Start a party"
@@ -38771,6 +38819,10 @@ msgstr "Starting…"
 #: src/lego/pages/components/BuildMenuSection.tsx
 msgid "Starts {nextProjectName}."
 msgstr "Starts {nextProjectName}."
+
+#: src/profile/SettingsSection.tsx
+msgid "Starts a distribution profile from how Coilbox is set up now. It is written to .coilbox/profile.json beside the app, and never overwrites a profile that is already there."
+msgstr "Starts a distribution profile from how Coilbox is set up now. It is written to .coilbox/profile.json beside the app, and never overwrites a profile that is already there."
 
 #: src/scenario/triggerTypes.ts
 msgid "Starts a paused game again, in single player only."
@@ -44266,6 +44318,7 @@ msgid "Took \"{name}\" off the withheld list."
 msgstr "Took \"{name}\" off the withheld list."
 
 #: src/general/pages/SettingsSection.tsx
+#: src/profile/SettingsSection.tsx
 msgid "Tools"
 msgstr "Tools"
 
@@ -45963,10 +46016,6 @@ msgstr "valid JSON but does not match the campaign schema"
 msgid "valid JSON but does not match the scenario schema"
 msgstr "valid JSON but does not match the scenario schema"
 
-#: src/profile/SettingsSection.tsx
-msgid "Validate profile"
-msgstr "Validate profile"
-
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 msgid "Value"
 msgstr "Value"
@@ -47597,10 +47646,6 @@ msgstr "Write mapinfo.lua"
 msgid "Write root \"{writeRootPath}\" is outside the package (\"{appDir}\"). Downloads and release updates would land there, not with the package. Point the write root at a folder under the package."
 msgstr "Write root \"{writeRootPath}\" is outside the package (\"{appDir}\"). Downloads and release updates would land there, not with the package. Point the write root at a folder under the package."
 
-#: src/profile/health.ts
-msgid "Write root portability n/a (not portable)"
-msgstr "Write root portability n/a (not portable)"
-
 #: src/lego/pages/components/WriteSkeletons.tsx
 msgid "Write saved models"
 msgstr "Write saved models"
@@ -47710,6 +47755,10 @@ msgstr "Wrote \"{name}\" to Chobby"
 msgid "Wrote {modelsWritten} of {modelsFound} models into {0, plural, one {# sheet} other {# sheets}}."
 msgstr "Wrote {modelsWritten} of {modelsFound} models into {0, plural, one {# sheet} other {# sheets}}."
 
+#: src/profile/SettingsSection.tsx
+msgid "Wrote {path}. Restart Coilbox to load it."
+msgstr "Wrote {path}. Restart Coilbox to load it."
+
 #: src/mapconv/pages/CompilePage.tsx
 msgid "Wrote {splatCount} splat files with {splatGround} ground to <0>{splatFolder}</0>"
 msgstr "Wrote {splatCount} splat files with {splatGround} ground to <0>{splatFolder}</0>"
@@ -47717,10 +47766,6 @@ msgstr "Wrote {splatCount} splat files with {splatGround} ground to <0>{splatFol
 #: src/lego/pages/components/WriteSkeletons.tsx
 msgid "Wrote {unitCount, plural, one {# unit} other {# units}} to {fileCount, plural, one {# file} other {# files}}."
 msgstr "Wrote {unitCount, plural, one {# unit} other {# units}} to {fileCount, plural, one {# file} other {# files}}."
-
-#: src/profile/SettingsSection.tsx
-msgid "Wrote <0/>. Restart Coilbox to load it."
-msgstr "Wrote <0/>. Restart Coilbox to load it."
 
 #. placeholder {0}: skyResult.path
 #: src/mapconv/pages/CompilePage.tsx

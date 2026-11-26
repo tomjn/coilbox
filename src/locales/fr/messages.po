@@ -1183,6 +1183,11 @@ msgstr "{0, plural, one {# victoire} other {# victoires}}"
 msgid "{0, plural, one {# wreck} other {# wrecks}}"
 msgstr "{0, plural, one {# épave} other {# épaves}}"
 
+#. placeholder {0}: home.entries.length
+#: src/home/config.ts
+msgid "{0, plural, one {# zone} other {# zones}}"
+msgstr ""
+
 #. placeholder {0}: group.paletteModels.length
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
@@ -1996,9 +2001,8 @@ msgid "{campaignCount, plural, one {In campaign} other {In # campaigns}}"
 msgstr "{campaignCount, plural, one {Dans une campagne} other {Dans # campagnes}}"
 
 #: src/profile/health.ts
-#, fuzzy
-msgid "{campaignFailureCount} campaign(s) failed to load"
-msgstr "{campaignFailureCount} campagne(s) n’ont pas pu être chargées"
+msgid "{campaignFailureCount, plural, one {# campaign failed to load} other {# campaigns failed to load}}"
+msgstr ""
 
 #: src/lego/pages/components/PieceTree.tsx
 #, fuzzy
@@ -2713,19 +2717,20 @@ msgid "{energy} energy"
 msgstr "{energy} énergie"
 
 #: src/profile/health.ts
-#, fuzzy
-msgid "{engines} engine(s) found, games not scanned yet"
-msgstr "{engines} moteur(s) trouvé(s), jeux pas encore analysés"
+msgid "{engines, plural, one {# engine found, games not scanned yet} other {# engines found, games not scanned yet}}"
+msgstr ""
 
 #: src/profile/health.ts
-#, fuzzy
-msgid "{engines} engine(s) found, games scan failed"
-msgstr "{engines} moteur(s) trouvé(s), échec de l’analyse des jeux"
+msgid "{engines, plural, one {# engine found, games scan failed} other {# engines found, games scan failed}}"
+msgstr ""
 
 #: src/profile/health.ts
-#, fuzzy
-msgid "{engines} engine(s), {games} game(s) found"
-msgstr "{engines} moteur(s), {games} jeu(x) trouvé(s)"
+msgid "{engines, plural, one {# engine} other {# engines}}"
+msgstr ""
+
+#: src/profile/health.ts
+msgid "{engineText}, {gameText} found"
+msgstr ""
 
 #: src/scenario/pages/components/mapKeyboard.ts
 #, fuzzy
@@ -2835,9 +2840,8 @@ msgid "{failureCount, plural, one {# analysis failed} other {# analyses failed}}
 msgstr "{failureCount, plural, one {# analyse a échoué} other {# analyses ont échoué}}"
 
 #: src/profile/health.ts
-#, fuzzy
-msgid "{failureCount} language pack(s) were not used"
-msgstr "{failureCount} pack(s) de langue n’ont pas été utilisés"
+msgid "{failureCount, plural, one {# language pack was not used} other {# language packs were not used}}"
+msgstr ""
 
 #: src/placement/preview.ts
 #, fuzzy
@@ -3116,6 +3120,7 @@ msgstr "{game} : {covered} envoyées, {left, plural, one {# unité} other {# un
 
 #: src/campaign/listing.ts
 #: src/packs/pages/components/ImportPackForm.tsx
+#: src/profile/health.ts
 #, fuzzy
 msgid "{gameCount, plural, one {# game} other {# games}}"
 msgstr "{gameCount, plural, one {# jeu} other {# jeux}}"
@@ -3129,11 +3134,6 @@ msgstr "{gameCount, plural, one {Jeu} other {Jeux}}"
 #, fuzzy
 msgid "{gameCount, plural, one {Search # game…} other {Search # games…}}"
 msgstr "{gameCount, plural, one {Rechercher parmi # jeu…} other {Rechercher parmi # jeux…}}"
-
-#: src/profile/health.ts
-#, fuzzy
-msgid "{gameCount} game(s), {mapCount} map(s), {engineText}"
-msgstr "{gameCount} jeu(x), {mapCount} carte(s), {engineText}"
 
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
@@ -3409,6 +3409,7 @@ msgid "{gameNameShown} has no {stored} class, so the engine drops this unit at l
 msgstr "{gameNameShown} n’a pas de classe {stored}, le moteur abandonne donc cette unité au chargement. Choisissez-en une autre."
 
 #: src/career/pages/CareerPage.tsx
+#: src/profile/health.ts
 #, fuzzy
 msgid "{games, plural, one {# game} other {# games}}"
 msgstr "{games, plural, one {# partie} other {# parties}}"
@@ -3417,6 +3418,10 @@ msgstr "{games, plural, one {# partie} other {# parties}}"
 #, fuzzy
 msgid "{gamesText} and {mapsText} ready."
 msgstr "{gamesText} et {mapsText} prêts."
+
+#: src/profile/health.ts
+msgid "{gameText}, {mapText}, {engineText}"
+msgstr ""
 
 #: src/content/pages/GameDetailPage.tsx
 #, fuzzy
@@ -3941,9 +3946,8 @@ msgid "{layerNames} draw events from an analysis."
 msgstr "{layerNames} dessinent les événements d’une analyse."
 
 #: src/home/config.ts
-#, fuzzy
-msgid "{layout}, {zoneCount} zone(s), {tracking}"
-msgstr "{layout}, {zoneCount} zone(s), {tracking}"
+msgid "{layout}, {zones}, {tracking}"
+msgstr ""
 
 #: src/scenario/launch.ts
 #: src/workshop/pages/components/PackagePanel.tsx
@@ -4499,6 +4503,7 @@ msgstr "{many, select, systems {Vaste (56 systèmes)} locations {Vaste (56 lieux
 
 #: src/multiplayer/pages/MatchmakingPage.tsx
 #: src/packs/pages/components/ImportPackForm.tsx
+#: src/profile/health.ts
 #, fuzzy
 msgid "{mapCount, plural, one {# map} other {# maps}}"
 msgstr "{mapCount, plural, one {# carte} other {# cartes}}"
@@ -6069,9 +6074,8 @@ msgid "{primary} primary · {secondary} secondary"
 msgstr "{primary} principaux · {secondary} secondaires"
 
 #: src/profile/health.ts
-#, fuzzy
-msgid "{problemCount} problem(s) in the bundled content"
-msgstr "{problemCount} problème(s) dans le contenu intégré"
+msgid "{problemCount, plural, one {# problem in the bundled content} other {# problems in the bundled content}}"
+msgstr ""
 
 #: src/lego/pages/components/BuildPictureDrawer.tsx
 #, fuzzy
@@ -6262,15 +6266,14 @@ msgstr "{roleId, select, buildarm_nano {point d’émission nano} aim {point de 
 msgid "{rootCount, plural, one {{sideName} has no usable start unit in {gameName}, so the unit limit is based on the # mobile unit that can build and that no other unit builds or morphs into.} other {{sideName} has no usable start unit in {gameName}, so the unit limit is based on the # mobile units that can build and that no other unit builds or morphs into.}}"
 msgstr "{rootCount, plural, one {{sideName} n’a pas d’unité de départ utilisable dans {gameName}, la limite d’unités se base donc sur la # unité mobile capable de construire qu’aucune autre unité ne construit ni ne transforme.} other {{sideName} n’a pas d’unité de départ utilisable dans {gameName}, la limite d’unités se base donc sur les # unités mobiles capables de construire qu’aucune autre unité ne construit ni ne transforme.}}"
 
+#: src/profile/health.ts
+msgid "{rootCount, plural, one {# content folder, {portableRoots} portable} other {# content folders, {portableRoots} portable}}"
+msgstr ""
+
 #: src/lego/model.ts
 #, fuzzy
 msgid "{rootCount, plural, one {# piece has no parent, but a model has one root.} other {# pieces have no parent, but a model has one root.}}"
 msgstr "{rootCount, plural, one {# pièce n’a pas de parent, mais un modèle a une seule racine.} other {# pièces n’ont pas de parent, mais un modèle a une seule racine.}}"
-
-#: src/profile/health.ts
-#, fuzzy
-msgid "{rootCount} content folder(s), {portableRoots} portable"
-msgstr "{rootCount} dossier(s) de contenu, {portableRoots} portable(s)"
 
 #: src/workshop/pages/components/AssetPicker.tsx
 #, fuzzy
@@ -6302,6 +6305,10 @@ msgstr "{s, plural, one {# place reste libre} other {# places restent libres}}"
 msgid "{sameCount, plural, one {Show # identical row} other {Show # identical rows}}"
 msgstr "{sameCount, plural, one {Afficher # ligne identique} other {Afficher # lignes identiques}}"
 
+#: src/profile/health.ts
+msgid "{scanRootCount, plural, one {Scanned # content folder: {scanRootPaths}.} other {Scanned # content folders: {scanRootPaths}.}}"
+msgstr ""
+
 #: src/uberstress/pages/HistoryPage.tsx
 #, fuzzy
 msgid "{scenario} p99 trend"
@@ -6313,9 +6320,8 @@ msgid "{scenarioCount, plural, one {No scenarios match. The only scenario is sti
 msgstr "{scenarioCount, plural, one {Aucun scénario ne correspond. Le seul scénario est toujours là.} other {Aucun scénario ne correspond. Les # sont toujours là.}}"
 
 #: src/profile/health.ts
-#, fuzzy
-msgid "{scenarioFailureCount} scenario(s) failed to load"
-msgstr "{scenarioFailureCount} scénario(s) n’ont pas pu être chargés"
+msgid "{scenarioFailureCount, plural, one {# scenario failed to load} other {# scenarios failed to load}}"
+msgstr ""
 
 #: src/scenario/pages/ScenarioEditPage.tsx
 #, fuzzy
@@ -9035,11 +9041,6 @@ msgstr "d’une taille différente de la carte de cette page"
 msgid "a different size from this page's map, so it is left out"
 msgstr "d’une taille différente de la carte de cette page, elle est donc exclue"
 
-#: src/profile/SettingsSection.tsx
-#, fuzzy
-msgid "A distribution profile is active (loaded from <0>{source}</0>). It reskins and narrows this build:"
-msgstr "Un profil de distribution est actif (chargé depuis <0>{source}</0>). Il modifie l’apparence et restreint cette version :"
-
 #: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off."
@@ -9104,6 +9105,10 @@ msgstr "Une fonction à part"
 #, fuzzy
 msgid "A game against several different AIs shows on each one's row. Games from campaign, Conquest and Warpath are not counted."
 msgstr "Une partie contre plusieurs IA différentes apparaît sur la ligne de chacune. Les parties de campagne, de Conquête et de Sentier de la guerre ne sont pas comptées."
+
+#: src/profile/SettingsSection.tsx
+msgid "A game can ship its own build of Coilbox with a profile.json beside the app. The profile renames Coilbox, hides features and settings, and limits which games show. This page lists what the loaded profile changed."
+msgstr ""
 
 #: src/conquest/pages/components/BattleOverlayParts.tsx
 #, fuzzy
@@ -9522,9 +9527,8 @@ msgid "A preset pack's address must be https."
 msgstr "L’adresse d’un pack de préréglages doit être en https."
 
 #: src/profile/SettingsSection.tsx
-#, fuzzy
-msgid "A profile is already there: <0/>. Edit that file, then restart Coilbox to pick it up."
-msgstr "Un profil existe déjà : <0/>. Modifiez ce fichier, puis redémarrez Coilbox pour le prendre en compte."
+msgid "A profile is already there: {path}. Edit that file, then restart Coilbox to pick it up."
+msgstr ""
 
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 #, fuzzy
@@ -10090,6 +10094,10 @@ msgstr ""
 msgid "About calling a function"
 msgstr "À propos de l’appel d’une fonction"
 
+#: src/profile/SettingsSection.tsx
+msgid "About checking the profile"
+msgstr ""
+
 #: src/lego/pages/components/CollisionPanel.tsx
 #, fuzzy
 msgid "About clicking on each piece"
@@ -10100,8 +10108,16 @@ msgstr "À propos du clic sur chaque pièce"
 msgid "About Coilbox"
 msgstr "À propos de Coilbox"
 
+#: src/profile/SettingsSection.tsx
+msgid "About creating a profile"
+msgstr ""
+
 #: src/content/pages/StorageSection.tsx
 msgid "About deleting replays"
+msgstr ""
+
+#: src/profile/SettingsSection.tsx
+msgid "About distribution profiles"
 msgstr ""
 
 #: src/downloads/pages/SettingsSection.tsx
@@ -10192,6 +10208,10 @@ msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
 msgid "About reduce motion"
+msgstr ""
+
+#: src/profile/SettingsSection.tsx
+msgid "About reloading the profile"
 msgstr ""
 
 #: src/content/pages/components/ReplayTracksStorage.tsx
@@ -12789,11 +12809,6 @@ msgstr "Créez une suite de missions d’escarmouche à partir de vos prérégla
 #, fuzzy
 msgid "Authored sequences of skirmish missions. Play a campaign mission by mission, tracking your progress as you go."
 msgstr "Des suites de missions d’escarmouche créées par des auteurs. Jouez une campagne mission par mission, en suivant votre progression."
-
-#: src/profile/SettingsSection.tsx
-#, fuzzy
-msgid "Authoring"
-msgstr "Création"
 
 #: src/profile/SettingsSection.tsx
 #, fuzzy
@@ -15673,10 +15688,18 @@ msgstr "scénarios de chat"
 msgid "Cheapest"
 msgstr "Le moins cher"
 
+#: src/profile/SettingsSection.tsx
+msgid "Check"
+msgstr ""
+
 #: src/account/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Check {address} for the verification code."
 msgstr "Consultez {address} pour le code de vérification."
+
+#: src/profile/SettingsSection.tsx
+msgid "Check again"
+msgstr ""
 
 #: src/game-updates/pages/GameUpdatesSection.tsx
 #: src/updater/pages/UpdatesSettingsSection.tsx
@@ -15688,6 +15711,10 @@ msgstr "Vérifier les mises à jour"
 #, fuzzy
 msgid "Check it loads"
 msgstr "Vérifier le chargement"
+
+#: src/profile/SettingsSection.tsx
+msgid "Check profile"
+msgstr ""
 
 #: src/multiplayer/battle/useBattleLaunch.ts
 #, fuzzy
@@ -15845,6 +15872,10 @@ msgstr "Vérifications"
 #, fuzzy
 msgid "Checks its muzzle every frame"
 msgstr "Vérifie sa bouche à chaque image"
+
+#: src/profile/SettingsSection.tsx
+msgid "Checks the profile, content folders and bundled content, and lists anything a player would trip over. Mistakes that fail quietly, such as a hidden id that matches nothing, only show up here."
+msgstr ""
 
 #: src/content/pages/ArchiveDetailPage.tsx
 #: src/content/pages/GameDetailPage.tsx
@@ -19146,6 +19177,7 @@ msgstr "Multiplicateur de force du cratère"
 
 #: src/campaign/pages/CampaignBuilderPage.tsx
 #: src/content/pages/components/ReplaySetPicker.tsx
+#: src/profile/SettingsSection.tsx
 #: src/scenario/pages/ScenarioBuilderPage.tsx
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
@@ -20788,7 +20820,6 @@ msgid "Distribute {axisName}: equal gaps, ends stay. Needs 3 pieces."
 msgstr "Répartir {axisName} : écarts égaux, les extrémités restent. Demande 3 pièces."
 
 #: src/profile/index.ts
-#: src/profile/SettingsSection.tsx
 #, fuzzy
 msgid "Distribution profile"
 msgstr "Profil de distribution"
@@ -20950,11 +20981,6 @@ msgstr "Télécharger et installer"
 msgid "Download & Install"
 msgstr "Télécharger et installer"
 
-#: src/profile/health.ts
-#, fuzzy
-msgid "Download + data folders are writable"
-msgstr "Les dossiers de téléchargement et de données sont accessibles en écriture"
-
 #: src/onboarding/pages/GamesPage.tsx
 msgid "Download a game"
 msgstr "Télécharger un jeu"
@@ -20994,6 +21020,10 @@ msgstr "Téléchargez un moteur pour jouer"
 #, fuzzy
 msgid "Download an import"
 msgstr "Télécharger une importation"
+
+#: src/profile/health.ts
+msgid "Download and data folders are writable"
+msgstr ""
 
 #: src/home/continue.ts
 #, fuzzy
@@ -21040,6 +21070,10 @@ msgstr "Échec du téléchargement : {downloadError}"
 #, fuzzy
 msgid "Download failed: {reason}"
 msgstr "Échec du téléchargement : {reason}"
+
+#: src/profile/health.ts
+msgid "Download folder not checked, as this is not a portable install"
+msgstr ""
 
 #: src/content/pages/components/MissingContentNotice.tsx
 #: src/scenario/pages/ScenariosPage.tsx
@@ -25812,7 +25846,6 @@ msgstr "santé"
 #: src/lego/pages/components/WorthSection.tsx
 #: src/lego/unitStats.ts
 #: src/lego/unitValueControls.ts
-#: src/profile/HealthChecklist.tsx
 #: src/workshop/randomMod.ts
 #: src/workshop/unitReference.ts
 #, fuzzy
@@ -29810,6 +29843,10 @@ msgstr "{loadedName} chargé"
 msgid "Loaded {loadedName}, with parts missing"
 msgstr "{loadedName} chargé, avec des éléments manquants"
 
+#: src/profile/SettingsSection.tsx
+msgid "Loaded from"
+msgstr ""
+
 #: src/play/pages/SkirmishPage.tsx
 #, fuzzy
 msgid "Loaded the preset \"{loadedName}\"."
@@ -33427,11 +33464,6 @@ msgstr "Aucun message privé. Utilisez + pour écrire à un utilisateur en ligne
 msgid "No distribution profile loaded"
 msgstr "Aucun profil de distribution chargé"
 
-#: src/profile/SettingsSection.tsx
-#, fuzzy
-msgid "No distribution profile loaded — standard Coilbox."
-msgstr "Aucun profil de distribution chargé : Coilbox standard."
-
 #: src/multiplayer/admin/EmailDomainsSection.tsx
 #, fuzzy
 msgid "No domains are blocked."
@@ -36313,6 +36345,10 @@ msgstr "rien, une marque n’est pas une modification"
 #, fuzzy
 msgid "nothing, the weapon stays in the library"
 msgstr "rien, l’arme reste dans la bibliothèque"
+
+#: src/profile/SettingsSection.tsx
+msgid "Nothing, this is standard Coilbox"
+msgstr ""
 
 #: src/notify/NotificationsSettings.tsx
 #, fuzzy
@@ -39704,6 +39740,10 @@ msgstr "Problèmes avec les armes de cette unité"
 msgid "Produced whether or not the unit is switched on."
 msgstr "Produit que l’unité soit en marche ou non."
 
+#: src/profile/SettingsSection.tsx
+msgid "Profile"
+msgstr ""
+
 #: src/profile/health.ts
 #, fuzzy
 msgid "Profile failed to load"
@@ -40363,16 +40403,15 @@ msgstr "Classement"
 msgid "Raw text"
 msgstr "Texte brut"
 
+#: src/profile/SettingsSection.tsx
+msgid "Re-reads .coilbox/profile.json and applies it to this window, so editing a profile does not need a restart. You stay on this page, but anything in progress elsewhere resets."
+msgstr ""
+
 #: src/animation/pages/CobPage.tsx
 #: src/uberstress/pages/HistoryPage.tsx
 #, fuzzy
 msgid "Re-run"
 msgstr "Relancer"
-
-#: src/profile/SettingsSection.tsx
-#, fuzzy
-msgid "Re-run validation"
-msgstr "Relancer la validation"
 
 #: src/content/pages/components/FolderRow.tsx
 #, fuzzy
@@ -41463,6 +41502,7 @@ msgstr "Relief"
 #: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #: src/play/pages/EngineLogSection.tsx
+#: src/profile/SettingsSection.tsx
 #, fuzzy
 msgid "Reload"
 msgstr "Recharge"
@@ -41476,11 +41516,6 @@ msgstr "Recharger dans le bac à sable"
 #, fuzzy
 msgid "Reload profile"
 msgstr "Recharger le profil"
-
-#: src/profile/SettingsSection.tsx
-#, fuzzy
-msgid "Reload re-reads .coilbox/profile.json and applies it to this window, so editing a profile does not need an app restart. You stay on this page, but anything in progress elsewhere resets."
-msgstr "Recharger relit .coilbox/profile.json et l’applique à cette fenêtre, donc modifier un profil ne nécessite pas de redémarrer l’application. Vous restez sur cette page, mais tout ce qui est en cours ailleurs est réinitialisé."
 
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #, fuzzy
@@ -42606,9 +42641,8 @@ msgid "Rest & repair"
 msgstr "Repos et réparation"
 
 #: src/profile/SettingsSection.tsx
-#, fuzzy
-msgid "Restart Coilbox"
-msgstr "Redémarrer Coilbox"
+msgid "Restart"
+msgstr ""
 
 #: src/game-updates/pages/GameUpdatesSection.tsx
 #: src/updater/pages/UpdatesSettingsSection.tsx
@@ -42700,6 +42734,10 @@ msgstr "Résultat"
 #, fuzzy
 msgid "Result detected from the replay."
 msgstr "Résultat détecté depuis la rediffusion."
+
+#: src/profile/HealthChecklist.tsx
+msgid "Results"
+msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/play/pages/SavegamesPage.tsx
@@ -43847,11 +43885,6 @@ msgstr "{done} unités sur {total} analysées."
 #: src/content/pages/components/FolderRow.tsx
 msgid "Scanned {scannedAt}"
 msgstr ""
-
-#: src/profile/health.ts
-#, fuzzy
-msgid "Scanned {scanRootCount} content folder(s): {scanRootPaths}."
-msgstr "{scanRootCount} dossier(s) de contenu analysé(s) : {scanRootPaths}."
 
 #: src/lego/pages/components/ScanSkeletons.tsx
 #, fuzzy
@@ -47354,11 +47387,6 @@ msgstr "départ {number}"
 msgid "Start a conquest"
 msgstr "Commencer une conquête"
 
-#: src/profile/SettingsSection.tsx
-#, fuzzy
-msgid "Start a distribution profile from how Coilbox is set up right now. It is written to .coilbox/profile.json beside the app, and never overwrites a profile that is already there."
-msgstr "Créer un profil de distribution à partir de la configuration actuelle de Coilbox. Il est écrit dans .coilbox/profile.json à côté de l’application, et n’écrase jamais un profil existant."
-
 #: src/multiplayer/chat/PartySection.tsx
 #, fuzzy
 msgid "Start a party"
@@ -47690,6 +47718,10 @@ msgstr "Démarrage…"
 #, fuzzy
 msgid "Starts {nextProjectName}."
 msgstr "Démarre {nextProjectName}."
+
+#: src/profile/SettingsSection.tsx
+msgid "Starts a distribution profile from how Coilbox is set up now. It is written to .coilbox/profile.json beside the app, and never overwrites a profile that is already there."
+msgstr ""
 
 #: src/scenario/triggerTypes.ts
 #, fuzzy
@@ -54509,6 +54541,7 @@ msgid "Took \"{name}\" off the withheld list."
 msgstr "« {name} » retiré de la liste des unités retenues."
 
 #: src/general/pages/SettingsSection.tsx
+#: src/profile/SettingsSection.tsx
 #, fuzzy
 msgid "Tools"
 msgstr "Outils"
@@ -56596,11 +56629,6 @@ msgstr "JSON valide mais ne correspond pas au schéma de campagne"
 msgid "valid JSON but does not match the scenario schema"
 msgstr "JSON valide mais ne correspond pas au schéma de scénario"
 
-#: src/profile/SettingsSection.tsx
-#, fuzzy
-msgid "Validate profile"
-msgstr "Valider le profil"
-
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 #, fuzzy
 msgid "Value"
@@ -58610,11 +58638,6 @@ msgstr "Écrire mapinfo.lua"
 msgid "Write root \"{writeRootPath}\" is outside the package (\"{appDir}\"). Downloads and release updates would land there, not with the package. Point the write root at a folder under the package."
 msgstr "La racine d’écriture « {writeRootPath} » est en dehors du paquet (« {appDir} »). Les téléchargements et mises à jour arriveraient là, pas avec le paquet. Pointez la racine d’écriture vers un dossier du paquet."
 
-#: src/profile/health.ts
-#, fuzzy
-msgid "Write root portability n/a (not portable)"
-msgstr "Portabilité de la racine d’écriture sans objet (non portable)"
-
 #: src/lego/pages/components/WriteSkeletons.tsx
 #, fuzzy
 msgid "Write saved models"
@@ -58751,6 +58774,10 @@ msgstr "« {name} » écrit dans Chobby"
 msgid "Wrote {modelsWritten} of {modelsFound} models into {0, plural, one {# sheet} other {# sheets}}."
 msgstr "{modelsWritten} modèles sur {modelsFound} écrits dans {0, plural, one {# planche} other {# planches}}."
 
+#: src/profile/SettingsSection.tsx
+msgid "Wrote {path}. Restart Coilbox to load it."
+msgstr ""
+
 #: src/mapconv/pages/CompilePage.tsx
 #, fuzzy
 msgid "Wrote {splatCount} splat files with {splatGround} ground to <0>{splatFolder}</0>"
@@ -58760,11 +58787,6 @@ msgstr "{splatCount} fichiers de splats avec {splatGround} de sol écrits dans <
 #, fuzzy
 msgid "Wrote {unitCount, plural, one {# unit} other {# units}} to {fileCount, plural, one {# file} other {# files}}."
 msgstr "{unitCount, plural, one {# unité écrite} other {# unités écrites}} dans {fileCount, plural, one {# fichier} other {# fichiers}}."
-
-#: src/profile/SettingsSection.tsx
-#, fuzzy
-msgid "Wrote <0/>. Restart Coilbox to load it."
-msgstr "<0/> écrit. Redémarrez Coilbox pour le charger."
 
 #. placeholder {0}: skyResult.path
 #: src/mapconv/pages/CompilePage.tsx

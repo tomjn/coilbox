@@ -1183,6 +1183,11 @@ msgstr "{0, plural, one {# νίκη} other {# νίκες}}"
 msgid "{0, plural, one {# wreck} other {# wrecks}}"
 msgstr "{0, plural, one {# συντρίμμι} other {# συντρίμμια}}"
 
+#. placeholder {0}: home.entries.length
+#: src/home/config.ts
+msgid "{0, plural, one {# zone} other {# zones}}"
+msgstr ""
+
 #. placeholder {0}: group.paletteModels.length
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
@@ -1997,9 +2002,8 @@ msgid "{campaignCount, plural, one {In campaign} other {In # campaigns}}"
 msgstr "{campaignCount, plural, one {Σε εκστρατεία} other {Σε # εκστρατείες}}"
 
 #: src/profile/health.ts
-#, fuzzy
-msgid "{campaignFailureCount} campaign(s) failed to load"
-msgstr "Εκστρατείες που δεν φορτώθηκαν: {campaignFailureCount}"
+msgid "{campaignFailureCount, plural, one {# campaign failed to load} other {# campaigns failed to load}}"
+msgstr ""
 
 #: src/lego/pages/components/PieceTree.tsx
 #, fuzzy
@@ -2714,19 +2718,20 @@ msgid "{energy} energy"
 msgstr "{energy} ενέργεια"
 
 #: src/profile/health.ts
-#, fuzzy
-msgid "{engines} engine(s) found, games not scanned yet"
-msgstr "Μηχανές που βρέθηκαν: {engines}, τα παιχνίδια δεν έχουν σαρωθεί ακόμη"
+msgid "{engines, plural, one {# engine found, games not scanned yet} other {# engines found, games not scanned yet}}"
+msgstr ""
 
 #: src/profile/health.ts
-#, fuzzy
-msgid "{engines} engine(s) found, games scan failed"
-msgstr "Μηχανές που βρέθηκαν: {engines}, η σάρωση παιχνιδιών απέτυχε"
+msgid "{engines, plural, one {# engine found, games scan failed} other {# engines found, games scan failed}}"
+msgstr ""
 
 #: src/profile/health.ts
-#, fuzzy
-msgid "{engines} engine(s), {games} game(s) found"
-msgstr "Βρέθηκαν μηχανές: {engines}, παιχνίδια: {games}"
+msgid "{engines, plural, one {# engine} other {# engines}}"
+msgstr ""
+
+#: src/profile/health.ts
+msgid "{engineText}, {gameText} found"
+msgstr ""
 
 #: src/scenario/pages/components/mapKeyboard.ts
 #, fuzzy
@@ -2836,9 +2841,8 @@ msgid "{failureCount, plural, one {# analysis failed} other {# analyses failed}}
 msgstr "{failureCount, plural, one {# ανάλυση απέτυχε} other {# αναλύσεις απέτυχαν}}"
 
 #: src/profile/health.ts
-#, fuzzy
-msgid "{failureCount} language pack(s) were not used"
-msgstr "Πακέτα γλώσσας που δεν χρησιμοποιήθηκαν: {failureCount}"
+msgid "{failureCount, plural, one {# language pack was not used} other {# language packs were not used}}"
+msgstr ""
 
 #: src/placement/preview.ts
 #, fuzzy
@@ -3117,6 +3121,7 @@ msgstr "{game}: στάλθηκαν {covered}, {left, plural, one {# μονάδα
 
 #: src/campaign/listing.ts
 #: src/packs/pages/components/ImportPackForm.tsx
+#: src/profile/health.ts
 #, fuzzy
 msgid "{gameCount, plural, one {# game} other {# games}}"
 msgstr "{gameCount, plural, one {# παιχνίδι} other {# παιχνίδια}}"
@@ -3130,11 +3135,6 @@ msgstr "{gameCount, plural, one {Παιχνίδι} other {Παιχνίδια}}"
 #, fuzzy
 msgid "{gameCount, plural, one {Search # game…} other {Search # games…}}"
 msgstr "{gameCount, plural, one {Αναζήτηση σε # παιχνίδι…} other {Αναζήτηση σε # παιχνίδια…}}"
-
-#: src/profile/health.ts
-#, fuzzy
-msgid "{gameCount} game(s), {mapCount} map(s), {engineText}"
-msgstr "Παιχνίδια: {gameCount}, χάρτες: {mapCount}, {engineText}"
 
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
@@ -3410,6 +3410,7 @@ msgid "{gameNameShown} has no {stored} class, so the engine drops this unit at l
 msgstr "Το {gameNameShown} δεν έχει κατηγορία {stored}, οπότε η μηχανή απορρίπτει αυτή τη μονάδα κατά τη φόρτωση. Επιλέξτε άλλη."
 
 #: src/career/pages/CareerPage.tsx
+#: src/profile/health.ts
 #, fuzzy
 msgid "{games, plural, one {# game} other {# games}}"
 msgstr "{games, plural, one {# παιχνίδι} other {# παιχνίδια}}"
@@ -3418,6 +3419,10 @@ msgstr "{games, plural, one {# παιχνίδι} other {# παιχνίδια}}"
 #, fuzzy
 msgid "{gamesText} and {mapsText} ready."
 msgstr "Έτοιμα: {gamesText} και {mapsText}."
+
+#: src/profile/health.ts
+msgid "{gameText}, {mapText}, {engineText}"
+msgstr ""
 
 #: src/content/pages/GameDetailPage.tsx
 #, fuzzy
@@ -3942,9 +3947,8 @@ msgid "{layerNames} draw events from an analysis."
 msgstr "Τα {layerNames} σχεδιάζουν γεγονότα από μια ανάλυση."
 
 #: src/home/config.ts
-#, fuzzy
-msgid "{layout}, {zoneCount} zone(s), {tracking}"
-msgstr "{layout}, ζώνες: {zoneCount}, {tracking}"
+msgid "{layout}, {zones}, {tracking}"
+msgstr ""
 
 #: src/scenario/launch.ts
 #: src/workshop/pages/components/PackagePanel.tsx
@@ -4500,6 +4504,7 @@ msgstr "{many, select, systems {Απέραντος (56 συστήματα)} loca
 
 #: src/multiplayer/pages/MatchmakingPage.tsx
 #: src/packs/pages/components/ImportPackForm.tsx
+#: src/profile/health.ts
 #, fuzzy
 msgid "{mapCount, plural, one {# map} other {# maps}}"
 msgstr "{mapCount, plural, one {# χάρτης} other {# χάρτες}}"
@@ -6070,9 +6075,8 @@ msgid "{primary} primary · {secondary} secondary"
 msgstr "{primary} κύριοι · {secondary} δευτερεύοντες"
 
 #: src/profile/health.ts
-#, fuzzy
-msgid "{problemCount} problem(s) in the bundled content"
-msgstr "Προβλήματα στο ενσωματωμένο περιεχόμενο: {problemCount}"
+msgid "{problemCount, plural, one {# problem in the bundled content} other {# problems in the bundled content}}"
+msgstr ""
 
 #: src/lego/pages/components/BuildPictureDrawer.tsx
 #, fuzzy
@@ -6263,15 +6267,14 @@ msgstr "{roleId, select, buildarm_nano {σημείο εκπομπής νανοψ
 msgid "{rootCount, plural, one {{sideName} has no usable start unit in {gameName}, so the unit limit is based on the # mobile unit that can build and that no other unit builds or morphs into.} other {{sideName} has no usable start unit in {gameName}, so the unit limit is based on the # mobile units that can build and that no other unit builds or morphs into.}}"
 msgstr "{rootCount, plural, one {Η φατρία {sideName} δεν έχει χρησιμοποιήσιμη αρχική μονάδα στο {gameName}, οπότε το όριο μονάδων βασίζεται στη # κινητή μονάδα που μπορεί να κατασκευάσει και που καμία άλλη μονάδα δεν κατασκευάζει ούτε μετατρέπεται σε αυτήν.} other {Η φατρία {sideName} δεν έχει χρησιμοποιήσιμη αρχική μονάδα στο {gameName}, οπότε το όριο μονάδων βασίζεται στις # κινητές μονάδες που μπορούν να κατασκευάσουν και που καμία άλλη μονάδα δεν κατασκευάζει ούτε μετατρέπεται σε αυτές.}}"
 
+#: src/profile/health.ts
+msgid "{rootCount, plural, one {# content folder, {portableRoots} portable} other {# content folders, {portableRoots} portable}}"
+msgstr ""
+
 #: src/lego/model.ts
 #, fuzzy
 msgid "{rootCount, plural, one {# piece has no parent, but a model has one root.} other {# pieces have no parent, but a model has one root.}}"
 msgstr "{rootCount, plural, one {# τμήμα δεν έχει γονικό, αλλά ένα μοντέλο έχει μία ρίζα.} other {# τμήματα δεν έχουν γονικό, αλλά ένα μοντέλο έχει μία ρίζα.}}"
-
-#: src/profile/health.ts
-#, fuzzy
-msgid "{rootCount} content folder(s), {portableRoots} portable"
-msgstr "Φάκελοι περιεχομένου: {rootCount}, φορητοί: {portableRoots}"
 
 #: src/workshop/pages/components/AssetPicker.tsx
 #, fuzzy
@@ -6303,6 +6306,10 @@ msgstr "{s, plural, one {# θέση μένει ανοιχτή} other {# θέσε
 msgid "{sameCount, plural, one {Show # identical row} other {Show # identical rows}}"
 msgstr "{sameCount, plural, one {Εμφάνιση # ίδιας γραμμής} other {Εμφάνιση # ίδιων γραμμών}}"
 
+#: src/profile/health.ts
+msgid "{scanRootCount, plural, one {Scanned # content folder: {scanRootPaths}.} other {Scanned # content folders: {scanRootPaths}.}}"
+msgstr ""
+
 #: src/uberstress/pages/HistoryPage.tsx
 #, fuzzy
 msgid "{scenario} p99 trend"
@@ -6314,9 +6321,8 @@ msgid "{scenarioCount, plural, one {No scenarios match. The only scenario is sti
 msgstr "{scenarioCount, plural, one {Κανένα σενάριο δεν ταιριάζει. Το μοναδικό σενάριο είναι ακόμη εδώ.} other {Κανένα σενάριο δεν ταιριάζει. Και τα # είναι ακόμη εδώ.}}"
 
 #: src/profile/health.ts
-#, fuzzy
-msgid "{scenarioFailureCount} scenario(s) failed to load"
-msgstr "Σενάρια που δεν φορτώθηκαν: {scenarioFailureCount}"
+msgid "{scenarioFailureCount, plural, one {# scenario failed to load} other {# scenarios failed to load}}"
+msgstr ""
 
 #: src/scenario/pages/ScenarioEditPage.tsx
 #, fuzzy
@@ -9036,11 +9042,6 @@ msgstr "διαφορετικό μέγεθος από τον χάρτη αυτή�
 msgid "a different size from this page's map, so it is left out"
 msgstr "διαφορετικό μέγεθος από τον χάρτη αυτής της σελίδας, οπότε παραλείπεται"
 
-#: src/profile/SettingsSection.tsx
-#, fuzzy
-msgid "A distribution profile is active (loaded from <0>{source}</0>). It reskins and narrows this build:"
-msgstr "Είναι ενεργό ένα προφίλ διανομής (φορτώθηκε από <0>{source}</0>). Αλλάζει την εμφάνιση και περιορίζει αυτή την έκδοση:"
-
 #: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off."
@@ -9105,6 +9106,10 @@ msgstr "Μια δική της συνάρτηση"
 #, fuzzy
 msgid "A game against several different AIs shows on each one's row. Games from campaign, Conquest and Warpath are not counted."
 msgstr "Ένα παιχνίδι εναντίον πολλών διαφορετικών AI εμφανίζεται στη γραμμή του καθενός. Τα παιχνίδια από εκστρατεία, Κατάκτηση και Μονοπάτι Μάχης δεν μετράνε."
+
+#: src/profile/SettingsSection.tsx
+msgid "A game can ship its own build of Coilbox with a profile.json beside the app. The profile renames Coilbox, hides features and settings, and limits which games show. This page lists what the loaded profile changed."
+msgstr ""
 
 #: src/conquest/pages/components/BattleOverlayParts.tsx
 #, fuzzy
@@ -9523,9 +9528,8 @@ msgid "A preset pack's address must be https."
 msgstr "Η διεύθυνση ενός πακέτου προρρυθμίσεων πρέπει να είναι https."
 
 #: src/profile/SettingsSection.tsx
-#, fuzzy
-msgid "A profile is already there: <0/>. Edit that file, then restart Coilbox to pick it up."
-msgstr "Υπάρχει ήδη ένα προφίλ: <0/>. Επεξεργαστείτε αυτό το αρχείο και επανεκκινήστε το Coilbox για να το φορτώσει."
+msgid "A profile is already there: {path}. Edit that file, then restart Coilbox to pick it up."
+msgstr ""
 
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 #, fuzzy
@@ -10091,6 +10095,10 @@ msgstr ""
 msgid "About calling a function"
 msgstr "Σχετικά με την κλήση συνάρτησης"
 
+#: src/profile/SettingsSection.tsx
+msgid "About checking the profile"
+msgstr ""
+
 #: src/lego/pages/components/CollisionPanel.tsx
 #, fuzzy
 msgid "About clicking on each piece"
@@ -10101,8 +10109,16 @@ msgstr "Σχετικά με το κλικ σε κάθε τμήμα"
 msgid "About Coilbox"
 msgstr "Σχετικά με το Coilbox"
 
+#: src/profile/SettingsSection.tsx
+msgid "About creating a profile"
+msgstr ""
+
 #: src/content/pages/StorageSection.tsx
 msgid "About deleting replays"
+msgstr ""
+
+#: src/profile/SettingsSection.tsx
+msgid "About distribution profiles"
 msgstr ""
 
 #: src/downloads/pages/SettingsSection.tsx
@@ -10193,6 +10209,10 @@ msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
 msgid "About reduce motion"
+msgstr ""
+
+#: src/profile/SettingsSection.tsx
+msgid "About reloading the profile"
 msgstr ""
 
 #: src/content/pages/components/ReplayTracksStorage.tsx
@@ -12790,11 +12810,6 @@ msgstr "Δημιουργήστε μια σειρά αποστολών αψιμα
 #, fuzzy
 msgid "Authored sequences of skirmish missions. Play a campaign mission by mission, tracking your progress as you go."
 msgstr "Σειρές αποστολών αψιμαχίας από δημιουργούς. Παίξτε μια εκστρατεία αποστολή προς αποστολή, παρακολουθώντας την πρόοδό σας."
-
-#: src/profile/SettingsSection.tsx
-#, fuzzy
-msgid "Authoring"
-msgstr "Δημιουργία"
 
 #: src/profile/SettingsSection.tsx
 #, fuzzy
@@ -15675,10 +15690,18 @@ msgstr "σενάρια συνομιλίας"
 msgid "Cheapest"
 msgstr "Φθηνότερο"
 
+#: src/profile/SettingsSection.tsx
+msgid "Check"
+msgstr ""
+
 #: src/account/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Check {address} for the verification code."
 msgstr "Ελέγξτε το {address} για τον κωδικό επαλήθευσης."
+
+#: src/profile/SettingsSection.tsx
+msgid "Check again"
+msgstr ""
 
 #: src/game-updates/pages/GameUpdatesSection.tsx
 #: src/updater/pages/UpdatesSettingsSection.tsx
@@ -15690,6 +15713,10 @@ msgstr "Έλεγχος για ενημερώσεις"
 #, fuzzy
 msgid "Check it loads"
 msgstr "Έλεγχος φόρτωσης"
+
+#: src/profile/SettingsSection.tsx
+msgid "Check profile"
+msgstr ""
 
 #: src/multiplayer/battle/useBattleLaunch.ts
 #, fuzzy
@@ -15847,6 +15874,10 @@ msgstr "Έλεγχοι"
 #, fuzzy
 msgid "Checks its muzzle every frame"
 msgstr "Ελέγχει την κάννη του σε κάθε καρέ"
+
+#: src/profile/SettingsSection.tsx
+msgid "Checks the profile, content folders and bundled content, and lists anything a player would trip over. Mistakes that fail quietly, such as a hidden id that matches nothing, only show up here."
+msgstr ""
 
 #: src/content/pages/ArchiveDetailPage.tsx
 #: src/content/pages/GameDetailPage.tsx
@@ -19150,6 +19181,7 @@ msgstr "Πολλαπλασιαστής ισχύος κρατήρα"
 
 #: src/campaign/pages/CampaignBuilderPage.tsx
 #: src/content/pages/components/ReplaySetPicker.tsx
+#: src/profile/SettingsSection.tsx
 #: src/scenario/pages/ScenarioBuilderPage.tsx
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
@@ -20792,7 +20824,6 @@ msgid "Distribute {axisName}: equal gaps, ends stay. Needs 3 pieces."
 msgstr "Κατανομή {axisName}: ίσα κενά, τα άκρα μένουν. Χρειάζεται 3 τμήματα."
 
 #: src/profile/index.ts
-#: src/profile/SettingsSection.tsx
 #, fuzzy
 msgid "Distribution profile"
 msgstr "Προφίλ διανομής"
@@ -20954,11 +20985,6 @@ msgstr "Λήψη και εγκατάσταση"
 msgid "Download & Install"
 msgstr "Λήψη και εγκατάσταση"
 
-#: src/profile/health.ts
-#, fuzzy
-msgid "Download + data folders are writable"
-msgstr "Οι φάκελοι λήψεων και δεδομένων είναι εγγράψιμοι"
-
 #: src/onboarding/pages/GamesPage.tsx
 #, fuzzy
 msgid "Download a game"
@@ -20999,6 +21025,10 @@ msgstr "Κατεβάστε μια μηχανή για να παίξετε"
 #, fuzzy
 msgid "Download an import"
 msgstr "Λήψη εισαγωγής"
+
+#: src/profile/health.ts
+msgid "Download and data folders are writable"
+msgstr ""
 
 #: src/home/continue.ts
 #, fuzzy
@@ -21045,6 +21075,10 @@ msgstr "Η λήψη απέτυχε: {downloadError}"
 #, fuzzy
 msgid "Download failed: {reason}"
 msgstr "Η λήψη απέτυχε: {reason}"
+
+#: src/profile/health.ts
+msgid "Download folder not checked, as this is not a portable install"
+msgstr ""
 
 #: src/content/pages/components/MissingContentNotice.tsx
 #: src/scenario/pages/ScenariosPage.tsx
@@ -25820,7 +25854,6 @@ msgstr "πόντοι ζωής"
 #: src/lego/pages/components/WorthSection.tsx
 #: src/lego/unitStats.ts
 #: src/lego/unitValueControls.ts
-#: src/profile/HealthChecklist.tsx
 #: src/workshop/randomMod.ts
 #: src/workshop/unitReference.ts
 #, fuzzy
@@ -29820,6 +29853,10 @@ msgstr "Φορτώθηκε το {loadedName}"
 msgid "Loaded {loadedName}, with parts missing"
 msgstr "Φορτώθηκε το {loadedName}, με εξαρτήματα που λείπουν"
 
+#: src/profile/SettingsSection.tsx
+msgid "Loaded from"
+msgstr ""
+
 #: src/play/pages/SkirmishPage.tsx
 #, fuzzy
 msgid "Loaded the preset \"{loadedName}\"."
@@ -33439,11 +33476,6 @@ msgstr "Κανένα προσωπικό μήνυμα. Χρησιμοποιήστ
 msgid "No distribution profile loaded"
 msgstr "Δεν φορτώθηκε προφίλ διανομής"
 
-#: src/profile/SettingsSection.tsx
-#, fuzzy
-msgid "No distribution profile loaded — standard Coilbox."
-msgstr "Δεν φορτώθηκε προφίλ διανομής — τυπικό Coilbox."
-
 #: src/multiplayer/admin/EmailDomainsSection.tsx
 #, fuzzy
 msgid "No domains are blocked."
@@ -36327,6 +36359,10 @@ msgstr "τίποτα, μια σήμανση δεν είναι αλλαγή"
 #, fuzzy
 msgid "nothing, the weapon stays in the library"
 msgstr "τίποτα, το όπλο μένει στη βιβλιοθήκη"
+
+#: src/profile/SettingsSection.tsx
+msgid "Nothing, this is standard Coilbox"
+msgstr ""
 
 #: src/notify/NotificationsSettings.tsx
 #, fuzzy
@@ -39721,6 +39757,10 @@ msgstr "Προβλήματα με τα όπλα αυτής της μονάδας
 msgid "Produced whether or not the unit is switched on."
 msgstr "Παράγεται είτε η μονάδα είναι ενεργή είτε όχι."
 
+#: src/profile/SettingsSection.tsx
+msgid "Profile"
+msgstr ""
+
 #: src/profile/health.ts
 #, fuzzy
 msgid "Profile failed to load"
@@ -40381,16 +40421,15 @@ msgstr "Βαθμολογία"
 msgid "Raw text"
 msgstr "Ακατέργαστο κείμενο"
 
+#: src/profile/SettingsSection.tsx
+msgid "Re-reads .coilbox/profile.json and applies it to this window, so editing a profile does not need a restart. You stay on this page, but anything in progress elsewhere resets."
+msgstr ""
+
 #: src/animation/pages/CobPage.tsx
 #: src/uberstress/pages/HistoryPage.tsx
 #, fuzzy
 msgid "Re-run"
 msgstr "Νέα εκτέλεση"
-
-#: src/profile/SettingsSection.tsx
-#, fuzzy
-msgid "Re-run validation"
-msgstr "Νέος έλεγχος εγκυρότητας"
 
 #: src/content/pages/components/FolderRow.tsx
 #, fuzzy
@@ -41482,6 +41521,7 @@ msgstr "Ανάγλυφο"
 #: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #: src/play/pages/EngineLogSection.tsx
+#: src/profile/SettingsSection.tsx
 #, fuzzy
 msgid "Reload"
 msgstr "Επαναφόρτωση"
@@ -41495,11 +41535,6 @@ msgstr "Επαναφόρτωση στο sandbox"
 #, fuzzy
 msgid "Reload profile"
 msgstr "Επαναφόρτωση προφίλ"
-
-#: src/profile/SettingsSection.tsx
-#, fuzzy
-msgid "Reload re-reads .coilbox/profile.json and applies it to this window, so editing a profile does not need an app restart. You stay on this page, but anything in progress elsewhere resets."
-msgstr "Η επαναφόρτωση διαβάζει ξανά το .coilbox/profile.json και το εφαρμόζει σε αυτό το παράθυρο, ώστε η επεξεργασία ενός προφίλ να μη χρειάζεται επανεκκίνηση της εφαρμογής. Μένετε σε αυτή τη σελίδα, αλλά ό,τι βρίσκεται σε εξέλιξη αλλού επαναφέρεται."
 
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #, fuzzy
@@ -42625,9 +42660,8 @@ msgid "Rest & repair"
 msgstr "Ανάπαυση και επισκευή"
 
 #: src/profile/SettingsSection.tsx
-#, fuzzy
-msgid "Restart Coilbox"
-msgstr "Επανεκκίνηση του Coilbox"
+msgid "Restart"
+msgstr ""
 
 #: src/game-updates/pages/GameUpdatesSection.tsx
 #: src/updater/pages/UpdatesSettingsSection.tsx
@@ -42719,6 +42753,10 @@ msgstr "Αποτέλεσμα"
 #, fuzzy
 msgid "Result detected from the replay."
 msgstr "Το αποτέλεσμα εντοπίστηκε από την επανάληψη."
+
+#: src/profile/HealthChecklist.tsx
+msgid "Results"
+msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/play/pages/SavegamesPage.tsx
@@ -43869,11 +43907,6 @@ msgstr "Σαρώθηκαν {done} από {total} μονάδες."
 #: src/content/pages/components/FolderRow.tsx
 msgid "Scanned {scannedAt}"
 msgstr ""
-
-#: src/profile/health.ts
-#, fuzzy
-msgid "Scanned {scanRootCount} content folder(s): {scanRootPaths}."
-msgstr "Σαρώθηκαν φάκελοι περιεχομένου ({scanRootCount}): {scanRootPaths}."
 
 #: src/lego/pages/components/ScanSkeletons.tsx
 #, fuzzy
@@ -47383,11 +47416,6 @@ msgstr "εκκίνηση {number}"
 msgid "Start a conquest"
 msgstr "Έναρξη Κατάκτησης"
 
-#: src/profile/SettingsSection.tsx
-#, fuzzy
-msgid "Start a distribution profile from how Coilbox is set up right now. It is written to .coilbox/profile.json beside the app, and never overwrites a profile that is already there."
-msgstr "Δημιουργία προφίλ διανομής από τον τρέχοντα τρόπο ρύθμισης του Coilbox. Γράφεται στο .coilbox/profile.json δίπλα στην εφαρμογή και δεν αντικαθιστά ποτέ ένα προφίλ που υπάρχει ήδη."
-
 #: src/multiplayer/chat/PartySection.tsx
 #, fuzzy
 msgid "Start a party"
@@ -47720,6 +47748,10 @@ msgstr "Έναρξη…"
 #, fuzzy
 msgid "Starts {nextProjectName}."
 msgstr "Ξεκινά το {nextProjectName}."
+
+#: src/profile/SettingsSection.tsx
+msgid "Starts a distribution profile from how Coilbox is set up now. It is written to .coilbox/profile.json beside the app, and never overwrites a profile that is already there."
+msgstr ""
 
 #: src/scenario/triggerTypes.ts
 #, fuzzy
@@ -54540,6 +54572,7 @@ msgid "Took \"{name}\" off the withheld list."
 msgstr "Το «{name}» αφαιρέθηκε από τη λίστα αποκλεισμένων."
 
 #: src/general/pages/SettingsSection.tsx
+#: src/profile/SettingsSection.tsx
 #, fuzzy
 msgid "Tools"
 msgstr "Εργαλεία"
@@ -56627,11 +56660,6 @@ msgstr "έγκυρο JSON αλλά δεν ταιριάζει με το σχήμ�
 msgid "valid JSON but does not match the scenario schema"
 msgstr "έγκυρο JSON αλλά δεν ταιριάζει με το σχήμα σεναρίου"
 
-#: src/profile/SettingsSection.tsx
-#, fuzzy
-msgid "Validate profile"
-msgstr "Έλεγχος εγκυρότητας προφίλ"
-
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 #, fuzzy
 msgid "Value"
@@ -58641,11 +58669,6 @@ msgstr "Εγγραφή mapinfo.lua"
 msgid "Write root \"{writeRootPath}\" is outside the package (\"{appDir}\"). Downloads and release updates would land there, not with the package. Point the write root at a folder under the package."
 msgstr "Ο ριζικός φάκελος εγγραφής «{writeRootPath}» είναι εκτός του πακέτου («{appDir}»). Οι λήψεις και οι ενημερώσεις εκδόσεων θα κατέληγαν εκεί, όχι μαζί με το πακέτο. Ορίστε τον ριζικό φάκελο εγγραφής σε φάκελο μέσα στο πακέτο."
 
-#: src/profile/health.ts
-#, fuzzy
-msgid "Write root portability n/a (not portable)"
-msgstr "Φορητότητα ριζικού φακέλου εγγραφής: δεν ισχύει (μη φορητό)"
-
 #: src/lego/pages/components/WriteSkeletons.tsx
 #, fuzzy
 msgid "Write saved models"
@@ -58782,6 +58805,10 @@ msgstr "Το «{name}» γράφτηκε στο Chobby"
 msgid "Wrote {modelsWritten} of {modelsFound} models into {0, plural, one {# sheet} other {# sheets}}."
 msgstr "Γράφτηκαν {modelsWritten} από {modelsFound} μοντέλα σε {0, plural, one {# φύλλο} other {# φύλλα}}."
 
+#: src/profile/SettingsSection.tsx
+msgid "Wrote {path}. Restart Coilbox to load it."
+msgstr ""
+
 #: src/mapconv/pages/CompilePage.tsx
 #, fuzzy
 msgid "Wrote {splatCount} splat files with {splatGround} ground to <0>{splatFolder}</0>"
@@ -58791,11 +58818,6 @@ msgstr "Γράφτηκαν {splatCount} αρχεία splat με έδαφος {sp
 #, fuzzy
 msgid "Wrote {unitCount, plural, one {# unit} other {# units}} to {fileCount, plural, one {# file} other {# files}}."
 msgstr "Γράφτηκαν {unitCount, plural, one {# μονάδα} other {# μονάδες}} σε {fileCount, plural, one {# αρχείο} other {# αρχεία}}."
-
-#: src/profile/SettingsSection.tsx
-#, fuzzy
-msgid "Wrote <0/>. Restart Coilbox to load it."
-msgstr "Γράφτηκε το <0/>. Επανεκκινήστε το Coilbox για να φορτωθεί."
 
 #. placeholder {0}: skyResult.path
 #: src/mapconv/pages/CompilePage.tsx
