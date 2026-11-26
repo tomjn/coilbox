@@ -26,3 +26,21 @@ export interface RapidMaster {
 export const DEFAULT_RAPID_MASTERS: RapidMaster[] = [
   { id: "spring", name: "Spring", url: "https://repos.springrts.com" },
 ];
+
+/**
+ * The repositories that can be read from. A row being typed in Sources can have
+ * no address yet, and an empty address would make a Select item that Radix
+ * refuses and a master the sidecar cannot fetch. A repeated address is kept
+ * once, so it does not show twice in the Rapid repositories picker.
+ */
+export function usableRapidRepos<T extends { url: string }>(
+  repos: readonly T[],
+): T[] {
+  const seen = new Set<string>();
+  return repos.flatMap((r) => {
+    const url = r.url.trim();
+    if (!url || seen.has(url)) return [];
+    seen.add(url);
+    return [{ ...r, url }];
+  });
+}

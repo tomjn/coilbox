@@ -3,6 +3,7 @@ import { errorText } from "@/lib/helpers";
 import { dlRepos, dlVersions } from "../downloads/bindings";
 import { useDownloadsConfig, useWriteRootPath } from "../downloads/config";
 import { type DownloadHistory, recordsFor } from "../downloads/downloadHistory";
+import { usableRapidRepos } from "../downloads/rapidMasters";
 import type { RapidRepoVersions } from "./gameVersionRows";
 import type { LibraryGame } from "./library";
 import { gameKeys } from "./libraryGames";
@@ -39,7 +40,9 @@ export function useGameRapidVersions(repos: readonly string[]): {
 } {
   const [cfg] = useDownloadsConfig();
   const writePath = useWriteRootPath("games");
-  const masters = cfg.rapidRepos.map((r) => r.url).join("\n");
+  const masters = usableRapidRepos(cfg.rapidRepos)
+    .map((r) => r.url)
+    .join("\n");
   const wanted = repos.join("\n");
   const [state, setState] = useState<{
     repos: RapidRepoVersions[];
