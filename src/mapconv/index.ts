@@ -93,10 +93,8 @@ const mapconvPlugin: FramePlugin = {
   settings: [
     {
       id: "mapconv",
-      title: lazyText(msg`mapconv`),
-      description: lazyText(
-        msg`The map compiler coilbox builds and takes apart maps with.`,
-      ),
+      title: lazyText(msg`Map compiler`),
+      description: lazyText(msg`Builds maps and takes them apart.`),
       parent: "advanced",
       order: 10,
       icon: MapIcon,

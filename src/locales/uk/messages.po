@@ -8613,8 +8613,7 @@ msgstr ""
 msgid "0.5 in each channel means no change; 1.0 is twice as bright."
 msgstr "0,5 у кожному каналі – без змін. 1,0 – удвічі яскравіше."
 
-#: src/mapconv/pages/CompilePage.tsx
-#: src/mapconv/pages/SettingsSection.tsx
+#: src/mapconv/compression.ts
 #, fuzzy
 msgid "1 — No compression"
 msgstr "1 – Без стиснення"
@@ -8649,12 +8648,7 @@ msgstr "1 на 1"
 msgid "1v1, cheese, teaching"
 msgstr "1 на 1, чиз, навчання"
 
-#: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "2 — Fast"
-msgstr "2 – Швидко"
-
-#: src/mapconv/pages/CompilePage.tsx
+#: src/mapconv/compression.ts
 #, fuzzy
 msgid "2 — Fast (compare last N tiles)"
 msgstr "2 – Швидко (порівнювати останні N плиток)"
@@ -8663,12 +8657,7 @@ msgstr "2 – Швидко (порівнювати останні N плиток
 msgid "2 samples"
 msgstr ""
 
-#: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "3 — Insane (slow)"
-msgstr "3 – Божевільно (повільно)"
-
-#: src/mapconv/pages/CompilePage.tsx
+#: src/mapconv/compression.ts
 #, fuzzy
 msgid "3 — Insane (whole map; very slow)"
 msgstr "3 – Божевільно (уся мапа, дуже повільно)"
@@ -8693,8 +8682,7 @@ msgstr "3D-модель"
 msgid "3D preview unavailable."
 msgstr "3D-перегляд недоступний."
 
-#: src/mapconv/pages/CompilePage.tsx
-#: src/mapconv/pages/SettingsSection.tsx
+#: src/mapconv/compression.ts
 #, fuzzy
 msgid "4 — High quality fast"
 msgstr "4 – Висока якість, швидко"
@@ -10112,6 +10100,10 @@ msgstr "Про клацання на кожному елементі"
 msgid "About Coilbox"
 msgstr "Про Coilbox"
 
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "About compression"
+msgstr ""
+
 #: src/profile/SettingsSection.tsx
 msgid "About creating a profile"
 msgstr ""
@@ -10222,6 +10214,10 @@ msgstr ""
 msgid "About reloading the profile"
 msgstr ""
 
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "About remembering folders"
+msgstr ""
+
 #: src/content/pages/components/ReplayTracksStorage.tsx
 #, fuzzy
 msgid "About replay tracks"
@@ -10287,6 +10283,10 @@ msgstr ""
 
 #: src/hub/pages/components/HubAddressField.tsx
 msgid "About the hub address"
+msgstr ""
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "About the map tools"
 msgstr ""
 
 #: src/sound/SoundSettings.tsx
@@ -12877,7 +12877,6 @@ msgid "Autosave {when}"
 msgstr "Автозбереження {when}"
 
 #: src/conquest/pages/components/BattleOverlay.tsx
-#: src/mapconv/pages/SettingsSection.tsx
 #, fuzzy
 msgid "available"
 msgstr "доступно"
@@ -14639,6 +14638,10 @@ msgstr "Створює окремий .glb і зберігає його куди
 msgid "Builds anything"
 msgstr "Будує що завгодно"
 
+#: src/mapconv/index.ts
+msgid "Builds maps and takes them apart."
+msgstr ""
+
 #: src/workshop/pages/components/BuildMenuPanel.tsx
 #, fuzzy
 msgid "Builds nothing"
@@ -15850,16 +15853,12 @@ msgstr "Перевірка вашого роутера…"
 msgid "Checking your sign-in"
 msgstr "Перевірка вашого входу"
 
-#: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "checking…"
-msgstr "перевірка…"
-
 #: src/blueprint/pages/components/WidgetPanel.tsx
 #: src/content/pages/components/states.tsx
 #: src/content/pages/components/UnitRendersRow.tsx
 #: src/deeplink/pages/ImportSection.tsx
 #: src/game-updates/pages/GameUpdatesSection.tsx
+#: src/mapconv/pages/SettingsSection.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #: src/notify/NotificationsSettings.tsx
 #: src/packs/pages/components/ImportPackForm.tsx
@@ -16772,6 +16771,10 @@ msgstr "Coilbox не може записати {label} у власний фай�
 #, fuzzy
 msgid "Coilbox challenge"
 msgstr "Виклик Coilbox"
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Coilbox comes with the SpringMapConvNG tools. Compile needs mapcompile and Decompile needs mapdecompile."
+msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "Coilbox connects to any TASServer-compatible lobby, including one you run yourself. lobby.recoilengine.org runs uberserver, which has a full deployment guide using Docker and MariaDB. Add yours as a custom server once it is running."
@@ -17787,6 +17790,10 @@ msgstr "Скомпільований скрипт юніта"
 msgid "Compiles the mission, checks it loads, then starts the engine."
 msgstr "Компілює місію, перевіряє, що вона завантажується, а потім запускає рушій."
 
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Compiling"
+msgstr ""
+
 #: src/conquest/galaxy3d/GalaxyView.tsx
 #, fuzzy
 msgid "Compiling shaders…"
@@ -17821,6 +17828,10 @@ msgstr "Завершено"
 #, fuzzy
 msgid "Compose this unit's two textures from separate layers, in the channel layout the engine reads rather than the layout an image editor works in. Building replaces the texture below, the same as choosing one by hand."
 msgstr "Складіть дві текстури цього юніта з окремих шарів, у розкладці каналів, яку читає рушій, а не в тій, з якою працює графічний редактор. Створення замінює текстуру нижче, так само як ручний вибір."
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Compression"
+msgstr ""
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 #, fuzzy
@@ -18615,6 +18626,10 @@ msgstr "Не вдалося прочитати взагалі ({unreadableCount}
 #, fuzzy
 msgid "Could not check everything"
 msgstr "Не вдалося перевірити все"
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Could not check for the tools: {probeError}"
+msgstr ""
 
 #: src/direct/ReachablePorts.tsx
 #, fuzzy
@@ -19873,11 +19888,6 @@ msgstr "типово {defaultValue}"
 msgid "Default AI"
 msgstr "Типовий ШІ"
 
-#: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Default compression type"
-msgstr "Типовий тип стиснення"
-
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Default damage"
@@ -19902,11 +19912,6 @@ msgstr "Типово: {defaultText}"
 #, fuzzy
 msgid "defaults"
 msgstr "типові значення"
-
-#: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Defaults"
-msgstr "Типові значення"
 
 #: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
@@ -24436,6 +24441,10 @@ msgstr "Уперед"
 #, fuzzy
 msgid "Forward one frame"
 msgstr "На кадр уперед"
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Found"
+msgstr ""
 
 #: src/multiplayer/admin/ChannelsSection.tsx
 #, fuzzy
@@ -30661,6 +30670,10 @@ msgstr "Мапу й рушій не встановлено"
 msgid "Map and game missing"
 msgstr "Бракує мапи й гри"
 
+#: src/mapconv/index.ts
+msgid "Map compiler"
+msgstr ""
+
 #: src/conquest/pages/ConquestListPage.tsx
 #, fuzzy
 msgid "Map folder \"{folder}\""
@@ -31659,6 +31672,10 @@ msgstr "Лише для MissileLauncher."
 #, fuzzy
 msgid "missing"
 msgstr "відсутня"
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Missing"
+msgstr ""
 
 #: src/campaign/index.ts
 #: src/scenario/validate.ts
@@ -35437,6 +35454,10 @@ msgstr "Не оновлено:"
 msgid "Not built"
 msgstr "Не зібрано"
 
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Not checked"
+msgstr ""
+
 #: src/multiplayer/battles/HostBattleForm.tsx
 #, fuzzy
 msgid "Not checked, because every battle you host goes through the server's relay."
@@ -35482,11 +35503,6 @@ msgstr "не змінено"
 #, fuzzy
 msgid "Not equipped anywhere."
 msgstr "Ніде не встановлено."
-
-#: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "not found"
-msgstr "не знайдено"
 
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #, fuzzy
@@ -39468,11 +39484,6 @@ msgstr "Потужність"
 msgid "pr-downloader is unavailable"
 msgstr "pr-downloader недоступний"
 
-#: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Pre-fill the file pickers with the folders you used last time."
-msgstr "Заповнювати вікна вибору файлів папками, які ви використовували минулого разу."
-
 #: src/content/replayEventList.ts
 #, fuzzy
 msgid "Pre-game"
@@ -41582,9 +41593,8 @@ msgid "Rematch: {rematchMapName}"
 msgstr "Реванш: {rematchMapName}"
 
 #: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Remember last-used folders"
-msgstr "Запам’ятовувати останні папки"
+msgid "Remember folders"
+msgstr ""
 
 #: src/content/pages/components/RemixPanel.tsx
 #: src/content/pages/PlayerDossierPage.tsx
@@ -44531,11 +44541,6 @@ msgstr "Створити облікові записи перед хрономе
 msgid "Seed SQL"
 msgstr "SQL сіда"
 
-#: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "seeds the Compile page"
-msgstr "задає початкові значення сторінки компіляції"
-
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
 msgid "seen before"
@@ -47235,11 +47240,6 @@ msgstr "springfiles не має рушіїв для такого типу ком
 msgid "springfiles has no engines to offer right now. Try again in a moment, or switch the source above to Recoil."
 msgstr "springfiles зараз не має рушіїв. Спробуйте трохи пізніше або перемкніть джерело вище на Recoil."
 
-#: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "SpringMapConvNG sidecars"
-msgstr "Sidecar SpringMapConvNG"
-
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Sprite colour"
@@ -49367,9 +49367,8 @@ msgid "The colour the shield fades to as its charge regenerates to full."
 msgstr "Колір, до якого змінюється щит, коли його заряд відновлюється до повного."
 
 #: src/mapconv/pages/SettingsSection.tsx
-#, fuzzy
-msgid "The compile/decompile features shell out to the bundled SpringMapConvNG binaries."
-msgstr "Функції компіляції й декомпіляції викликають вбудовані виконувані файли SpringMapConvNG."
+msgid "The Compile page starts with this choice. You can still change it there for each map."
+msgstr ""
 
 #: src/scenario/validate.ts
 #, fuzzy
@@ -49880,6 +49879,10 @@ msgstr "Файл використовує зображення ({imagesUsed}), �
 #, fuzzy
 msgid "The file paints with {imagesUsed} textures where a Spring unit has one, so the first was taken and the rest of the model draws with it."
 msgstr "Файл використовує текстури ({imagesUsed}), а юніт Spring має одну, тож узято першу, і вся модель малюється з нею."
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "The file pickers open in the folders you used last time. Turning this off forgets them."
+msgstr ""
 
 #: src/lego/moduleFile.ts
 #, fuzzy
@@ -50826,11 +50829,6 @@ msgstr "мапа"
 #, fuzzy
 msgid "The map \"{savedTitle}\" is no longer installed."
 msgstr "Мапу «{savedTitle}» більше не встановлено."
-
-#: src/mapconv/index.ts
-#, fuzzy
-msgid "The map compiler coilbox builds and takes apart maps with."
-msgstr "Компілятор мап, яким coilbox збирає й розбирає мапи."
 
 #: src/scenario/pages/ScenarioEditPage.tsx
 #, fuzzy
@@ -54540,6 +54538,7 @@ msgid "Took \"{name}\" off the withheld list."
 msgstr "\"{name}\" прибрано зі списку утриманих."
 
 #: src/general/pages/SettingsSection.tsx
+#: src/mapconv/pages/SettingsSection.tsx
 #: src/profile/SettingsSection.tsx
 #, fuzzy
 msgid "Tools"

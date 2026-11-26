@@ -151,7 +151,7 @@ Each settings section lives at `#/settings/<id>`. **Any** of these ids can be hi
 | → Storage                    | `storage`          | `#/settings/storage`           |
 | → Import                      | `import`           | `#/settings/import`            |
 | Advanced                  | `advanced`         | `#/settings/advanced`          |
-| → mapconv                 | `mapconv`          | `#/settings/mapconv`           |
+| → Map compiler            | `mapconv`          | `#/settings/mapconv`           |
 | → uberstress                | `uberstress`       | `#/settings/uberstress`        |
 | → Distribution profile        | `profile`          | `#/settings/profile`           |
 
