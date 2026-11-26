@@ -3,12 +3,20 @@ import { Button } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { AlertCircle, FolderPlus, Loader2, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CheckField } from "@/components/Field";
+import { HelpPopover } from "@/components/HelpPopover";
+import { SettingList, SettingRow } from "@/components/SettingRow";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { describeError } from "@/i18n/uiError";
-import { useDefaultWriteRoot, useWriteRootPath } from "../../downloads/config";
+import {
+  useDefaultWriteRoot,
+  useDownloadsConfig,
+  useWriteRootPath,
+} from "../../downloads/config";
+import { backfillWriteRootId } from "../../downloads/writeRoot";
 import {
   type ContentState,
   contentAddRoot,
@@ -21,14 +29,15 @@ import {
 } from "../bindings";
 import { useContentPrefs, useContentState, useSetupStatus } from "../config";
 import { DownloadFolders } from "./components/DownloadFolders";
-import { RootCard } from "./components/RootCard";
+import { FolderRow } from "./components/FolderRow";
 
 const msg = (e: unknown): string => describeError(e);
 
 /**
- * Content Folders settings section: lists tracked Spring/Recoil data roots,
- * supports rescan / manual add (with an "Add anyway" override) / per-root rescan
- * & remove, and holds the detection preferences. The frame renders the section
+ * Content Folders settings section: where new content is downloaded to, the
+ * tracked Spring/Recoil data roots in one divided list (rescan, manual add with
+ * an "Add anyway" override, per-root rescan and remove), and the detection
+ * preferences. The frame renders the section
  * title, so this is the body only.
  */
 export default function FoldersSection() {
@@ -46,6 +55,7 @@ export default function FoldersSection() {
   const [addPortable, setAddPortable] = useState(false);
   const { standardPath } = useSetupStatus();
   const ensureWriteRoot = useDefaultWriteRoot();
+  const [downloads, setDownloads] = useDownloadsConfig();
 
   const doRescan = useCallback(async () => {
     setRescanning(true);
@@ -74,13 +84,19 @@ export default function FoldersSection() {
   }, [loading, state, prefs.autoScanOnStartup, doRescan]);
 
   const pickAndAdd = async () => {
-    const picked = await open({
-      directory: true,
-      multiple: false,
-      title: t`Select a Spring/Recoil data folder`,
-    });
-    if (typeof picked !== "string") return;
     setActionError(null);
+    let picked: Awaited<ReturnType<typeof open>>;
+    try {
+      picked = await open({
+        directory: true,
+        multiple: false,
+        title: t`Select a Spring/Recoil data folder`,
+      });
+    } catch (e) {
+      setActionError(msg(e));
+      return;
+    }
+    if (typeof picked !== "string") return;
     try {
       const { state } = await contentAddRoot({
         path: picked,
@@ -107,6 +123,7 @@ export default function FoldersSection() {
 
   const addAnyway = async () => {
     if (!addError) return;
+    setActionError(null);
     try {
       const { state } = await contentAddRoot({
         path: addError.path,
@@ -141,9 +158,19 @@ export default function FoldersSection() {
 
   const removeRoot = async (path: string) => {
     setActionError(null);
+    const removedId = state?.roots.find((r) => r.path === path)?.id;
     try {
       const { state } = await contentRemoveRoot({ path });
       setState(state);
+      // Removing the default folder would leave downloads nowhere to go, as a
+      // default naming an unlisted folder is kept for a drive that is not
+      // plugged in. This one was removed on purpose, so move to another.
+      if (removedId && downloads.writeRootId === removedId) {
+        setDownloads({
+          ...downloads,
+          writeRootId: backfillWriteRootId(state.roots, undefined),
+        });
+      }
     } catch (e) {
       setActionError(msg(e));
     }
@@ -179,25 +206,36 @@ export default function FoldersSection() {
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="flex flex-col gap-10">
       <DownloadFolders roots={roots} />
 
-      <section className="space-y-4">
-        {/* No intro line. The section's description says what these folders
-            are, and it sits directly above. */}
-        <div className="flex flex-wrap items-center justify-end gap-2">
+      <section className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold">
+            <Trans>Folders</Trans>
+          </h2>
           <div className="flex items-center gap-2">
-            {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the <Checkbox> control */}
-            <label
-              className="flex items-center gap-1.5 text-xs text-muted-foreground"
-              title={t`Store the added folder as a path relative to the app dir, so it follows the executable in a portable install. The folder must be inside the app folder.`}
-            >
+            <div className="flex items-center gap-1.5">
               <Checkbox
+                id="add-folder-portable"
                 checked={addPortable}
                 onCheckedChange={(v) => setAddPortable(v === true)}
               />
-              <Trans>Portable</Trans>
-            </label>
+              <Label
+                htmlFor="add-folder-portable"
+                className="cursor-pointer text-xs font-normal text-muted-foreground"
+              >
+                <Trans>Add as portable</Trans>
+              </Label>
+              <HelpPopover label={t`About portable folders`}>
+                <p>
+                  <Trans>
+                    A portable folder is saved relative to the app, so it moves
+                    with a portable install. It must be inside the app folder.
+                  </Trans>
+                </p>
+              </HelpPopover>
+            </div>
             <Button
               type="button"
               variant="outline"
@@ -209,6 +247,7 @@ export default function FoldersSection() {
             </Button>
             <Button
               type="button"
+              variant="outline"
               size="sm"
               disabled={rescanning}
               onClick={doRescan}
@@ -226,7 +265,7 @@ export default function FoldersSection() {
         {(error || actionError) && (
           <Alert variant="destructive">
             <AlertCircle />
-            <AlertDescription className="break-words">
+            <AlertDescription className="select-text break-words">
               {error ?? actionError}
             </AlertDescription>
           </Alert>
@@ -261,8 +300,8 @@ export default function FoldersSection() {
 
         {loading && !state ? (
           <div className="flex flex-col gap-3">
-            <Skeleton className="h-32 rounded-lg border border-border/50 bg-card" />
-            <Skeleton className="h-32 rounded-lg border border-border/50 bg-card" />
+            <Skeleton className="h-20 rounded-md border border-border/50 bg-card" />
+            <Skeleton className="h-20 rounded-md border border-border/50 bg-card" />
           </div>
         ) : roots.length === 0 ? (
           <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-10 text-center">
@@ -291,9 +330,9 @@ export default function FoldersSection() {
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
+          <ul className="divide-y divide-border rounded-md border border-border">
             {roots.map((root) => (
-              <RootCard
+              <FolderRow
                 key={root.id}
                 root={root}
                 receives={receives(root.path)}
@@ -304,60 +343,79 @@ export default function FoldersSection() {
                 onOpen={openRoot}
               />
             ))}
-          </div>
+          </ul>
         )}
       </section>
 
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold">
           <Trans>Detection</Trans>
         </h2>
-        {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the <Checkbox> control */}
-        <label className="flex items-start gap-2.5 text-sm">
-          <Checkbox
-            checked={prefs.autoScanOnStartup}
-            onCheckedChange={(v) =>
-              setPrefs({ ...prefs, autoScanOnStartup: v === true })
+        <SettingList>
+          <SettingRow
+            id="scan-on-startup"
+            label={t`Scan on startup`}
+            helpLabel={t`About scanning on startup`}
+            help={
+              <p>
+                <Trans>
+                  When coilbox starts, it looks for content folders if it has
+                  none yet, then reads the games and maps so the library opens
+                  quickly.
+                </Trans>
+              </p>
             }
-            className="mt-0.5"
-          />
-          <span className="flex flex-col gap-0.5">
-            <span className="font-medium leading-none">
-              <Trans>Scan on startup</Trans>
-            </span>
-            <span className="text-xs leading-snug text-muted-foreground">
-              <Trans>
-                Detect standard data roots the first time this section opens.
-              </Trans>
-            </span>
-          </span>
-        </label>
-        {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the <Checkbox> control */}
-        <label className="flex items-start gap-2.5 text-sm">
-          <Checkbox
-            checked={prefs.probeZeroK}
-            onCheckedChange={(v) =>
-              setPrefs({ ...prefs, probeZeroK: v === true })
+          >
+            <Switch
+              id="scan-on-startup"
+              checked={prefs.autoScanOnStartup}
+              onCheckedChange={(v) =>
+                setPrefs({ ...prefs, autoScanOnStartup: v === true })
+              }
+            />
+          </SettingRow>
+          <SettingRow
+            id="probe-zero-k"
+            label={t`Look for Zero-K on Steam`}
+            helpLabel={t`About looking for Zero-K`}
+            help={
+              <p>
+                <Trans>
+                  A rescan also checks Steam's install folders for Zero-K.
+                </Trans>
+              </p>
             }
-            className="mt-0.5"
-          />
-          <span className="flex flex-col gap-0.5">
-            <span className="font-medium leading-none">
-              <Trans>Probe Zero-K / Steam</Trans>
-            </span>
-            <span className="text-xs leading-snug text-muted-foreground">
-              <Trans>
-                Also check Steam install locations for Zero-K during a rescan.
-              </Trans>
-            </span>
-          </span>
-        </label>
-        <CheckField
-          label={t`Fetch download lists in the background`}
-          hint={t`Load map, game and engine lists after launch. Turn this off on a metered connection.`}
-          checked={prefs.fetchListsInBackground !== false}
-          onChange={(v) => setPrefs({ ...prefs, fetchListsInBackground: v })}
-        />
+          >
+            <Switch
+              id="probe-zero-k"
+              checked={prefs.probeZeroK}
+              onCheckedChange={(v) =>
+                setPrefs({ ...prefs, probeZeroK: v === true })
+              }
+            />
+          </SettingRow>
+          <SettingRow
+            id="fetch-lists-in-background"
+            label={t`Fetch download lists in the background`}
+            helpLabel={t`About fetching download lists`}
+            help={
+              <p>
+                <Trans>
+                  Loads the map, game and engine lists after launch. Turn this
+                  off on a metered connection.
+                </Trans>
+              </p>
+            }
+          >
+            <Switch
+              id="fetch-lists-in-background"
+              checked={prefs.fetchListsInBackground !== false}
+              onCheckedChange={(v) =>
+                setPrefs({ ...prefs, fetchListsInBackground: v === true })
+              }
+            />
+          </SettingRow>
+        </SettingList>
       </section>
     </div>
   );

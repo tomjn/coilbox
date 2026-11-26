@@ -558,6 +558,11 @@ msgstr "{0, plural, one {# def override} other {# def overrides}}"
 msgid "{0, plural, one {# duplicate} other {# duplicates}}"
 msgstr "{0, plural, one {# duplicate} other {# duplicates}}"
 
+#. placeholder {0}: counts.engines
+#: src/content/pages/components/FolderRow.tsx
+msgid "{0, plural, one {# engine} other {# engines}}"
+msgstr "{0, plural, one {# engine} other {# engines}}"
+
 #. placeholder {0}: rows.length
 #: src/content/pages/components/ReplayEventList.tsx
 msgid "{0, plural, one {# entry.} other {# entries.}}"
@@ -615,9 +620,11 @@ msgstr "{0, plural, one {# game · outcome unknown} other {# games · outcome un
 msgid "{0, plural, one {# game indexed} other {# games indexed}}"
 msgstr "{0, plural, one {# game indexed} other {# games indexed}}"
 
+#. placeholder {0}: counts.games
 #. placeholder {0}: p.games
 #. placeholder {0}: record.games
 #: src/content/pages/components/AiRecordSection.tsx
+#: src/content/pages/components/FolderRow.tsx
 #: src/content/pages/components/PlayerPicker.tsx
 msgid "{0, plural, one {# game} other {# games}}"
 msgstr "{0, plural, one {# game} other {# games}}"
@@ -651,6 +658,11 @@ msgstr "{0, plural, one {# link icon unknown} other {# link icons unknown}}"
 #: src/content/pages/StatsPage.tsx
 msgid "{0, plural, one {# loss} other {# losses}}"
 msgstr "{0, plural, one {# loss} other {# losses}}"
+
+#. placeholder {0}: counts.maps
+#: src/content/pages/components/FolderRow.tsx
+msgid "{0, plural, one {# map} other {# maps}}"
+msgstr "{0, plural, one {# map} other {# maps}}"
 
 #. placeholder {0}: metal.spotCount
 #: src/mapconv/pages/components/MetalFigures.tsx
@@ -723,6 +735,11 @@ msgstr "{0, plural, one {# order was placed off the map and is not drawn.} other
 #: src/content/rapidPool.ts
 msgid "{0, plural, one {# orphaned blob} other {# orphaned blobs}}"
 msgstr "{0, plural, one {# orphaned blob} other {# orphaned blobs}}"
+
+#. placeholder {0}: counts.packages
+#: src/content/pages/components/FolderRow.tsx
+msgid "{0, plural, one {# package} other {# packages}}"
+msgstr "{0, plural, one {# package} other {# packages}}"
 
 #. placeholder {0}: metal.closeCount
 #: src/mapconv/pages/components/MetalFigures.tsx
@@ -7648,6 +7665,10 @@ msgstr "A player who is not an ally sees no health bar and no health in the tool
 msgid "A player's first unit has to be made for them at the start, not given to them, to count as a starting unit."
 msgstr "A player's first unit has to be made for them at the start, not given to them, to count as a starting unit."
 
+#: src/content/pages/FoldersSection.tsx
+msgid "A portable folder is saved relative to the app, so it moves with a portable install. It must be inside the app folder."
+msgstr "A portable folder is saved relative to the app, so it moves with a portable install. It must be inside the app folder."
+
 #: src/i18n/uiError.ts
 msgid "A preset pack's address must be https."
 msgstr "A preset pack's address must be https."
@@ -7723,6 +7744,10 @@ msgstr "A reroll keeps it with a kept part"
 #: src/lego/pages/components/PieceTree.tsx
 msgid "A reroll replaces it"
 msgstr "A reroll replaces it"
+
+#: src/content/pages/FoldersSection.tsx
+msgid "A rescan also checks Steam's install folders for Zero-K."
+msgstr "A rescan also checks Steam's install folders for Zero-K."
 
 #: src/scenario/pages/components/RestrictionPanel.tsx
 msgid "A restriction binds every team the scenario declares, not the player alone: the rule names no team. Teams the scenario says nothing about, Gaia included, are untouched."
@@ -8110,6 +8135,10 @@ msgstr "About Coilbox"
 msgid "About empty pieces"
 msgstr "About empty pieces"
 
+#: src/content/pages/FoldersSection.tsx
+msgid "About fetching download lists"
+msgstr "About fetching download lists"
+
 #: src/lego/pages/BuilderPage.tsx
 msgid "About fixing UVs and normals"
 msgstr "About fixing UVs and normals"
@@ -8126,6 +8155,10 @@ msgstr "About interface size"
 msgid "About keys with more than one action"
 msgstr "About keys with more than one action"
 
+#: src/content/pages/FoldersSection.tsx
+msgid "About looking for Zero-K"
+msgstr "About looking for Zero-K"
+
 #: src/lego/pages/BuilderPage.tsx
 msgid "About mirroring"
 msgstr "About mirroring"
@@ -8141,6 +8174,10 @@ msgstr "About one piece's box"
 #: src/general/pages/SettingsSection.tsx
 msgid "About performance mode"
 msgstr "About performance mode"
+
+#: src/content/pages/FoldersSection.tsx
+msgid "About portable folders"
+msgstr "About portable folders"
 
 #: src/lego/pages/components/ProportionsPanel.tsx
 msgid "About proportions"
@@ -8169,6 +8206,10 @@ msgstr "About saved copies"
 #: src/content/pages/components/KeymapsPanel.tsx
 msgid "About saved keymaps"
 msgstr "About saved keymaps"
+
+#: src/content/pages/FoldersSection.tsx
+msgid "About scanning on startup"
+msgstr "About scanning on startup"
 
 #: src/lego/pages/components/CollisionPanel.tsx
 msgid "About shooting at each piece"
@@ -8593,6 +8634,10 @@ msgstr "Add another login"
 #: src/content/pages/FoldersSection.tsx
 msgid "Add anyway"
 msgstr "Add anyway"
+
+#: src/content/pages/FoldersSection.tsx
+msgid "Add as portable"
+msgstr "Add as portable"
 
 #: src/lobby-servers/pages/components/AutojoinChannels.tsx
 msgid "Add channel"
@@ -9240,10 +9285,6 @@ msgstr "Already watched"
 #: src/content/pages/components/BuildTreeDrawer.tsx
 msgid "Also buildable by"
 msgstr "Also buildable by"
-
-#: src/content/pages/FoldersSection.tsx
-msgid "Also check Steam install locations for Zero-K during a rescan."
-msgstr "Also check Steam install locations for Zero-K during a rescan."
 
 #: src/widgets/pages/RemoveWidget.tsx
 msgid "Also delete its entries from the config files"
@@ -10254,10 +10295,6 @@ msgstr "Authoring"
 #: src/profile/SettingsSection.tsx
 msgid "Authoring tools"
 msgstr "Authoring tools"
-
-#: src/content/pages/components/RootCard.tsx
-msgid "auto"
-msgstr "auto"
 
 #: src/workshop/pages/components/CheckpointsDrawer.tsx
 msgid "Auto"
@@ -11804,7 +11841,7 @@ msgstr "Bundled content: {summary}"
 msgid "Bundled map folder \"{folder}\""
 msgstr "Bundled map folder \"{folder}\""
 
-#: src/content/pages/components/RootCard.tsx
+#: src/content/pages/components/FolderRow.tsx
 msgid "bundled, read only"
 msgstr "bundled, read only"
 
@@ -15400,6 +15437,10 @@ msgstr "Couldn't save preset"
 msgid "Count"
 msgstr "Count"
 
+#: src/content/pages/components/FolderRow.tsx
+msgid "Count what is in this folder again"
+msgstr "Count what is in this folder again"
+
 #: src/content/pages/components/MapRecords.tsx
 msgid "Counted"
 msgstr "Counted"
@@ -16563,13 +16604,9 @@ msgstr "Detail"
 msgid "Details"
 msgstr "Details"
 
-#: src/content/pages/FoldersSection.tsx
-msgid "Detect standard data roots the first time this section opens."
-msgstr "Detect standard data roots the first time this section opens."
-
-#: src/content/pages/components/RootCard.tsx
-msgid "detected via {origins}"
-msgstr "detected via {origins}"
+#: src/content/pages/components/FolderRow.tsx
+msgid "Detected via {origins}"
+msgstr "Detected via {origins}"
 
 #: src/content/pages/FoldersSection.tsx
 msgid "Detection"
@@ -18069,10 +18106,6 @@ msgstr "Engine to use"
 msgid "Engine unknown"
 msgstr "Engine unknown"
 
-#: src/content/pages/components/RootCard.tsx
-msgid "engines"
-msgstr "engines"
-
 #: src/content/index.ts
 #: src/content/pages/StorageSection.tsx
 msgid "Engines"
@@ -19467,6 +19500,10 @@ msgstr "Folder name"
 msgid "Folder writability not checked"
 msgstr "Folder writability not checked"
 
+#: src/content/pages/FoldersSection.tsx
+msgid "Folders"
+msgstr "Folders"
+
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #: src/play/FollowedPacksView.tsx
 msgid "Follow"
@@ -19641,7 +19678,7 @@ msgstr "For stockpile weapons this is spent over time as it stockpiles; otherwis
 msgid "Force spectate"
 msgstr "Force spectate"
 
-#: src/content/pages/components/RootCard.tsx
+#: src/content/pages/components/FolderRow.tsx
 msgid "forced"
 msgstr "forced"
 
@@ -20291,7 +20328,6 @@ msgstr "Gameplay"
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/content/pages/components/BuildTreeEmbed.tsx
 #: src/content/pages/components/RemixPanel.tsx
-#: src/content/pages/components/RootCard.tsx
 #: src/content/pages/GamesPage.tsx
 #: src/content/pages/KeybindsSection.tsx
 #: src/play/pages/components/GamePickerGrid.tsx
@@ -24077,10 +24113,6 @@ msgstr "Load a style"
 msgid "Load from file"
 msgstr "Load from file"
 
-#: src/content/pages/FoldersSection.tsx
-msgid "Load map, game and engine lists after launch. Turn this off on a metered connection."
-msgstr "Load map, game and engine lists after launch. Turn this off on a metered connection."
-
 #: src/play/PresetLoadGate.tsx
 msgid "Load onto {game}"
 msgstr "Load onto {game}"
@@ -24240,6 +24272,10 @@ msgstr "Loadout"
 #: src/lego/pages/components/LoadoutPicker.tsx
 msgid "Loadouts"
 msgstr "Loadouts"
+
+#: src/content/pages/FoldersSection.tsx
+msgid "Loads the map, game and engine lists after launch. Turn this off on a metered connection."
+msgstr "Loads the map, game and engine lists after launch. Turn this off on a metered connection."
 
 #: src/content/engineSettingText.ts
 msgid "Lobbies replace this with your lobby name, so it shows up in replays and when the engine is started on its own."
@@ -24419,6 +24455,10 @@ msgstr "long"
 #: src/content/pages/ReplaysPage.tsx
 msgid "Longest"
 msgstr "Longest"
+
+#: src/content/pages/FoldersSection.tsx
+msgid "Look for Zero-K on Steam"
+msgstr "Look for Zero-K on Steam"
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 msgid "Look up"
@@ -24701,7 +24741,7 @@ msgstr "Manage maps"
 msgid "Manoeuvre"
 msgstr "Manoeuvre"
 
-#: src/content/pages/components/RootCard.tsx
+#: src/content/pages/components/FolderRow.tsx
 msgid "manual"
 msgstr "manual"
 
@@ -24933,7 +24973,6 @@ msgid "Mapping wiki"
 msgstr "Mapping wiki"
 
 #: src/conquest/pages/GalaxyPage.tsx
-#: src/content/pages/components/RootCard.tsx
 #: src/content/pages/MapsPage.tsx
 #: src/play/pages/components/MapPickerGrid.tsx
 msgid "maps"
@@ -25567,7 +25606,7 @@ msgstr "Missile, Torpedo and Starburst only. Starts aimed along the launching pi
 msgid "MissileLauncher only."
 msgstr "MissileLauncher only."
 
-#: src/content/pages/components/RootCard.tsx
+#: src/content/pages/components/FolderRow.tsx
 msgid "missing"
 msgstr "missing"
 
@@ -26545,7 +26584,6 @@ msgstr "Neutral team"
 msgid "Neutral team colour"
 msgstr "Neutral team colour"
 
-#: src/content/pages/components/RootCard.tsx
 #: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/MatchupPage.tsx
 #: src/content/pages/PlayerDossierPage.tsx
@@ -28580,7 +28618,7 @@ msgstr "Not a new best on {name}. This win was {slower} slower than {best}."
 msgid "Not a number"
 msgstr "Not a number"
 
-#: src/content/pages/components/RootCard.tsx
+#: src/content/pages/components/FolderRow.tsx
 msgid "not a Spring root"
 msgstr "not a Spring root"
 
@@ -28813,6 +28851,10 @@ msgstr "Not saved: {saveError}"
 #: src/components/SaveStatus.tsx
 msgid "Not saved. Leaving this page loses the change."
 msgstr "Not saved. Leaving this page loses the change."
+
+#: src/content/pages/components/FolderRow.tsx
+msgid "Not scanned yet"
+msgstr "Not scanned yet"
 
 #: src/multiplayer/battle/DeliveryProgressPanel.tsx
 msgid "not sent"
@@ -29915,7 +29957,7 @@ msgid "Opcodes"
 msgstr "Opcodes"
 
 #: src/content/pages/components/EngineRow.tsx
-#: src/content/pages/components/RootCard.tsx
+#: src/content/pages/components/FolderRow.tsx
 #: src/deeplink/DeepLinkHandler.tsx
 #: src/hub/pages/BrowsePage.tsx
 #: src/hub/pages/ItemPage.tsx
@@ -30163,6 +30205,10 @@ msgstr "Open the build the hub has"
 #: src/content/pages/components/EngineRow.tsx
 msgid "Open the engine's folder"
 msgstr "Open the engine's folder"
+
+#: src/content/pages/components/FolderRow.tsx
+msgid "Open the folder"
+msgstr "Open the folder"
 
 #: src/deeplink/actions.ts
 msgid "Open the game \"{id}\"."
@@ -30711,10 +30757,6 @@ msgstr "Package tweak project"
 #: src/mapconv/pages/CompilePage.tsx
 msgid "Packaged <0>{0}</0>"
 msgstr "Packaged <0>{0}</0>"
-
-#: src/content/pages/components/RootCard.tsx
-msgid "packages"
-msgstr "packages"
 
 #: src/content/bundle.ts
 msgid "packages/ has rapid packages but there is no pool/ beside it. Copy pool/ too, or the packages cannot be read."
@@ -31810,13 +31852,9 @@ msgstr "Port {port} is already in use. Another coilbox, or a room you left runni
 msgid "Port opened"
 msgstr "Port opened"
 
-#: src/content/pages/components/RootCard.tsx
+#: src/content/pages/components/FolderRow.tsx
 msgid "portable"
 msgstr "portable"
-
-#: src/content/pages/FoldersSection.tsx
-msgid "Portable"
-msgstr "Portable"
 
 #: src/profile/health.ts
 msgid "Portable mode active — {portableRoot}"
@@ -32071,10 +32109,6 @@ msgstr "Private note"
 #: src/multiplayer/NoteButton.tsx
 msgid "Private note, only visible to you…"
 msgstr "Private note, only visible to you…"
-
-#: src/content/pages/FoldersSection.tsx
-msgid "Probe Zero-K / Steam"
-msgstr "Probe Zero-K / Steam"
 
 #: src/lego/pages/components/ProblemsButton.tsx
 msgid "Problems"
@@ -32658,7 +32692,7 @@ msgstr "Re-run"
 msgid "Re-run validation"
 msgstr "Re-run validation"
 
-#: src/content/pages/components/RootCard.tsx
+#: src/content/pages/components/FolderRow.tsx
 msgid "Re-scan"
 msgstr "Re-scan"
 
@@ -32701,11 +32735,7 @@ msgstr "Read in place from {bundlePath}. Only the engine is copied, once, into t
 msgid "Read it"
 msgstr "Read it"
 
-#: src/content/pages/components/RootCard.tsx
-msgid "read only"
-msgstr "read only"
-
-#: src/content/pages/components/RootCard.tsx
+#: src/content/pages/components/FolderRow.tsx
 msgid "Read only"
 msgstr "Read only"
 
@@ -33656,8 +33686,8 @@ msgstr "Remixed from"
 #: src/campaign/pages/components/MissionMediaFields.tsx
 #: src/campaign/pages/components/MissionRemoveButton.tsx
 #: src/content/pages/components/CompatMode.tsx
+#: src/content/pages/components/FolderRow.tsx
 #: src/content/pages/components/MissionRuntimeSection.tsx
-#: src/content/pages/components/RootCard.tsx
 #: src/hub/pages/ItemPage.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/BuildMenuSection.tsx
@@ -35513,9 +35543,9 @@ msgstr "Scanned {all} units in {time}: {counted}. {wroteText}."
 msgid "Scanned {done} of {total} units."
 msgstr "Scanned {done} of {total} units."
 
-#: src/content/pages/components/RootCard.tsx
-msgid "scanned {scannedAt}"
-msgstr "scanned {scannedAt}"
+#: src/content/pages/components/FolderRow.tsx
+msgid "Scanned {scannedAt}"
+msgstr "Scanned {scannedAt}"
 
 #: src/profile/health.ts
 msgid "Scanned {scanRootCount} content folder(s): {scanRootPaths}."
@@ -38828,6 +38858,10 @@ msgstr "Stop placing {what}"
 msgid "Stop placing a part, a module or a connector"
 msgstr "Stop placing a part, a module or a connector"
 
+#: src/content/pages/components/FolderRow.tsx
+msgid "Stop reading this folder. Nothing in it is deleted."
+msgstr "Stop reading this folder. Nothing in it is deleted."
+
 #: src/direct/HostRoomControl.tsx
 msgid "Stop room"
 msgstr "Stop room"
@@ -38903,10 +38937,6 @@ msgstr "Stops to shoot"
 #: src/content/index.ts
 msgid "Storage"
 msgstr "Storage"
-
-#: src/content/pages/FoldersSection.tsx
-msgid "Store the added folder as a path relative to the app dir, so it follows the executable in a portable install. The folder must be inside the app folder."
-msgstr "Store the added folder as a path relative to the app dir, so it follows the executable in a portable install. The folder must be inside the app folder."
 
 #: src/multiplayer/admin/ServerAdminHelp.tsx
 msgid "Stored channel history older than 14 days is deleted."
@@ -45810,10 +45840,6 @@ msgstr "Username, IP or email to unban"
 msgid "Uses the bench/DB settings on the Servers page. Uncheck to benchmark an external address."
 msgstr "Uses the bench/DB settings on the Servers page. Uncheck to benchmark an external address."
 
-#: src/content/pages/components/RootCard.tsx
-msgid "valid"
-msgstr "valid"
-
 #: src/profile/useHealthChecks.ts
 msgid "valid JSON but does not match the campaign schema"
 msgstr "valid JSON but does not match the campaign schema"
@@ -46722,6 +46748,10 @@ msgstr "When armed"
 #: src/lego/pages/components/AnimationPanel.tsx
 msgid "When ChangeHeading is sent"
 msgstr "When ChangeHeading is sent"
+
+#: src/content/pages/FoldersSection.tsx
+msgid "When coilbox starts, it looks for content folders if it has none yet, then reads the games and maps so the library opens quickly."
+msgstr "When coilbox starts, it looks for content folders if it has none yet, then reads the games and maps so the library opens quickly."
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "When Coilbox starts, log back in to every account that was connected when it last closed. To connect one account every time, tick Connect on startup on that login."

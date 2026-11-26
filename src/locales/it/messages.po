@@ -685,6 +685,11 @@ msgstr "{0, plural, one {# sostituzione di definizione} other {# sostituzioni di
 msgid "{0, plural, one {# duplicate} other {# duplicates}}"
 msgstr "{0, plural, one {# duplicato} other {# duplicati}}"
 
+#. placeholder {0}: counts.engines
+#: src/content/pages/components/FolderRow.tsx
+msgid "{0, plural, one {# engine} other {# engines}}"
+msgstr ""
+
 #. placeholder {0}: rows.length
 #: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
@@ -753,9 +758,11 @@ msgstr "{0, plural, one {# partita · esito sconosciuto} other {# partite · esi
 msgid "{0, plural, one {# game indexed} other {# games indexed}}"
 msgstr "{0, plural, one {# partita indicizzata} other {# partite indicizzate}}"
 
+#. placeholder {0}: counts.games
 #. placeholder {0}: p.games
 #. placeholder {0}: record.games
 #: src/content/pages/components/AiRecordSection.tsx
+#: src/content/pages/components/FolderRow.tsx
 #: src/content/pages/components/PlayerPicker.tsx
 #, fuzzy
 msgid "{0, plural, one {# game} other {# games}}"
@@ -796,6 +803,11 @@ msgstr "{0, plural, one {# icona di link sconosciuta} other {# icone di link sco
 #, fuzzy
 msgid "{0, plural, one {# loss} other {# losses}}"
 msgstr "{0, plural, one {# sconfitta} other {# sconfitte}}"
+
+#. placeholder {0}: counts.maps
+#: src/content/pages/components/FolderRow.tsx
+msgid "{0, plural, one {# map} other {# maps}}"
+msgstr ""
 
 #. placeholder {0}: metal.spotCount
 #: src/mapconv/pages/components/MetalFigures.tsx
@@ -882,6 +894,11 @@ msgstr "{0, plural, one {# ordine è stato piazzato fuori dalla mappa e non vien
 #, fuzzy
 msgid "{0, plural, one {# orphaned blob} other {# orphaned blobs}}"
 msgstr "{0, plural, one {# blob orfano} other {# blob orfani}}"
+
+#. placeholder {0}: counts.packages
+#: src/content/pages/components/FolderRow.tsx
+msgid "{0, plural, one {# package} other {# packages}}"
+msgstr ""
 
 #. placeholder {0}: metal.closeCount
 #: src/mapconv/pages/components/MetalFigures.tsx
@@ -9481,6 +9498,10 @@ msgstr "Un giocatore che non è un alleato non vede barra della salute né salut
 msgid "A player's first unit has to be made for them at the start, not given to them, to count as a starting unit."
 msgstr "La prima unità di un giocatore deve essere creata per lui all’inizio, non ceduta, per contare come unità iniziale."
 
+#: src/content/pages/FoldersSection.tsx
+msgid "A portable folder is saved relative to the app, so it moves with a portable install. It must be inside the app folder."
+msgstr ""
+
 #: src/i18n/uiError.ts
 #, fuzzy
 msgid "A preset pack's address must be https."
@@ -9575,6 +9596,10 @@ msgstr "Un reroll la mantiene con un componente mantenuto"
 #, fuzzy
 msgid "A reroll replaces it"
 msgstr "Un reroll la sostituisce"
+
+#: src/content/pages/FoldersSection.tsx
+msgid "A rescan also checks Steam's install folders for Zero-K."
+msgstr ""
 
 #: src/scenario/pages/components/RestrictionPanel.tsx
 #, fuzzy
@@ -10054,6 +10079,10 @@ msgstr "Informazioni su Coilbox"
 msgid "About empty pieces"
 msgstr "Informazioni sui pezzi vuoti"
 
+#: src/content/pages/FoldersSection.tsx
+msgid "About fetching download lists"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "About fixing UVs and normals"
@@ -10069,6 +10098,10 @@ msgstr ""
 
 #: src/content/pages/components/KeyBindingEditor.tsx
 msgid "About keys with more than one action"
+msgstr ""
+
+#: src/content/pages/FoldersSection.tsx
+msgid "About looking for Zero-K"
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
@@ -10088,6 +10121,10 @@ msgstr "Informazioni sul riquadro di un pezzo"
 
 #: src/general/pages/SettingsSection.tsx
 msgid "About performance mode"
+msgstr ""
+
+#: src/content/pages/FoldersSection.tsx
+msgid "About portable folders"
 msgstr ""
 
 #: src/lego/pages/components/ProportionsPanel.tsx
@@ -10120,6 +10157,10 @@ msgstr ""
 
 #: src/content/pages/components/KeymapsPanel.tsx
 msgid "About saved keymaps"
+msgstr ""
+
+#: src/content/pages/FoldersSection.tsx
+msgid "About scanning on startup"
 msgstr ""
 
 #: src/lego/pages/components/CollisionPanel.tsx
@@ -10638,6 +10679,10 @@ msgstr "Aggiungi altre credenziali"
 #, fuzzy
 msgid "Add anyway"
 msgstr "Aggiungi comunque"
+
+#: src/content/pages/FoldersSection.tsx
+msgid "Add as portable"
+msgstr ""
 
 #: src/lobby-servers/pages/components/AutojoinChannels.tsx
 #, fuzzy
@@ -11436,11 +11481,6 @@ msgstr "Già guardati"
 #, fuzzy
 msgid "Also buildable by"
 msgstr "Costruibile anche da"
-
-#: src/content/pages/FoldersSection.tsx
-#, fuzzy
-msgid "Also check Steam install locations for Zero-K during a rescan."
-msgstr "Durante una nuova scansione, controlla anche i percorsi di installazione di Steam per Zero-K."
 
 #: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
@@ -12692,11 +12732,6 @@ msgstr "Creazione"
 #, fuzzy
 msgid "Authoring tools"
 msgstr "Strumenti di creazione"
-
-#: src/content/pages/components/RootCard.tsx
-#, fuzzy
-msgid "auto"
-msgstr "auto"
 
 #: src/workshop/pages/components/CheckpointsDrawer.tsx
 #, fuzzy
@@ -14598,7 +14633,7 @@ msgstr "Contenuti inclusi: {summary}"
 msgid "Bundled map folder \"{folder}\""
 msgstr "Cartella della mappa inclusa «{folder}»"
 
-#: src/content/pages/components/RootCard.tsx
+#: src/content/pages/components/FolderRow.tsx
 #, fuzzy
 msgid "bundled, read only"
 msgstr "incluso, sola lettura"
@@ -19009,6 +19044,10 @@ msgstr "Impossibile salvare la preimpostazione"
 msgid "Count"
 msgstr "Numero"
 
+#: src/content/pages/components/FolderRow.tsx
+msgid "Count what is in this folder again"
+msgstr ""
+
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
 msgid "Counted"
@@ -20438,15 +20477,9 @@ msgstr "Dettaglio"
 msgid "Details"
 msgstr "Dettagli"
 
-#: src/content/pages/FoldersSection.tsx
-#, fuzzy
-msgid "Detect standard data roots the first time this section opens."
-msgstr "Rileva le cartelle dati standard la prima volta che si apre questa sezione."
-
-#: src/content/pages/components/RootCard.tsx
-#, fuzzy
-msgid "detected via {origins}"
-msgstr "rilevato tramite {origins}"
+#: src/content/pages/components/FolderRow.tsx
+msgid "Detected via {origins}"
+msgstr ""
 
 #: src/content/pages/FoldersSection.tsx
 #, fuzzy
@@ -22275,11 +22308,6 @@ msgstr "Motore da usare"
 msgid "Engine unknown"
 msgstr "Motore sconosciuto"
 
-#: src/content/pages/components/RootCard.tsx
-#, fuzzy
-msgid "engines"
-msgstr "motori"
-
 #: src/content/index.ts
 #: src/content/pages/StorageSection.tsx
 #, fuzzy
@@ -24007,6 +24035,10 @@ msgstr "Nome della cartella"
 msgid "Folder writability not checked"
 msgstr "Scrivibilità delle cartelle non verificata"
 
+#: src/content/pages/FoldersSection.tsx
+msgid "Folders"
+msgstr ""
+
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #: src/play/FollowedPacksView.tsx
 #, fuzzy
@@ -24222,7 +24254,7 @@ msgstr "Per le armi ad accumulo viene speso nel tempo durante l’accumulo, altr
 msgid "Force spectate"
 msgstr "Forza come spettatore"
 
-#: src/content/pages/components/RootCard.tsx
+#: src/content/pages/components/FolderRow.tsx
 #, fuzzy
 msgid "forced"
 msgstr "forzato"
@@ -25018,7 +25050,6 @@ msgstr "Gameplay"
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/content/pages/components/BuildTreeEmbed.tsx
 #: src/content/pages/components/RemixPanel.tsx
-#: src/content/pages/components/RootCard.tsx
 #: src/content/pages/GamesPage.tsx
 #: src/content/pages/KeybindsSection.tsx
 #: src/play/pages/components/GamePickerGrid.tsx
@@ -29692,11 +29723,6 @@ msgstr "Carica uno stile"
 msgid "Load from file"
 msgstr "Carica da file"
 
-#: src/content/pages/FoldersSection.tsx
-#, fuzzy
-msgid "Load map, game and engine lists after launch. Turn this off on a metered connection."
-msgstr "Carica gli elenchi di mappe, giochi e motori dopo l’avvio. Disattivalo su una connessione a consumo."
-
 #: src/play/PresetLoadGate.tsx
 #, fuzzy
 msgid "Load onto {game}"
@@ -29893,6 +29919,10 @@ msgstr "Equipaggiamento"
 #, fuzzy
 msgid "Loadouts"
 msgstr "Equipaggiamenti"
+
+#: src/content/pages/FoldersSection.tsx
+msgid "Loads the map, game and engine lists after launch. Turn this off on a metered connection."
+msgstr ""
 
 #: src/content/engineSettingText.ts
 msgid "Lobbies replace this with your lobby name, so it shows up in replays and when the engine is started on its own."
@@ -30113,6 +30143,10 @@ msgstr "lunga"
 #, fuzzy
 msgid "Longest"
 msgstr "La più lunga"
+
+#: src/content/pages/FoldersSection.tsx
+msgid "Look for Zero-K on Steam"
+msgstr ""
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
@@ -30460,7 +30494,7 @@ msgstr "Gestisci mappe"
 msgid "Manoeuvre"
 msgstr "Manovra"
 
-#: src/content/pages/components/RootCard.tsx
+#: src/content/pages/components/FolderRow.tsx
 #, fuzzy
 msgid "manual"
 msgstr "manuale"
@@ -30741,7 +30775,6 @@ msgid "Mapping wiki"
 msgstr "Wiki sulle mappe"
 
 #: src/conquest/pages/GalaxyPage.tsx
-#: src/content/pages/components/RootCard.tsx
 #: src/content/pages/MapsPage.tsx
 #: src/play/pages/components/MapPickerGrid.tsx
 #, fuzzy
@@ -31518,7 +31551,7 @@ msgstr "Solo Missile, Torpedo e Starburst. Parte puntato nella direzione del pez
 msgid "MissileLauncher only."
 msgstr "Solo MissileLauncher."
 
-#: src/content/pages/components/RootCard.tsx
+#: src/content/pages/components/FolderRow.tsx
 #, fuzzy
 msgid "missing"
 msgstr "mancante"
@@ -32721,7 +32754,6 @@ msgstr "Squadra neutrale"
 msgid "Neutral team colour"
 msgstr "Colore della squadra neutrale"
 
-#: src/content/pages/components/RootCard.tsx
 #: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/MatchupPage.tsx
 #: src/content/pages/PlayerDossierPage.tsx
@@ -35244,7 +35276,7 @@ msgstr "Nessun nuovo record su {name}. Questa vittoria è stata {slower} più le
 msgid "Not a number"
 msgstr "Non è un numero"
 
-#: src/content/pages/components/RootCard.tsx
+#: src/content/pages/components/FolderRow.tsx
 #, fuzzy
 msgid "not a Spring root"
 msgstr "non è una radice Spring"
@@ -35533,6 +35565,10 @@ msgstr "Non salvato: {saveError}"
 #, fuzzy
 msgid "Not saved. Leaving this page loses the change."
 msgstr "Non salvato. Se lasci questa pagina la modifica va persa."
+
+#: src/content/pages/components/FolderRow.tsx
+msgid "Not scanned yet"
+msgstr ""
 
 #: src/multiplayer/battle/DeliveryProgressPanel.tsx
 #, fuzzy
@@ -36901,7 +36937,7 @@ msgid "Opcodes"
 msgstr "Opcode"
 
 #: src/content/pages/components/EngineRow.tsx
-#: src/content/pages/components/RootCard.tsx
+#: src/content/pages/components/FolderRow.tsx
 #: src/deeplink/DeepLinkHandler.tsx
 #: src/hub/pages/BrowsePage.tsx
 #: src/hub/pages/ItemPage.tsx
@@ -37203,6 +37239,10 @@ msgstr ""
 
 #: src/content/pages/components/EngineRow.tsx
 msgid "Open the engine's folder"
+msgstr ""
+
+#: src/content/pages/components/FolderRow.tsx
+msgid "Open the folder"
 msgstr ""
 
 #: src/deeplink/actions.ts
@@ -37881,11 +37921,6 @@ msgstr "Impacchetta il progetto di ritocchi"
 #, fuzzy
 msgid "Packaged <0>{0}</0>"
 msgstr "Pacchettizzato <0>{0}</0>"
-
-#: src/content/pages/components/RootCard.tsx
-#, fuzzy
-msgid "packages"
-msgstr "pacchetti"
 
 #: src/content/bundle.ts
 #, fuzzy
@@ -39235,15 +39270,10 @@ msgstr "La porta {port} è già in uso. La occupa un altro coilbox, o una stanza
 msgid "Port opened"
 msgstr "Porta aperta"
 
-#: src/content/pages/components/RootCard.tsx
+#: src/content/pages/components/FolderRow.tsx
 #, fuzzy
 msgid "portable"
 msgstr "portabile"
-
-#: src/content/pages/FoldersSection.tsx
-#, fuzzy
-msgid "Portable"
-msgstr "Portabile"
 
 #: src/profile/health.ts
 #, fuzzy
@@ -39556,11 +39586,6 @@ msgstr "Nota privata"
 #, fuzzy
 msgid "Private note, only visible to you…"
 msgstr "Nota privata, visibile solo a te…"
-
-#: src/content/pages/FoldersSection.tsx
-#, fuzzy
-msgid "Probe Zero-K / Steam"
-msgstr "Rileva Zero-K / Steam"
 
 #: src/lego/pages/components/ProblemsButton.tsx
 #, fuzzy
@@ -40279,7 +40304,7 @@ msgstr "Esegui di nuovo"
 msgid "Re-run validation"
 msgstr "Ripeti la convalida"
 
-#: src/content/pages/components/RootCard.tsx
+#: src/content/pages/components/FolderRow.tsx
 #, fuzzy
 msgid "Re-scan"
 msgstr "Ripeti scansione"
@@ -40332,12 +40357,7 @@ msgstr "Letto direttamente da {bundlePath}. Solo il motore viene copiato, una vo
 msgid "Read it"
 msgstr "Leggilo"
 
-#: src/content/pages/components/RootCard.tsx
-#, fuzzy
-msgid "read only"
-msgstr "sola lettura"
-
-#: src/content/pages/components/RootCard.tsx
+#: src/content/pages/components/FolderRow.tsx
 #, fuzzy
 msgid "Read only"
 msgstr "Sola lettura"
@@ -41503,8 +41523,8 @@ msgstr "Remix di"
 #: src/campaign/pages/components/MissionMediaFields.tsx
 #: src/campaign/pages/components/MissionRemoveButton.tsx
 #: src/content/pages/components/CompatMode.tsx
+#: src/content/pages/components/FolderRow.tsx
 #: src/content/pages/components/MissionRuntimeSection.tsx
-#: src/content/pages/components/RootCard.tsx
 #: src/hub/pages/ItemPage.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/BuildMenuSection.tsx
@@ -43782,10 +43802,9 @@ msgstr "Scansionate {all} unità in {time}: {counted}. {wroteText}."
 msgid "Scanned {done} of {total} units."
 msgstr "Scansionate {done} unità su {total}."
 
-#: src/content/pages/components/RootCard.tsx
-#, fuzzy
-msgid "scanned {scannedAt}"
-msgstr "scansionato {scannedAt}"
+#: src/content/pages/components/FolderRow.tsx
+msgid "Scanned {scannedAt}"
+msgstr ""
 
 #: src/profile/health.ts
 #, fuzzy
@@ -47871,6 +47890,10 @@ msgstr "Smetti di piazzare {what}"
 msgid "Stop placing a part, a module or a connector"
 msgstr "Smetti di piazzare un componente, un modulo o un connettore"
 
+#: src/content/pages/components/FolderRow.tsx
+msgid "Stop reading this folder. Nothing in it is deleted."
+msgstr ""
+
 #: src/direct/HostRoomControl.tsx
 #, fuzzy
 msgid "Stop room"
@@ -47964,11 +47987,6 @@ msgstr "Si ferma per sparare"
 #, fuzzy
 msgid "Storage"
 msgstr "Spazio su disco"
-
-#: src/content/pages/FoldersSection.tsx
-#, fuzzy
-msgid "Store the added folder as a path relative to the app dir, so it follows the executable in a portable install. The folder must be inside the app folder."
-msgstr "Salva la cartella aggiunta come percorso relativo alla cartella dell’app, così segue l’eseguibile in un’installazione portabile. La cartella deve essere dentro la cartella dell’app."
 
 #: src/multiplayer/admin/ServerAdminHelp.tsx
 #, fuzzy
@@ -56525,11 +56543,6 @@ msgstr "Nome utente, IP o email a cui togliere il ban"
 msgid "Uses the bench/DB settings on the Servers page. Uncheck to benchmark an external address."
 msgstr "Usa le impostazioni di benchmark e database della pagina Server. Deseleziona per fare il benchmark di un indirizzo esterno."
 
-#: src/content/pages/components/RootCard.tsx
-#, fuzzy
-msgid "valid"
-msgstr "valido"
-
 #: src/profile/useHealthChecks.ts
 #, fuzzy
 msgid "valid JSON but does not match the campaign schema"
@@ -57649,6 +57662,10 @@ msgstr "Quando è armato"
 #, fuzzy
 msgid "When ChangeHeading is sent"
 msgstr "Quando viene inviato ChangeHeading"
+
+#: src/content/pages/FoldersSection.tsx
+msgid "When coilbox starts, it looks for content folders if it has none yet, then reads the games and maps so the library opens quickly."
+msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
