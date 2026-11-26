@@ -555,6 +555,14 @@ describe("requiredRuntimeVersion", () => {
   });
 
   /**
+   * Issue #5298. A runtime behind 17 has no `unit_attacked`, so it reports it
+   * once and the condition never holds.
+   */
+  it("asks for 17 when unit_attacked is used", () => {
+    expect(requiredRuntimeVersion(withTrigger(["unit_attacked"], []))).toBe(17);
+  });
+
+  /**
    * Issue #5252. A runtime behind 13 finds no engine team number on the neutral
    * team and drops it with everything placed for it.
    */

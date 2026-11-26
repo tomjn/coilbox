@@ -10458,6 +10458,14 @@ msgstr ""
 msgid "attacker"
 msgstr ""
 
+#: src/scenario/triggerTypes.ts
+msgid "attacking team"
+msgstr ""
+
+#: src/scenario/triggerTypes.ts
+msgid "attacking unit types"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 msgid "Attacks from a hover"
 msgstr ""
@@ -21521,6 +21529,10 @@ msgstr ""
 
 #: src/scenario/triggerTypes.ts
 msgid "Holds once a team has kept a zone for the time you set, optionally only while uncontested."
+msgstr ""
+
+#: src/scenario/triggerTypes.ts
+msgid "Holds once an actor, or a unit of a group, has taken damage from another unit since this trigger was armed."
 msgstr ""
 
 #: src/scenario/triggerTypes.ts

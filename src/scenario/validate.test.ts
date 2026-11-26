@@ -408,6 +408,32 @@ describe("validateMission", () => {
     });
   });
 
+  describe("a unit_attacked condition (issue #5298)", () => {
+    const issuesFor = (params: Record<string, unknown>) =>
+      validateMission(
+        withStep({ type: "unit_attacked", params }, "conditions"),
+        undefined,
+        [{ name: "armpw" }],
+      ).filter((issue) => issue.path.startsWith('triggers["open"]'));
+
+    it("takes a group or an actor, and needs one", () => {
+      expect(issuesFor({ group: "wave1", attackerTeam: "player" })).toEqual([]);
+      const issues = issuesFor({ attackerTeam: "player" });
+      expect(issues).toHaveLength(1);
+      expect(issues[0].message).toBe("needs one of actor, group");
+    });
+
+    it("reports an attacking unit type the game does not have", () => {
+      const issues = issuesFor({
+        group: "wave1",
+        attackerDefs: ["armpw", "armbad"],
+      });
+      expect(issues.map((issue) => issue.path)).toEqual([
+        'triggers["open"].conditions[0].params.attackerDefs[1]',
+      ]);
+    });
+  });
+
   it("resolves an order target against actors and groups alike", () => {
     const issues = validateMission(
       mission({
