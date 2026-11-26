@@ -8050,6 +8050,10 @@ msgstr "About {subject}"
 msgid "About actions"
 msgstr "About actions"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "About ambient effects"
+msgstr "About ambient effects"
+
 #: src/lego/pages/components/MovementSection.tsx
 msgid "About banking"
 msgstr "About banking"
@@ -8074,6 +8078,14 @@ msgstr "About empty pieces"
 msgid "About fixing UVs and normals"
 msgstr "About fixing UVs and normals"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "About fullscreen"
+msgstr "About fullscreen"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "About interface size"
+msgstr "About interface size"
+
 #: src/lego/pages/BuilderPage.tsx
 msgid "About mirroring"
 msgstr "About mirroring"
@@ -8086,9 +8098,17 @@ msgstr "About moving a set"
 msgid "About one piece's box"
 msgstr "About one piece's box"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "About performance mode"
+msgstr "About performance mode"
+
 #: src/lego/pages/components/ProportionsPanel.tsx
 msgid "About proportions"
 msgstr "About proportions"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "About reduce motion"
+msgstr "About reduce motion"
 
 #: src/content/pages/components/ReplayTracksStorage.tsx
 msgid "About replay tracks"
@@ -8118,6 +8138,10 @@ msgstr "About the collision volume"
 msgid "About the colour texture"
 msgstr "About the colour texture"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "About the frame rate"
+msgstr "About the frame rate"
+
 #: src/lego/pages/BuilderPage.tsx
 msgid "About the pivot point"
 msgstr "About the pivot point"
@@ -8125,6 +8149,10 @@ msgstr "About the pivot point"
 #: src/lego/pages/components/TextureBuilderPanel.tsx
 msgid "About the shading map"
 msgstr "About the shading map"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "About the startup splash"
+msgstr "About the startup splash"
 
 #: src/lego/pages/components/TimelineTab.tsx
 msgid "About the timeline"
@@ -13080,6 +13108,10 @@ msgstr "Click the model to put a connector there. Escape to stop"
 msgid "Click the second point"
 msgstr "Click the second point"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "Click the splash or press Escape to close it early."
+msgstr "Click the splash or press Escape to close it early."
+
 #: src/workshop/pages/components/CollectionsPanel.tsx
 msgid "Click to edit its units, double click to rename"
 msgstr "Click to edit its units, double click to rename"
@@ -13670,10 +13702,6 @@ msgstr "Coilbox is making pictures of {subject}'s units for the hub."
 #: src/hub/assets/UploadRunBadge.tsx
 msgid "Coilbox is making pictures of {subject}'s units. Nothing has been sent yet."
 msgstr "Coilbox is making pictures of {subject}'s units. Nothing has been sent yet."
-
-#: src/general/pages/AboutCoilbox.tsx
-msgid "Coilbox is open source. Browse the code, report a bug, or star the project on GitHub."
-msgstr "Coilbox is open source. Browse the code, report a bug, or star the project on GitHub."
 
 #: src/hub/uploadOutcomes.ts
 msgid "Coilbox is out of date"
@@ -16641,7 +16669,6 @@ msgid "Dismiss the failed analysis of {0}"
 msgstr "Dismiss the failed analysis of {0}"
 
 #: src/content/index.ts
-#: src/general/pages/SettingsSection.tsx
 msgid "Display"
 msgstr "Display"
 
@@ -17151,6 +17178,10 @@ msgstr "Drawn while cloaked and moving. Defaults to the standing cost."
 #: src/content/unitFieldNotes.ts
 msgid "Drawn while cloaked and standing still."
 msgstr "Drawn while cloaked and standing still."
+
+#: src/general/pages/SettingsSection.tsx
+msgid "Draws 3D views at a lower resolution with fewer particles, for laptops and older graphics cards."
+msgstr "Draws 3D views at a lower resolution with fewer particles, for laptops and older graphics cards."
 
 #: src/content/unitFieldNotes.ts
 msgid "Draws a stain under the unit while it stands there."
@@ -18544,6 +18575,10 @@ msgstr "Extracting…"
 #: src/content/unitFieldNotes.ts
 msgid "Extraction depth"
 msgstr "Extraction depth"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "F11 and the button in the top bar also switch it."
+msgstr "F11 and the button in the top bar also switch it."
 
 #: src/lego/pages/components/ViewKey.tsx
 msgid "Faces"
@@ -22257,6 +22292,7 @@ msgstr "Interceptable-by bitmask"
 msgid "Interception radius"
 msgstr "Interception radius"
 
+#: src/general/pages/SettingsSection.tsx
 #: src/sound/events.ts
 #: src/sound/library.ts
 msgid "Interface"
@@ -25535,8 +25571,8 @@ msgid "Most of this game's PNG build pictures are {commonWidth} by {commonHeight
 msgstr "Most of this game's PNG build pictures are {commonWidth} by {commonHeight} pixels. This one is {size} by {size}."
 
 #: src/general/pages/SettingsSection.tsx
-msgid "Motion & effects"
-msgstr "Motion & effects"
+msgid "Motion and effects"
+msgstr "Motion and effects"
 
 #: src/workshop/weaponSlots.ts
 msgid "Mount"
@@ -33749,10 +33785,6 @@ msgstr "Rendering…"
 msgid "Renders"
 msgstr "Renders"
 
-#: src/general/pages/SettingsSection.tsx
-msgid "Renders 3D views at a lower resolution with fewer particles — for laptops and older GPUs."
-msgstr "Renders 3D views at a lower resolution with fewer particles — for laptops and older GPUs."
-
 #: src/workshop/pages/UnitPage.tsx
 msgid "Reopen the seed and rules this project was made from, to change one and replay it"
 msgstr "Reopen the seed and rules this project was made from, to change one and replay it"
@@ -34649,10 +34681,6 @@ msgstr "Run"
 msgid "Run {at} with {game} on engine {engine}, in {took}."
 msgstr "Run {at} with {game} on engine {engine}, in {took}."
 
-#: src/general/pages/SettingsSection.tsx
-msgid "Run Coilbox in fullscreen. Also toggleable with F11 or the top-bar button; the choice is remembered across restarts."
-msgstr "Run Coilbox in fullscreen. Also toggleable with F11 or the top-bar button; the choice is remembered across restarts."
-
 #: src/uberstress/pages/RunPage.tsx
 msgid "Run complete"
 msgstr "Run complete"
@@ -35183,8 +35211,8 @@ msgid "Scales every sound Coilbox makes. Audio played by a campaign briefing or 
 msgstr "Scales every sound Coilbox makes. Audio played by a campaign briefing or a profile page has its own controls and is not affected."
 
 #: src/general/pages/SettingsSection.tsx
-msgid "Scales the whole of Coilbox: text, spacing and the 3D views. Fit more on a small screen, or make everything easier to read on a large one. Cmd or Ctrl with plus and minus does the same, and with zero puts it back to 100%."
-msgstr "Scales the whole of Coilbox: text, spacing and the 3D views. Fit more on a small screen, or make everything easier to read on a large one. Cmd or Ctrl with plus and minus does the same, and with zero puts it back to 100%."
+msgid "Scales text, spacing and the 3D views. Cmd or Ctrl with plus or minus changes it, and with zero sets it back to 100%."
+msgstr "Scales text, spacing and the 3D views. Cmd or Ctrl with plus or minus changes it, and with zero sets it back to 100%."
 
 #: src/lego/pages/components/TransformFields.tsx
 msgid "Scaling each axis on its own. Click to keep proportions"
@@ -36505,6 +36533,10 @@ msgstr "setup packs"
 msgid "Setup packs"
 msgstr "Setup packs"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "Setup wizard"
+msgstr "Setup wizard"
+
 #: src/lego/pages/components/SetPanel.tsx
 msgid "Several"
 msgstr "Several"
@@ -36995,10 +37027,6 @@ msgstr "Show the {label} model"
 #: src/i18n/frameStrings.ts
 msgid "Show the back and forward navigation buttons in the top bar."
 msgstr "Show the back and forward navigation buttons in the top bar."
-
-#: src/general/pages/SettingsSection.tsx
-msgid "Show the brand splash when Coilbox launches. Click it or press Escape to dismiss it early."
-msgstr "Show the brand splash when Coilbox launches. Click it or press Escape to dismiss it early."
 
 #: src/placement/PlacementSurface.tsx
 msgid "Show the build grid the blueprint stands on"
@@ -38055,8 +38083,8 @@ msgid "Star on GitHub"
 msgstr "Star on GitHub"
 
 #: src/general/pages/SettingsSection.tsx
-msgid "Star twinkle, nebulae and other decorative touches. Turn off for a plainer interface. Sound is controlled separately, in Sound settings."
-msgstr "Star twinkle, nebulae and other decorative touches. Turn off for a plainer interface. Sound is controlled separately, in Sound settings."
+msgid "Star twinkle, nebulae and other decorative touches. Sound has its own settings page."
+msgstr "Star twinkle, nebulae and other decorative touches. Sound has its own settings page."
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #: src/hub/pages/components/ItemPreview.tsx
@@ -38594,8 +38622,8 @@ msgid "Stopping…"
 msgstr "Stopping…"
 
 #: src/general/pages/SettingsSection.tsx
-msgid "Stops ambient animation — the galaxy twinkle, scrolling panoramas, spinning map previews and result flourishes. \"Follow system\" respects your OS accessibility preference."
-msgstr "Stops ambient animation — the galaxy twinkle, scrolling panoramas, spinning map previews and result flourishes. \"Follow system\" respects your OS accessibility preference."
+msgid "Stops ambient animation, such as the galaxy twinkle, scrolling panoramas, spinning map previews and result flourishes. Follow system uses your operating system's accessibility setting."
+msgstr "Stops ambient animation, such as the galaxy twinkle, scrolling panoramas, spinning map previews and result flourishes. Follow system uses your operating system's accessibility setting."
 
 #: src/content/unitFieldNotes.ts
 msgid "Stops to shoot"

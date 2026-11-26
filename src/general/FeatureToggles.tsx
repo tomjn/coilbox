@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { Label } from "@/components/ui/label";
+import { SettingList, SettingRow } from "@/components/SettingRow";
 import { Switch } from "@/components/ui/switch";
 import { FEATURES, type Feature, useFeatureSetting } from "./features";
 
@@ -9,11 +9,11 @@ import { FEATURES, type Feature, useFeatureSetting } from "./features";
  */
 export function FeatureToggles() {
   return (
-    <div className="space-y-3">
+    <SettingList>
       {FEATURES.map((feature) => (
         <FeatureSwitch key={feature} feature={feature} />
       ))}
-    </div>
+    </SettingList>
   );
 }
 
@@ -58,20 +58,13 @@ function FeatureSwitch({ feature }: { feature: Feature }) {
   const { label, tools } = useFeatureText(feature);
   const id = `feature-${feature}`;
   return (
-    <Label
-      htmlFor={id}
-      className="flex cursor-pointer items-start gap-3 font-normal"
-    >
+    <SettingRow id={id} label={label} description={tools}>
       <Switch
         id={id}
         checked={enabled}
         onCheckedChange={(v) => setEnabled(v === true)}
-        className="mt-0.5"
+        aria-describedby={`${id}-description`}
       />
-      <span className="space-y-1">
-        <span className="block text-sm font-medium">{label}</span>
-        <span className="block text-xs text-muted-foreground">{tools}</span>
-      </span>
-    </Label>
+    </SettingRow>
   );
 }

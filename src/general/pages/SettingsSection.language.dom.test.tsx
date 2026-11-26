@@ -53,15 +53,21 @@ vi.mock("@picoframe/frame", async (importOriginal) => {
 // native select that takes the same props, as other DOM tests here do.
 vi.mock("@/components/OptionSelect", () => ({
   OptionSelect: ({
+    id,
     value,
     onValueChange,
     options,
   }: {
+    id?: string;
     value: string;
     onValueChange: (v: string) => void;
     options: { value: string; label: string; hint?: string }[];
   }) => (
-    <select value={value} onChange={(e) => onValueChange(e.target.value)}>
+    <select
+      id={id}
+      value={value}
+      onChange={(e) => onValueChange(e.target.value)}
+    >
       {options.map((o) => (
         <option key={o.value} value={o.value} data-hint={o.hint}>
           {o.label}

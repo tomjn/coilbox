@@ -126,7 +126,7 @@ it("moves on after a successful sign in", async () => {
   show();
   fireEvent.click(await signInButton());
   await waitFor(() => expect(onSettle).toHaveBeenCalledWith("hub"));
-  expect(screen.getByText("You're ready")).toBeTruthy();
+  expect(await screen.findByText("You're ready")).toBeTruthy();
 });
 
 it("shows a failed sign in and stays on the page", async () => {

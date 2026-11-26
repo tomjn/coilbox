@@ -9989,6 +9989,10 @@ msgstr "关于 {subject}"
 msgid "About actions"
 msgstr "关于动作"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "About ambient effects"
+msgstr ""
+
 #: src/lego/pages/components/MovementSection.tsx
 #, fuzzy
 msgid "About banking"
@@ -10019,6 +10023,14 @@ msgstr "关于空部件"
 msgid "About fixing UVs and normals"
 msgstr "关于修复 UV 和法线"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "About fullscreen"
+msgstr ""
+
+#: src/general/pages/SettingsSection.tsx
+msgid "About interface size"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "About mirroring"
@@ -10034,10 +10046,18 @@ msgstr "关于移动一组部件"
 msgid "About one piece's box"
 msgstr "关于单个部件的包围盒"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "About performance mode"
+msgstr ""
+
 #: src/lego/pages/components/ProportionsPanel.tsx
 #, fuzzy
 msgid "About proportions"
 msgstr "关于比例"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "About reduce motion"
+msgstr ""
 
 #: src/content/pages/components/ReplayTracksStorage.tsx
 #, fuzzy
@@ -10074,6 +10094,10 @@ msgstr "关于碰撞体积"
 msgid "About the colour texture"
 msgstr "关于颜色纹理"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "About the frame rate"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "About the pivot point"
@@ -10083,6 +10107,10 @@ msgstr "关于枢轴点"
 #, fuzzy
 msgid "About the shading map"
 msgstr "关于着色贴图"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "About the startup splash"
+msgstr ""
 
 #: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
@@ -16184,6 +16212,10 @@ msgstr "点击模型在那里放置连接器。按 Escape 停止"
 msgid "Click the second point"
 msgstr "点击第二个点"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "Click the splash or press Escape to close it early."
+msgstr ""
+
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #, fuzzy
 msgid "Click to edit its units, double click to rename"
@@ -16903,11 +16935,6 @@ msgstr "Coilbox 正在为中心制作 {subject} 的单位图片。"
 #, fuzzy
 msgid "Coilbox is making pictures of {subject}'s units. Nothing has been sent yet."
 msgstr "Coilbox 正在制作 {subject} 的单位图片。尚未发送任何内容。"
-
-#: src/general/pages/AboutCoilbox.tsx
-#, fuzzy
-msgid "Coilbox is open source. Browse the code, report a bug, or star the project on GitHub."
-msgstr "Coilbox 是开源的。可以在 GitHub 上浏览代码、报告 bug 或为项目加星标。"
 
 #: src/hub/uploadOutcomes.ts
 #, fuzzy
@@ -20564,7 +20591,6 @@ msgid "Dismiss the failed analysis of {0}"
 msgstr "关闭对 {0} 的失败分析"
 
 #: src/content/index.ts
-#: src/general/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Display"
 msgstr "显示"
@@ -21187,6 +21213,10 @@ msgstr "隐形且移动时消耗。默认为静止时的消耗。"
 #, fuzzy
 msgid "Drawn while cloaked and standing still."
 msgstr "隐形且静止时消耗。"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "Draws 3D views at a lower resolution with fewer particles, for laptops and older graphics cards."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -22899,6 +22929,10 @@ msgstr "正在解压…"
 #, fuzzy
 msgid "Extraction depth"
 msgstr "开采深度"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "F11 and the button in the top bar also switch it."
+msgstr ""
 
 #: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
@@ -27480,6 +27514,7 @@ msgstr "可拦截位掩码"
 msgid "Interception radius"
 msgstr "拦截半径"
 
+#: src/general/pages/SettingsSection.tsx
 #: src/sound/events.ts
 #: src/sound/library.ts
 #, fuzzy
@@ -31528,9 +31563,8 @@ msgid "Most of this game's PNG build pictures are {commonWidth} by {commonHeight
 msgstr "此游戏的大多数 PNG 建造图片为 {commonWidth} × {commonHeight} 像素。这张为 {size} × {size}。"
 
 #: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Motion & effects"
-msgstr "动态与效果"
+msgid "Motion and effects"
+msgstr ""
 
 #: src/workshop/weaponSlots.ts
 #, fuzzy
@@ -41674,11 +41708,6 @@ msgstr "渲染中…"
 msgid "Renders"
 msgstr "渲染图"
 
-#: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Renders 3D views at a lower resolution with fewer particles — for laptops and older GPUs."
-msgstr "以较低分辨率和较少粒子渲染 3D 视图，适合笔记本电脑和较旧的 GPU。"
-
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
 msgid "Reopen the seed and rules this project was made from, to change one and replay it"
@@ -42780,11 +42809,6 @@ msgstr "运行"
 msgid "Run {at} with {game} on engine {engine}, in {took}."
 msgstr "于 {at} 使用 {game} 在引擎 {engine} 上运行，耗时 {took}。"
 
-#: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Run Coilbox in fullscreen. Also toggleable with F11 or the top-bar button; the choice is remembered across restarts."
-msgstr "以全屏方式运行 Coilbox。也可以用 F11 或顶栏按钮切换，该选择在重启后仍会保留。"
-
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
 msgid "Run complete"
@@ -43435,9 +43459,8 @@ msgid "Scales every sound Coilbox makes. Audio played by a campaign briefing or 
 msgstr "调整 Coilbox 发出的所有声音的音量。战役简报或个人资料页面播放的音频有自己的控制，不受影响。"
 
 #: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Scales the whole of Coilbox: text, spacing and the 3D views. Fit more on a small screen, or make everything easier to read on a large one. Cmd or Ctrl with plus and minus does the same, and with zero puts it back to 100%."
-msgstr "缩放整个 Coilbox：文字、间距和 3D 视图。在小屏幕上显示更多内容，或在大屏幕上让一切更易阅读。Cmd 或 Ctrl 加上加号和减号也能调整，加 0 则恢复为 100%。"
+msgid "Scales text, spacing and the 3D views. Cmd or Ctrl with plus or minus changes it, and with zero sets it back to 100%."
+msgstr ""
 
 #: src/lego/pages/components/TransformFields.tsx
 #, fuzzy
@@ -45066,6 +45089,10 @@ msgstr "设置包"
 msgid "Setup packs"
 msgstr "设置包"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "Setup wizard"
+msgstr ""
+
 #: src/lego/pages/components/SetPanel.tsx
 #, fuzzy
 msgid "Several"
@@ -45671,11 +45698,6 @@ msgstr "显示 {label} 模型"
 #, fuzzy
 msgid "Show the back and forward navigation buttons in the top bar."
 msgstr "在顶栏中显示后退和前进导航按钮。"
-
-#: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Show the brand splash when Coilbox launches. Click it or press Escape to dismiss it early."
-msgstr "Coilbox 启动时显示品牌启动画面。点击它或按 Escape 可提前关闭。"
 
 #: src/placement/PlacementSurface.tsx
 #, fuzzy
@@ -46977,9 +46999,8 @@ msgid "Star on GitHub"
 msgstr "在 GitHub 上加星"
 
 #: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Star twinkle, nebulae and other decorative touches. Turn off for a plainer interface. Sound is controlled separately, in Sound settings."
-msgstr "星光闪烁、星云等装饰效果。关闭可获得更简洁的界面。声音在“音效”设置中单独控制。"
+msgid "Star twinkle, nebulae and other decorative touches. Sound has its own settings page."
+msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #: src/hub/pages/components/ItemPreview.tsx
@@ -47644,9 +47665,8 @@ msgid "Stopping…"
 msgstr "停止中…"
 
 #: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Stops ambient animation — the galaxy twinkle, scrolling panoramas, spinning map previews and result flourishes. \"Follow system\" respects your OS accessibility preference."
-msgstr "停止环境动画：银河闪烁、滚动全景、旋转的地图预览和结果动画效果。“跟随系统”会遵循你的操作系统辅助功能偏好。"
+msgid "Stops ambient animation, such as the galaxy twinkle, scrolling panoramas, spinning map previews and result flourishes. Follow system uses your operating system's accessibility setting."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy

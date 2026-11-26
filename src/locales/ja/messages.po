@@ -9989,6 +9989,10 @@ msgstr "{subject} について"
 msgid "About actions"
 msgstr "アクションについて"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "About ambient effects"
+msgstr ""
+
 #: src/lego/pages/components/MovementSection.tsx
 #, fuzzy
 msgid "About banking"
@@ -10019,6 +10023,14 @@ msgstr "空のピースについて"
 msgid "About fixing UVs and normals"
 msgstr "UV と法線の修正について"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "About fullscreen"
+msgstr ""
+
+#: src/general/pages/SettingsSection.tsx
+msgid "About interface size"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "About mirroring"
@@ -10034,10 +10046,18 @@ msgstr "セットの移動について"
 msgid "About one piece's box"
 msgstr "1 つのピースのボックスについて"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "About performance mode"
+msgstr ""
+
 #: src/lego/pages/components/ProportionsPanel.tsx
 #, fuzzy
 msgid "About proportions"
 msgstr "プロポーションについて"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "About reduce motion"
+msgstr ""
 
 #: src/content/pages/components/ReplayTracksStorage.tsx
 #, fuzzy
@@ -10074,6 +10094,10 @@ msgstr "当たり判定ボリュームについて"
 msgid "About the colour texture"
 msgstr "カラーテクスチャについて"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "About the frame rate"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "About the pivot point"
@@ -10083,6 +10107,10 @@ msgstr "ピボットについて"
 #, fuzzy
 msgid "About the shading map"
 msgstr "シェーディングマップについて"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "About the startup splash"
+msgstr ""
 
 #: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
@@ -16184,6 +16212,10 @@ msgstr "モデルをクリックしてコネクターを置きます。Escape �
 msgid "Click the second point"
 msgstr "2 点目をクリック"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "Click the splash or press Escape to close it early."
+msgstr ""
+
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #, fuzzy
 msgid "Click to edit its units, double click to rename"
@@ -16903,11 +16935,6 @@ msgstr "Coilbox はハブ用に {subject} のユニットの画像を作成し�
 #, fuzzy
 msgid "Coilbox is making pictures of {subject}'s units. Nothing has been sent yet."
 msgstr "Coilbox は {subject} のユニットの画像を作成しています。まだ何も送信していません。"
-
-#: src/general/pages/AboutCoilbox.tsx
-#, fuzzy
-msgid "Coilbox is open source. Browse the code, report a bug, or star the project on GitHub."
-msgstr "Coilbox はオープンソースです。GitHub でコードを見たり、バグを報告したり、プロジェクトにスターを付けたりできます。"
 
 #: src/hub/uploadOutcomes.ts
 #, fuzzy
@@ -20564,7 +20591,6 @@ msgid "Dismiss the failed analysis of {0}"
 msgstr "{0} の失敗した分析を閉じる"
 
 #: src/content/index.ts
-#: src/general/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Display"
 msgstr "表示"
@@ -21187,6 +21213,10 @@ msgstr "クローク中に移動している間に消費します。デフォル
 #, fuzzy
 msgid "Drawn while cloaked and standing still."
 msgstr "クローク中に静止している間に消費します。"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "Draws 3D views at a lower resolution with fewer particles, for laptops and older graphics cards."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -22899,6 +22929,10 @@ msgstr "展開しています…"
 #, fuzzy
 msgid "Extraction depth"
 msgstr "採掘の深さ"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "F11 and the button in the top bar also switch it."
+msgstr ""
 
 #: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
@@ -27480,6 +27514,7 @@ msgstr "迎撃可能ビットマスク"
 msgid "Interception radius"
 msgstr "迎撃半径"
 
+#: src/general/pages/SettingsSection.tsx
 #: src/sound/events.ts
 #: src/sound/library.ts
 #, fuzzy
@@ -31528,9 +31563,8 @@ msgid "Most of this game's PNG build pictures are {commonWidth} by {commonHeight
 msgstr "このゲームの PNG 建設画像の大半は {commonWidth} x {commonHeight} ピクセルです。この画像は {size} x {size} です。"
 
 #: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Motion & effects"
-msgstr "モーションと効果"
+msgid "Motion and effects"
+msgstr ""
 
 #: src/workshop/weaponSlots.ts
 #, fuzzy
@@ -41674,11 +41708,6 @@ msgstr "レンダリング中…"
 msgid "Renders"
 msgstr "レンダー"
 
-#: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Renders 3D views at a lower resolution with fewer particles — for laptops and older GPUs."
-msgstr "3D ビューを低い解像度と少ないパーティクルで描画します — ノートパソコンや古い GPU 向けです。"
-
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
 msgid "Reopen the seed and rules this project was made from, to change one and replay it"
@@ -42780,11 +42809,6 @@ msgstr "実行"
 msgid "Run {at} with {game} on engine {engine}, in {took}."
 msgstr "{at} に {game} とエンジン {engine} で実行しました。所要時間 {took}。"
 
-#: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Run Coilbox in fullscreen. Also toggleable with F11 or the top-bar button; the choice is remembered across restarts."
-msgstr "Coilbox を全画面で実行します。F11 やトップバーのボタンでも切り替えられ、設定は再起動後も記憶されます。"
-
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
 msgid "Run complete"
@@ -43435,9 +43459,8 @@ msgid "Scales every sound Coilbox makes. Audio played by a campaign briefing or 
 msgstr "Coilbox が出すすべての音の大きさを調整します。キャンペーンのブリーフィングやプロフィールページで再生される音声には独自の操作があり、影響を受けません。"
 
 #: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Scales the whole of Coilbox: text, spacing and the 3D views. Fit more on a small screen, or make everything easier to read on a large one. Cmd or Ctrl with plus and minus does the same, and with zero puts it back to 100%."
-msgstr "Coilbox 全体の大きさを調整します。文字、余白、3D ビューが対象です。小さな画面でより多く表示したり、大きな画面ですべてを読みやすくしたりできます。Cmd または Ctrl とプラス、マイナスで同じ操作ができ、0 で 100% に戻ります。"
+msgid "Scales text, spacing and the 3D views. Cmd or Ctrl with plus or minus changes it, and with zero sets it back to 100%."
+msgstr ""
 
 #: src/lego/pages/components/TransformFields.tsx
 #, fuzzy
@@ -45066,6 +45089,10 @@ msgstr "セットアップパック"
 msgid "Setup packs"
 msgstr "セットアップパック"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "Setup wizard"
+msgstr ""
+
 #: src/lego/pages/components/SetPanel.tsx
 #, fuzzy
 msgid "Several"
@@ -45671,11 +45698,6 @@ msgstr "{label} のモデルを表示"
 #, fuzzy
 msgid "Show the back and forward navigation buttons in the top bar."
 msgstr "トップバーに戻る・進むのナビゲーションボタンを表示します。"
-
-#: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Show the brand splash when Coilbox launches. Click it or press Escape to dismiss it early."
-msgstr "Coilbox の起動時にブランドのスプラッシュ画面を表示します。クリックするか Escape を押すと、すぐに閉じます。"
 
 #: src/placement/PlacementSurface.tsx
 #, fuzzy
@@ -46977,9 +46999,8 @@ msgid "Star on GitHub"
 msgstr "GitHub でスターを付ける"
 
 #: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Star twinkle, nebulae and other decorative touches. Turn off for a plainer interface. Sound is controlled separately, in Sound settings."
-msgstr "星のきらめき、星雲などの装飾。オフにするとシンプルなインターフェースになります。サウンドは「サウンド」設定で別に管理します。"
+msgid "Star twinkle, nebulae and other decorative touches. Sound has its own settings page."
+msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #: src/hub/pages/components/ItemPreview.tsx
@@ -47644,9 +47665,8 @@ msgid "Stopping…"
 msgstr "停止中…"
 
 #: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Stops ambient animation — the galaxy twinkle, scrolling panoramas, spinning map previews and result flourishes. \"Follow system\" respects your OS accessibility preference."
-msgstr "背景のアニメーション（銀河のきらめき、スクロールするパノラマ、回転するマッププレビュー、結果の演出）を止めます。「システムに従う」は OS のアクセシビリティ設定に従います。"
+msgid "Stops ambient animation, such as the galaxy twinkle, scrolling panoramas, spinning map previews and result flourishes. Follow system uses your operating system's accessibility setting."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy

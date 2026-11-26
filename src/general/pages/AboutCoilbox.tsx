@@ -1,7 +1,7 @@
 import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { Bug, ExternalLink, Info, Star } from "lucide-react";
+import { Bug, ExternalLink, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import { formatCompact, formatNumber } from "@/lib/format";
 import { API_URL, ISSUE_URL, REPO_URL } from "../errorReport";
@@ -42,16 +42,10 @@ export function AboutCoilbox() {
   }, []);
 
   return (
-    <section className="space-y-3">
-      <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        <Info size={15} /> <Trans>About Coilbox</Trans>
+    <section className="flex flex-col gap-3">
+      <h2 className="text-sm font-semibold">
+        <Trans>About Coilbox</Trans>
       </h2>
-      <p className="text-xs text-muted-foreground">
-        <Trans>
-          Coilbox is open source. Browse the code, report a bug, or star the
-          project on GitHub.
-        </Trans>
-      </p>
       <div className="flex flex-wrap gap-2">
         <Button
           size="sm"
