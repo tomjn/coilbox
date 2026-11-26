@@ -71,8 +71,8 @@ const ready = () =>
     ).toBe(false),
   );
 
-const programField = () =>
-  screen.getAllByRole("textbox")[0] as HTMLInputElement;
+/** The path the Location row shows, or "Not set". */
+const location = () => document.getElementById("oa-program-path")?.textContent;
 
 beforeEach(() => {
   i18n.loadAndActivate({ locale: "en", messages: {} });
@@ -88,8 +88,8 @@ it("fills an empty setting from OA's usual place and shows the version", async (
   bindings.playOaFind.mockResolvedValue({ found: MAC_OA });
   show();
 
-  await waitFor(() => expect(programField().value).toBe(MAC_OA.path));
-  expect(screen.getByDisplayValue(MAC_OA.version)).toBeTruthy();
+  await waitFor(() => expect(location()).toBe(MAC_OA.path));
+  expect(screen.getByText(MAC_OA.version)).toBeTruthy();
   expect(settings[OA_PROGRAM_KEY]).toEqual(MAC_OA);
 });
 
@@ -97,7 +97,7 @@ it("leaves the setting empty and says nothing when OA is not in its usual place"
   show();
 
   await waitFor(() => expect(bindings.playOaFind).toHaveBeenCalled());
-  expect(programField().value).toBe("");
+  expect(location()).toBe("Not set");
   expect(settings[OA_PROGRAM_KEY]).toBeUndefined();
   expect(screen.queryByRole("alert")).toBeNull();
 });
@@ -114,9 +114,9 @@ it("stores a picked program that prints an OA version", async () => {
 
   fireEvent.click(screen.getByRole("button", { name: /choose/i }));
 
-  await waitFor(() => expect(programField().value).toBe(unpacked.path));
+  await waitFor(() => expect(location()).toBe(unpacked.path));
   expect(bindings.playOaCheck).toHaveBeenCalledWith({ path: unpacked.path });
-  expect(screen.getByDisplayValue(unpacked.version)).toBeTruthy();
+  expect(screen.getByText(unpacked.version)).toBeTruthy();
   expect(settings[OA_PROGRAM_KEY]).toEqual(unpacked);
 });
 
@@ -143,7 +143,7 @@ it("refuses a program that is not OA, says why, and keeps the stored one", async
     "textContent",
     "/bin/ls is not Open Annihilation. Choose the open-annihilation file.",
   );
-  expect(programField().value).toBe(MAC_OA.path);
+  expect(location()).toBe(MAC_OA.path);
   expect(settings[OA_PROGRAM_KEY]).toEqual(MAC_OA);
 });
 
@@ -162,7 +162,7 @@ it("stores nothing when the first pick is refused", async () => {
   fireEvent.click(screen.getByRole("button", { name: /choose/i }));
 
   await screen.findByRole("alert");
-  expect(programField().value).toBe("");
+  expect(location()).toBe("Not set");
   expect(settings[OA_PROGRAM_KEY]).toBeUndefined();
 });
 
@@ -187,9 +187,7 @@ it("reads the stored program's version again, because OA updates itself", async 
   bindings.playOaCheck.mockResolvedValue(updated);
   show();
 
-  await waitFor(() =>
-    expect(screen.getByDisplayValue(updated.version)).toBeTruthy(),
-  );
+  await waitFor(() => expect(screen.getByText(updated.version)).toBeTruthy());
   expect(settings[OA_PROGRAM_KEY]).toEqual(updated);
   expect(bindings.playOaFind).not.toHaveBeenCalled();
 });
@@ -202,7 +200,7 @@ it("says so when the stored program no longer runs, and keeps the path", async (
   show();
 
   expect(await screen.findByRole("alert")).toBeTruthy();
-  expect(programField().value).toBe(MAC_OA.path);
+  expect(location()).toBe(MAC_OA.path);
   expect(settings[OA_PROGRAM_KEY]).toEqual(MAC_OA);
 });
 
@@ -215,4 +213,38 @@ it("tells the player when Find has nothing to find", async () => {
 
   expect(await screen.findByRole("alert")).toBeTruthy();
   expect(bindings.playOaFind).toHaveBeenCalledTimes(2);
+});
+
+it("shows Checking in place of the stored version until the check on open answers", async () => {
+  settings[OA_PROGRAM_KEY] = MAC_OA;
+  let answer: (p: typeof MAC_OA) => void = () => {};
+  bindings.playOaCheck.mockReturnValue(
+    new Promise((resolve) => {
+      answer = resolve;
+    }),
+  );
+  show();
+
+  expect(screen.getByText("Checking…")).toBeTruthy();
+  expect(screen.queryByText(MAC_OA.version)).toBeNull();
+  answer(MAC_OA);
+  expect(await screen.findByText(MAC_OA.version)).toBeTruthy();
+});
+
+it("says so when the file picker fails, rather than doing nothing", async () => {
+  dialog.open.mockRejectedValue(new Error("dialog unavailable"));
+  show();
+  await ready();
+
+  fireEvent.click(screen.getByRole("button", { name: /choose/i }));
+
+  expect(await screen.findByRole("alert")).toHaveProperty(
+    "textContent",
+    "dialog unavailable",
+  );
+  expect(bindings.playOaCheck).not.toHaveBeenCalled();
+  expect(
+    (screen.getByRole("button", { name: /choose/i }) as HTMLButtonElement)
+      .disabled,
+  ).toBe(false);
 });

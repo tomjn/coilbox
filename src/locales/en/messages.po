@@ -364,7 +364,6 @@ msgid "(no username)"
 msgstr "(no username)"
 
 #: src/mapconv/pages/components/PathField.tsx
-#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 msgid "(none)"
 msgstr "(none)"
 
@@ -8418,6 +8417,10 @@ msgstr "About the music source"
 msgid "About the notification sound"
 msgstr "About the notification sound"
 
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "About the Open Annihilation program"
+msgstr "About the Open Annihilation program"
+
 #: src/lego/pages/BuilderPage.tsx
 msgid "About the pivot point"
 msgstr "About the pivot point"
@@ -12972,6 +12975,7 @@ msgstr "Checking your sign-in"
 #: src/game-updates/pages/GameUpdatesSection.tsx
 #: src/mapconv/pages/SettingsSection.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 #: src/notify/NotificationsSettings.tsx
 #: src/packs/pages/components/ImportPackForm.tsx
 #: src/scenario/pages/components/ImportScenarioForm.tsx
@@ -14101,6 +14105,10 @@ msgstr "Coilbox joins battle {heldBattle} once you are logged in to <0>{heldAddr
 #: src/content/pages/components/KeymapsPanel.tsx
 msgid "Coilbox keymap"
 msgstr "Coilbox keymap"
+
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "Coilbox looks for Open Annihilation where its installer puts it. If yours is somewhere else, choose the open-annihilation file."
+msgstr "Coilbox looks for Open Annihilation where its installer puts it. If yours is somewhere else, choose the open-annihilation file."
 
 #: src/lego/moduleFileIo.ts
 msgid "Coilbox module"
@@ -24535,6 +24543,7 @@ msgid "Local tweak-slot mod option"
 msgstr "Local tweak-slot mod option"
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 msgid "Location"
 msgstr "Location"
 
@@ -29151,6 +29160,7 @@ msgstr "not set"
 
 #: src/lego/pages/components/MovementSection.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 msgid "Not set"
 msgstr "Not set"
 
@@ -30373,6 +30383,10 @@ msgstr "Open Annihilation refused to open this battle."
 #: src/multiplayer/battles/HostBattleForm.tsx
 msgid "Open Annihilation takes a password of up to {OA_PASSWORD_MAX} characters."
 msgstr "Open Annihilation takes a password of up to {OA_PASSWORD_MAX} characters."
+
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "Open Annihilation updates itself, so Coilbox reads its version again each time you open this page."
+msgstr "Open Annihilation updates itself, so Coilbox reads its version again each time you open this page."
 
 #: src/blueprint/pages/components/ImportPackForm.tsx
 msgid "Open another file"
