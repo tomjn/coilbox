@@ -8111,6 +8111,10 @@ msgstr "About fullscreen"
 msgid "About interface size"
 msgstr "About interface size"
 
+#: src/content/pages/components/KeyBindingEditor.tsx
+msgid "About keys with more than one action"
+msgstr "About keys with more than one action"
+
 #: src/lego/pages/BuilderPage.tsx
 msgid "About mirroring"
 msgstr "About mirroring"
@@ -8147,6 +8151,10 @@ msgstr "About roles"
 msgid "About round shapes"
 msgstr "About round shapes"
 
+#: src/content/pages/components/KeymapsPanel.tsx
+msgid "About saved keymaps"
+msgstr "About saved keymaps"
+
 #: src/lego/pages/components/CollisionPanel.tsx
 msgid "About shooting at each piece"
 msgstr "About shooting at each piece"
@@ -8166,6 +8174,10 @@ msgstr "About the colour texture"
 #: src/general/pages/SettingsSection.tsx
 msgid "About the frame rate"
 msgstr "About the frame rate"
+
+#: src/content/pages/KeybindsSection.tsx
+msgid "About the game's bindings"
+msgstr "About the game's bindings"
 
 #: src/lego/pages/BuilderPage.tsx
 msgid "About the pivot point"
@@ -8346,6 +8358,10 @@ msgstr "Action name"
 #: src/lego/pages/components/TimelineTab.tsx
 msgid "Action settings"
 msgstr "Action settings"
+
+#: src/content/pages/components/KeyBindingEditor.tsx
+msgid "Action to add"
+msgstr "Action to add"
 
 #: src/content/pages/components/MissionRuntimeSection.tsx
 #: src/downloads/pages/ActivityPage.tsx
@@ -8962,6 +8978,10 @@ msgstr "Align {axisName} middle. A piece with no shape lines up by its origin."
 #: src/workshop/pages/UnitPage.tsx
 msgid "All"
 msgstr "All"
+
+#: src/content/pages/KeybindsSection.tsx
+msgid "All bindings"
+msgstr "All bindings"
 
 #: src/profile/health.ts
 msgid "All campaigns loaded"
@@ -10969,10 +10989,6 @@ msgstr "Between two minutes"
 #: src/conquest/galaxy3d/GalaxyView.tsx
 msgid "binary pair — {primary} + {companion}"
 msgstr "binary pair — {primary} + {companion}"
-
-#: src/content/pages/KeybindsSection.tsx
-msgid "Bindings a game brings with it:"
-msgstr "Bindings a game brings with it:"
 
 #: src/lego/scriptMarks.ts
 msgid "black smoke"
@@ -14667,10 +14683,6 @@ msgstr "Cooperative"
 #: src/workshop/pages/components/PackagePanel.tsx
 msgid "Copied"
 msgstr "Copied"
-
-#: src/content/pages/components/KeymapsPanel.tsx
-msgid "Copied a link to \"{keymapName}\"."
-msgstr "Copied a link to \"{keymapName}\"."
 
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
 msgid "Copied from {copiedFrom}. A change here reaches every slot that fires it, and no other unit."
@@ -20035,6 +20047,7 @@ msgstr "game"
 #: src/content/index.ts
 #: src/content/pages/components/ArchiveTypeBadge.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
+#: src/content/pages/KeybindsSection.tsx
 #: src/direct/HostRoomForm.tsx
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/hub/pages/BrowsePage.tsx
@@ -23103,8 +23116,8 @@ msgid "Keep them as they are"
 msgstr "Keep them as they are"
 
 #: src/content/pages/components/KeymapsPanel.tsx
-msgid "Keep this keymap under a name, switch between them, and share one."
-msgstr "Keep this keymap under a name, switch between them, and share one."
+msgid "Keep this keymap under a name, switch between them, and share one. Apply loads a keymap into the editor. Nothing changes in uikeys.txt until you save."
+msgstr "Keep this keymap under a name, switch between them, and share one. Apply loads a keymap into the editor. Nothing changes in uikeys.txt until you save."
 
 #: src/content/pages/MapDetailPage.tsx
 msgid "Keep this map out of generated warpaths and conquests. It stays playable in skirmish and multiplayer."
@@ -23213,6 +23226,10 @@ msgstr "keybinds"
 #: src/content/index.ts
 msgid "Keybinds"
 msgstr "Keybinds"
+
+#: src/content/pages/KeybindsSection.tsx
+msgid "Keyboard"
+msgstr "Keyboard"
 
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
@@ -31117,8 +31134,8 @@ msgid "Pick a game, a seed and a scope. Two people who type the same seed and ru
 msgstr "Pick a game, a seed and a scope. Two people who type the same seed and rules against the same game get the same mod."
 
 #: src/content/pages/KeybindsSection.tsx
-msgid "Pick a key above to see what it does, or find it in the list below."
-msgstr "Pick a key above to see what it does, or find it in the list below."
+msgid "Pick a key to see what it does."
+msgstr "Pick a key to see what it does."
 
 #: src/placement/BlueprintOnMap.tsx
 msgid "Pick a map to see which of this layout's buildings the ground would take. The layout is not changed by anything you do here."
@@ -33618,9 +33635,7 @@ msgstr "Remixed from"
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #: src/campaign/pages/components/MissionMediaFields.tsx
 #: src/campaign/pages/components/MissionRemoveButton.tsx
-#: src/content/pages/components/BindingList.tsx
 #: src/content/pages/components/CompatMode.tsx
-#: src/content/pages/components/KeyBindingEditor.tsx
 #: src/content/pages/components/MissionRuntimeSection.tsx
 #: src/content/pages/components/RootCard.tsx
 #: src/hub/pages/ItemPage.tsx
@@ -33639,9 +33654,17 @@ msgstr "Remove"
 msgid "Remove {accountName}"
 msgstr "Remove {accountName}"
 
+#: src/content/pages/components/BindingList.tsx
+msgid "Remove {action} from {keys}"
+msgstr "Remove {action} from {keys}"
+
 #: src/lego/pages/components/AnchorList.tsx
 msgid "Remove {anchorName}"
 msgstr "Remove {anchorName}"
+
+#: src/content/pages/components/KeyBindingEditor.tsx
+msgid "Remove {bound}"
+msgstr "Remove {bound}"
 
 #: src/lego/pages/components/BuiltBySection.tsx
 msgid "Remove {builderName}"
@@ -40584,6 +40607,10 @@ msgstr "The game's definitions could not be read."
 #: src/workshop/pages/components/InPlaceWrite.tsx
 msgid "The game's files already hold every change, so nothing was written."
 msgstr "The game's files already hold every change, so nothing was written."
+
+#: src/content/pages/KeybindsSection.tsx
+msgid "The game's own bindings are the starting point. The engine reads uikeys.txt instead of them, so saving writes the game's bindings into the file along with your changes."
+msgstr "The game's own bindings are the starting point. The engine reads uikeys.txt instead of them, so saving writes the game's bindings into the file along with your changes."
 
 #: src/scenario/pages/components/teams.ts
 msgid "The game's own start"
