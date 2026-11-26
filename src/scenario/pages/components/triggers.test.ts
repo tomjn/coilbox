@@ -191,6 +191,35 @@ describe("the trigger list", () => {
     }
   });
 
+  it("keeps onBecomingTrue only while the trigger repeats and it is on", () => {
+    const set = editTrigger(document(), "open", {
+      repeat: true,
+      onBecomingTrue: true,
+    });
+    expect(set.triggers[0].onBecomingTrue).toBe(true);
+
+    for (const patch of [{ onBecomingTrue: false }, { repeat: false }]) {
+      const cleared = editTrigger(set, "open", patch);
+      expect(cleared.triggers[0]).not.toHaveProperty("onBecomingTrue");
+    }
+    expect(setAtTheStart(set, "open").triggers[0]).not.toHaveProperty(
+      "onBecomingTrue",
+    );
+  });
+
+  it("does not call an empty list Always when it fires once", () => {
+    const [open] = document().triggers;
+    const empty = {
+      ...open,
+      repeat: true,
+      conditions: { op: "all" as const, conditions: [] },
+    };
+    expect(noConditionsLabel({ ...empty, enabled: true })).toBe("Always");
+    const once = { ...empty, onBecomingTrue: true };
+    expect(noConditionsLabel({ ...once, enabled: true })).toBe("At the start");
+    expect(noConditionsLabel({ ...once, enabled: false })).toBe("When armed");
+  });
+
   it("moves a trigger up and down, and not off either end", () => {
     const before = document();
     expect(moveTrigger(before, "close", -1).triggers.map((t) => t.id)).toEqual([

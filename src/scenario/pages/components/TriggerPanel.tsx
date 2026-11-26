@@ -500,6 +500,21 @@ function TriggerForm({
             <Trans>Fires every time</Trans>
           </Label>
         </div>
+        {trigger.repeat && (
+          <div className="flex items-center gap-2">
+            <Switch
+              id="trigger-on-becoming-true"
+              checked={trigger.onBecomingTrue === true}
+              onCheckedChange={(onBecomingTrue) => edit({ onBecomingTrue })}
+            />
+            <Label
+              htmlFor="trigger-on-becoming-true"
+              className="text-xs font-medium"
+            >
+              <Trans>Only when it becomes true</Trans>
+            </Label>
+          </div>
+        )}
         {(trigger.repeat || trigger.cooldown !== undefined) && (
           <CooldownField
             seconds={trigger.cooldown}

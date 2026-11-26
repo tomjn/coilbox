@@ -171,6 +171,11 @@ describe("scenario fixture corpus", () => {
       "a trigger with a cooldown": allTriggers.some(
         (t) => (t.cooldown ?? 0) > 0,
       ),
+      // Issue #5295. The one trigger key the runtime reads that a fixture would
+      // otherwise never emit.
+      "a trigger that fires as its conditions become true": allTriggers.some(
+        (t) => t.onBecomingTrue === true,
+      ),
       "a trigger disarmed at start": allTriggers.some((t) => !t.enabled),
       "a base": allBases.length > 0,
       "a base building with a factory queue": allBuildings.some(

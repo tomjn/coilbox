@@ -37146,6 +37146,10 @@ msgstr "Alleen tot"
 msgid "Only used when the weapon has no model."
 msgstr "Alleen gebruikt als het wapen geen model heeft."
 
+#: src/scenario/pages/components/TriggerPanel.tsx
+msgid "Only when it becomes true"
+msgstr "Alleen wanneer het waar wordt"
+
 #: src/direct/hostingRoute.ts
 #, fuzzy
 msgid "Only when players cannot reach you directly."

@@ -436,6 +436,13 @@ export type ScenarioTrigger = {
    */
   cooldown?: number;
   /**
+   * A repeating trigger that fires only as its conditions go from not holding to
+   * holding, rather than on every pass they hold (issue #5295). Being armed while
+   * they already hold counts as becoming true. Only ever `true`, and only on a
+   * trigger that repeats.
+   */
+  onBecomingTrue?: boolean;
+  /**
    * The difficulties this trigger runs at. Absent is every one.
    *
    * A trigger outside its range is not armed and cannot be armed:
@@ -1115,6 +1122,9 @@ function parseTrigger(t: Record<string, unknown>): ScenarioTrigger | null {
   // A wait of zero or less is what leaving it out means, so it is left out.
   const cooldown = num(t.cooldown);
   if (cooldown !== undefined && cooldown > 0) trigger.cooldown = cooldown;
+  if (trigger.repeat && t.onBecomingTrue === true) {
+    trigger.onBecomingTrue = true;
+  }
   return trigger;
 }
 

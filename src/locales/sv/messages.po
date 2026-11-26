@@ -37146,6 +37146,10 @@ msgstr "Bara upp till"
 msgid "Only used when the weapon has no model."
 msgstr "Används bara när vapnet inte har någon modell."
 
+#: src/scenario/pages/components/TriggerPanel.tsx
+msgid "Only when it becomes true"
+msgstr "Bara när det blir sant"
+
 #: src/direct/hostingRoute.ts
 #, fuzzy
 msgid "Only when players cannot reach you directly."

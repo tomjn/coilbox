@@ -534,6 +534,27 @@ describe("requiredRuntimeVersion", () => {
   });
 
   /**
+   * Issue #5295. A runtime behind 16 reads past `onBecomingTrue` and fires on
+   * every pass the conditions hold.
+   */
+  it("asks for 16 for a trigger that fires as its conditions become true", () => {
+    const scenario = withTrigger([], []);
+    const flagged: Scenario = {
+      ...scenario,
+      triggers: [
+        { ...scenario.triggers[0], repeat: true, onBecomingTrue: true },
+      ],
+    };
+    expect(requiredRuntimeVersion(flagged)).toBe(16);
+    expect(
+      requiredRuntimeVersion({
+        ...scenario,
+        triggers: [{ ...scenario.triggers[0], repeat: true }],
+      }),
+    ).toBe(1);
+  });
+
+  /**
    * Issue #5252. A runtime behind 13 finds no engine team number on the neutral
    * team and drops it with everything placed for it.
    */

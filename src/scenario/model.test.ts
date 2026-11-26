@@ -744,6 +744,22 @@ describe("parseScenario — triggers", () => {
     }
   });
 
+  it("keeps onBecomingTrue only when it is on, on a repeating trigger", () => {
+    const parsed = (extra: Record<string, unknown>) =>
+      parseScenario(doc({ triggers: [trigger(extra)] }))?.triggers[0];
+
+    expect(parsed({ repeat: true, onBecomingTrue: true })?.onBecomingTrue).toBe(
+      true,
+    );
+    for (const extra of [
+      { repeat: true, onBecomingTrue: false },
+      { repeat: true, onBecomingTrue: "true" },
+      { repeat: false, onBecomingTrue: true },
+    ]) {
+      expect(parsed(extra)).not.toHaveProperty("onBecomingTrue");
+    }
+  });
+
   it("falls back to an all-of condition group", () => {
     const s = parseScenario(
       doc({ triggers: [trigger({ conditions: { op: "some" } })] }),

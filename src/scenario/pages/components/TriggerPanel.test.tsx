@@ -624,6 +624,31 @@ describe("duplicateSelected, the handle a routed Cmd+D calls", () => {
   });
 });
 
+describe("a repeating trigger that fires as its conditions become true", () => {
+  const toggle = () =>
+    screen.queryByRole("switch", { name: "Only when it becomes true" });
+
+  it("offers the switch on a repeating trigger and not on a fire-once one", () => {
+    openPanel([trigger()]);
+    select("wave-one");
+    expect(toggle()).toBeNull();
+
+    fireEvent.click(screen.getByRole("switch", { name: "Fires every time" }));
+    expect(toggle()).not.toBeNull();
+  });
+
+  it("saves the switch into the document, and leaves it out when off", () => {
+    openPanel([trigger({ repeat: true })]);
+    select("wave-one");
+
+    fireEvent.click(toggle() as HTMLElement);
+    expect(stored()[0].onBecomingTrue).toBe(true);
+
+    fireEvent.click(toggle() as HTMLElement);
+    expect(stored()[0]).not.toHaveProperty("onBecomingTrue");
+  });
+});
+
 describe("a trigger's cooldown when the document moves under it", () => {
   it("shows the wait an undo put back", () => {
     openPanel([trigger({ repeat: true, cooldown: 30 })]);

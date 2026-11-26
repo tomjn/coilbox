@@ -37146,6 +37146,10 @@ msgstr "Bare opptil"
 msgid "Only used when the weapon has no model."
 msgstr "Brukes bare når våpenet ikke har noen modell."
 
+#: src/scenario/pages/components/TriggerPanel.tsx
+msgid "Only when it becomes true"
+msgstr "Bare når det blir sant"
+
 #: src/direct/hostingRoute.ts
 #, fuzzy
 msgid "Only when players cannot reach you directly."
