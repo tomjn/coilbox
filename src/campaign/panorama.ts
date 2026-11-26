@@ -9,18 +9,27 @@ import {
 import type { ImageRef } from "./model";
 
 /**
- * Session cache of resolved panorama data URLs, keyed by `campaignId::file`.
- * Mirrors the branding image cache: a stored `file` panorama is read back off disk
- * once per session and shared across the preview and the export path.
+ * Session cache of resolved panorama data URLs. Mirrors the branding image cache:
+ * a `file` panorama is read back once per session and shared across the preview
+ * and the export path.
  */
 const panoramaCache = new Map<string, Promise<string>>();
 
-/** Read a stored `file` panorama back as a `data:` URI (cache-backed). */
+/**
+ * A stored campaign and a game's campaign can share an id and a file name, so the
+ * key says which of the two was read (issue #5485).
+ */
+function cacheKey(campaignId: string, file: string): string {
+  const origin = gameCampaignOrigin(campaignId);
+  return `${origin?.archivePath ?? ""}::${campaignId}::${file}`;
+}
+
+/** Read a `file` panorama back as a `data:` URI (cache-backed). */
 export function resolvePanoramaDataUri(
   campaignId: string,
   file: string,
 ): Promise<string> {
-  const key = `${campaignId}::${file}`;
+  const key = cacheKey(campaignId, file);
   let promise = panoramaCache.get(key);
   if (!promise) {
     const origin = gameCampaignOrigin(campaignId);
@@ -96,7 +105,7 @@ export function useCampaignPanorama(
       })
       .catch(() => {
         // A failed read shouldn't stick forever — drop it so a later render retries.
-        panoramaCache.delete(`${campaignId}::${imageFile}`);
+        panoramaCache.delete(cacheKey(campaignId, imageFile));
         if (!cancelled) setSrc(undefined);
       });
     return () => {

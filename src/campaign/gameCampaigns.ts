@@ -55,13 +55,24 @@ const origins = new Map<string, CampaignGameOrigin>();
 /** Each game campaign's document as the game holds it, by campaign id. */
 const documents = new Map<string, string>();
 
+/** The ids of the campaigns coilbox holds itself, local or bundled. */
+let storedIds: ReadonlySet<string> = new Set();
+
+/**
+ * Say which campaigns coilbox holds itself. One of those hides a game's campaign
+ * with the same id, so the lookups below must not answer for it (issue #5485).
+ */
+export function setStoredCampaignIds(ids: Iterable<string>): void {
+  storedIds = new Set(ids);
+}
+
 /**
  * A game campaign's document as the game holds it, which is where an exported
  * campaign carries its missions' dialogue clips. `undefined` for a campaign
  * that is not a game's, or one not listed yet this session.
  */
 export function gameCampaignJson(campaignId: string): string | undefined {
-  return documents.get(campaignId);
+  return storedIds.has(campaignId) ? undefined : documents.get(campaignId);
 }
 
 /**
@@ -71,7 +82,7 @@ export function gameCampaignJson(campaignId: string): string | undefined {
 export function gameCampaignOrigin(
   campaignId: string,
 ): CampaignGameOrigin | undefined {
-  return origins.get(campaignId);
+  return storedIds.has(campaignId) ? undefined : origins.get(campaignId);
 }
 
 /**

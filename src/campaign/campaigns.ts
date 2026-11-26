@@ -14,7 +14,11 @@ import {
   campaignProgressLoad,
   campaignProgressSave,
 } from "./bindings";
-import { type CampaignGameOrigin, gameCampaigns } from "./gameCampaigns";
+import {
+  type CampaignGameOrigin,
+  gameCampaigns,
+  setStoredCampaignIds,
+} from "./gameCampaigns";
 import { sortCampaigns } from "./listing";
 import { type Campaign, type ProgressFile, parseCampaignJson } from "./model";
 import { sweepOrphanedScenarioMedia } from "./scenarioMedia";
@@ -48,6 +52,7 @@ async function fetchCampaigns(): Promise<LoadedCampaign[]> {
       console.warn("skipping invalid campaign document", item.source);
     }
   }
+  setStoredCampaignIds(loaded.map((l) => l.campaign.id));
   // Every campaign there is, which is what deciding whether a dialogue clip is
   // still named needs. Not awaited: the list must not wait on a disk sweep, and
   // the sweep only ever removes folders this list does not name.
