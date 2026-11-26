@@ -288,6 +288,9 @@ end
 
 local ACTIVE, COMPLETE = 0, 1
 
+-- The weaponDefID the engine passes for ground collision damage.
+local FALL = -2
+
 local function state()
 	return GG.CoilboxMission
 end
@@ -1382,12 +1385,28 @@ local HARNESS_HERO, HARNESS_ANCHOR = "coilbox_harness_hero", "coilbox_harness_an
 local HARNESS_GRUNT = "coilbox_harness_grunt"
 
 --- Whether a unit is hurt by a hit. The engine reports a death a frame or more
--- after the damage, so what is read is the health it is left with.
+-- after the damage, so what is read is the health it is left with. The hit is
+-- named as a fall, because one that names no weapon counts as flying debris, and
+-- a game may take that to nothing.
 local function hurt(unitID)
 	local before = Spring.GetUnitHealth(unitID)
-	Spring.AddUnitDamage(unitID, 50)
+	Spring.AddUnitDamage(unitID, 50, 0, nil, FALL)
 	local after = Spring.GetUnitHealth(unitID)
 	return after == nil or after < before
+end
+
+--- Check that a hit leaves a unit unhurt, after the same hit has hurt a new unit
+-- of its type that nothing protects. Without that, a hit the game ignores would
+-- pass for protection.
+local function checkSurvives(name, unitID)
+	local x, y, z = Spring.GetUnitBasePosition(unitID)
+	local control = Spring.CreateUnit(Spring.GetUnitDefID(unitID), x + 200, y, z + 200, 0,
+		Spring.GetUnitTeam(unitID))
+	check("a hit hurts an unprotected unit, as control for: " .. name, control and hurt(control))
+	if control then
+		Spring.DestroyUnit(control, false, true)
+	end
+	check(name, not hurt(unitID))
 end
 
 plans.reload = {
@@ -1413,8 +1432,8 @@ plans.reload = {
 			Spring.SetGameRulesParam(HARNESS_HERO, mission.units.hero)
 			Spring.SetGameRulesParam(HARNESS_GRUNT, mission.units.grunt)
 			Spring.SetGameRulesParam(HARNESS_ANCHOR, anchor or -1)
-			check("the invulnerable actor survives a hit before the reload", not hurt(mission.units.hero))
-			check("and the anchor does", not hurt(anchor))
+			checkSurvives("the invulnerable actor survives a hit before the reload", mission.units.hero)
+			checkSurvives("and the anchor does", anchor)
 			-- The reload is the next thing that happens.
 			SendToUnsynced("coilbox_harness_reload")
 		end },
@@ -1440,11 +1459,11 @@ plans.reloaded = {
 				mission.units.hero == hero and rules("coilbox_mission_actor_hero") == hero,
 				tostring(mission.units.hero) .. "/" .. tostring(rules("coilbox_mission_actor_hero"))
 					.. " wanted " .. tostring(hero))
-			check("and the invulnerable actor still survives a hit", not hurt(hero))
+			checkSurvives("and the invulnerable actor still survives a hit", hero)
 			check("the anchor is still known as one",
 				mission.gameOver.isAnchor(anchor) and mission.gameOver.anchorCount(0) == 1,
 				tostring(mission.gameOver.isAnchor(anchor)) .. "/" .. mission.gameOver.anchorCount(0))
-			check("and still survives a hit", not hurt(anchor))
+			checkSurvives("and still survives a hit", anchor)
 			Spring.DestroyUnit(grunt, false, true)
 			check("a var keeps the number it had reached",
 				rules("coilbox_mission_var_counter") == 6, rules("coilbox_mission_var_counter"))
@@ -1625,8 +1644,6 @@ plans.pursuit = {
 -- the probe puts an enemy laser tower beside them, so every hit a trigger hears
 -- is the engine's own, from a real weapon through the game's gadget handler.
 
--- The weaponDefID the engine passes for ground collision damage.
-local FALL = -2
 local HEARD = { "any", "llt", "convoy", "killed" }
 local UNHEARD = { "ownside", "pw", "safe", "statue" }
 local statueTower
