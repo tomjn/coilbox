@@ -10056,6 +10056,10 @@ msgstr ""
 msgid "About interface size"
 msgstr ""
 
+#: src/content/pages/components/KeyBindingEditor.tsx
+msgid "About keys with more than one action"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "About mirroring"
@@ -10099,6 +10103,10 @@ msgstr "Acerca de los papeles"
 msgid "About round shapes"
 msgstr "Acerca de las formas redondas"
 
+#: src/content/pages/components/KeymapsPanel.tsx
+msgid "About saved keymaps"
+msgstr ""
+
 #: src/lego/pages/components/CollisionPanel.tsx
 #, fuzzy
 msgid "About shooting at each piece"
@@ -10121,6 +10129,10 @@ msgstr "Acerca de la textura de color"
 
 #: src/general/pages/SettingsSection.tsx
 msgid "About the frame rate"
+msgstr ""
+
+#: src/content/pages/KeybindsSection.tsx
+msgid "About the game's bindings"
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
@@ -10343,6 +10355,10 @@ msgstr "Nombre de la acción"
 #, fuzzy
 msgid "Action settings"
 msgstr "Ajustes de la acción"
+
+#: src/content/pages/components/KeyBindingEditor.tsx
+msgid "Action to add"
+msgstr ""
 
 #: src/content/pages/components/MissionRuntimeSection.tsx
 #: src/downloads/pages/ActivityPage.tsx
@@ -11100,6 +11116,10 @@ msgstr "Alinear {axisName} al centro. Una parte sin forma se alinea por su orige
 #, fuzzy
 msgid "All"
 msgstr "Todo"
+
+#: src/content/pages/KeybindsSection.tsx
+msgid "All bindings"
+msgstr ""
 
 #: src/profile/health.ts
 #, fuzzy
@@ -13581,11 +13601,6 @@ msgstr "Entre dos minutos"
 #, fuzzy
 msgid "binary pair — {primary} + {companion}"
 msgstr "par binario: {primary} + {companion}"
-
-#: src/content/pages/KeybindsSection.tsx
-#, fuzzy
-msgid "Bindings a game brings with it:"
-msgstr "Asignaciones que trae un juego:"
 
 #: src/lego/scriptMarks.ts
 #, fuzzy
@@ -18112,11 +18127,6 @@ msgstr "Cooperativo"
 #, fuzzy
 msgid "Copied"
 msgstr "Copiado"
-
-#: src/content/pages/components/KeymapsPanel.tsx
-#, fuzzy
-msgid "Copied a link to \"{keymapName}\"."
-msgstr "Se copió un enlace a “{keymapName}”."
 
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
 #, fuzzy
@@ -24713,6 +24723,7 @@ msgstr "juego"
 #: src/content/index.ts
 #: src/content/pages/components/ArchiveTypeBadge.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
+#: src/content/pages/KeybindsSection.tsx
 #: src/direct/HostRoomForm.tsx
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/hub/pages/BrowsePage.tsx
@@ -28490,9 +28501,8 @@ msgid "Keep them as they are"
 msgstr "Dejarlos como están"
 
 #: src/content/pages/components/KeymapsPanel.tsx
-#, fuzzy
-msgid "Keep this keymap under a name, switch between them, and share one."
-msgstr "Guarda esta asignación de teclas con un nombre, cambia entre ellas y comparte una."
+msgid "Keep this keymap under a name, switch between them, and share one. Apply loads a keymap into the editor. Nothing changes in uikeys.txt until you save."
+msgstr ""
 
 #: src/content/pages/MapDetailPage.tsx
 #, fuzzy
@@ -28627,6 +28637,10 @@ msgstr "atajos de teclado"
 #, fuzzy
 msgid "Keybinds"
 msgstr "Atajos de teclado"
+
+#: src/content/pages/KeybindsSection.tsx
+msgid "Keyboard"
+msgstr ""
 
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
@@ -38385,9 +38399,8 @@ msgid "Pick a game, a seed and a scope. Two people who type the same seed and ru
 msgstr "Elige un juego, una semilla y un alcance. Dos personas que escriban la misma semilla y reglas con el mismo juego obtienen el mismo mod."
 
 #: src/content/pages/KeybindsSection.tsx
-#, fuzzy
-msgid "Pick a key above to see what it does, or find it in the list below."
-msgstr "Elige una tecla arriba para ver qué hace o búscala en la lista de abajo."
+msgid "Pick a key to see what it does."
+msgstr ""
 
 #: src/placement/BlueprintOnMap.tsx
 #, fuzzy
@@ -41457,9 +41470,7 @@ msgstr "Remezclada de"
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #: src/campaign/pages/components/MissionMediaFields.tsx
 #: src/campaign/pages/components/MissionRemoveButton.tsx
-#: src/content/pages/components/BindingList.tsx
 #: src/content/pages/components/CompatMode.tsx
-#: src/content/pages/components/KeyBindingEditor.tsx
 #: src/content/pages/components/MissionRuntimeSection.tsx
 #: src/content/pages/components/RootCard.tsx
 #: src/hub/pages/ItemPage.tsx
@@ -41480,10 +41491,18 @@ msgstr "Quitar"
 msgid "Remove {accountName}"
 msgstr "Quitar {accountName}"
 
+#: src/content/pages/components/BindingList.tsx
+msgid "Remove {action} from {keys}"
+msgstr ""
+
 #: src/lego/pages/components/AnchorList.tsx
 #, fuzzy
 msgid "Remove {anchorName}"
 msgstr "Quitar {anchorName}"
+
+#: src/content/pages/components/KeyBindingEditor.tsx
+msgid "Remove {bound}"
+msgstr ""
 
 #: src/lego/pages/components/BuiltBySection.tsx
 #, fuzzy
@@ -50040,6 +50059,10 @@ msgstr "No se pudieron leer las definiciones del juego."
 #, fuzzy
 msgid "The game's files already hold every change, so nothing was written."
 msgstr "Los archivos del juego ya contienen todos los cambios, así que no se escribió nada."
+
+#: src/content/pages/KeybindsSection.tsx
+msgid "The game's own bindings are the starting point. The engine reads uikeys.txt instead of them, so saving writes the game's bindings into the file along with your changes."
+msgstr ""
 
 #: src/scenario/pages/components/teams.ts
 #, fuzzy

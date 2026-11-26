@@ -4,6 +4,7 @@ import { Button, Input } from "@picoframe/frame";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { Download, Link2, Trash2, Upload } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { HelpPopover } from "@/components/HelpPopover";
 import { describeError } from "@/i18n/uiError";
 import {
   asContainer,
@@ -169,8 +170,9 @@ export function KeymapsPanel({
       return;
     }
     const code = encodeContainerCode("keymap", KEYMAP_KIND_VERSION, payload);
+    setError(null);
+    setStatus(null);
     void copyDeepLink(buildImportCodeLink(code));
-    setStatus(t`Copied a link to "${keymapName}".`);
   }
 
   async function onImport() {
@@ -192,17 +194,19 @@ export function KeymapsPanel({
   }
 
   return (
-    <section className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card p-3">
-      <div className="flex items-start justify-between gap-2">
-        <div>
+    <section className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1">
           <h2 className="font-semibold text-sm">
             <Trans>Saved keymaps</Trans>
           </h2>
-          <p className="mt-0.5 text-muted-foreground text-xs">
+          <HelpPopover label={t`About saved keymaps`}>
             <Trans>
               Keep this keymap under a name, switch between them, and share one.
+              Apply loads a keymap into the editor. Nothing changes in
+              uikeys.txt until you save.
             </Trans>
-          </p>
+          </HelpPopover>
         </div>
         <Button size="sm" variant="outline" onClick={onImport}>
           <Upload className="mr-1 size-3.5" />
@@ -218,6 +222,7 @@ export function KeymapsPanel({
             if (e.key === "Enter") void onSave();
           }}
           placeholder={t`Name this keymap`}
+          aria-label={t`Name this keymap`}
         />
         <Button size="sm" disabled={busy || !name.trim()} onClick={onSave}>
           <Trans>Save</Trans>
@@ -230,11 +235,11 @@ export function KeymapsPanel({
       ) : null}
 
       {saved.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
+        <p className="rounded-md border border-dashed px-4 py-6 text-center text-muted-foreground text-sm">
           <Trans>No saved keymaps for this content folder yet.</Trans>
         </p>
       ) : (
-        <ul className="space-y-1">
+        <ul className="divide-y divide-border rounded-md border border-border">
           {saved.map((s) => {
             const payload = payloadOf(s);
             const itemName = s.name;
@@ -242,10 +247,7 @@ export function KeymapsPanel({
             const otherGame =
               payload?.gameName && gameName && payload.gameName !== gameName;
             return (
-              <li
-                key={s.slug}
-                className="rounded border border-border/40 px-2 py-1.5"
-              >
+              <li key={s.slug} className="py-2 ps-4 pe-2">
                 <div className="flex items-center justify-between gap-2">
                   <span className="min-w-0 truncate text-sm">{s.name}</span>
                   <span className="flex shrink-0 items-center gap-1">

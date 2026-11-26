@@ -1,5 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
+import { X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -61,6 +62,7 @@ export function BindingList({
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           placeholder={t`Search by key or action`}
+          aria-label={t`Search by key or action`}
         />
         <span className="shrink-0 text-xs text-muted-foreground">
           <Trans>
@@ -69,60 +71,58 @@ export function BindingList({
         </span>
       </div>
 
-      <div className="max-h-96 overflow-y-auto rounded-lg border border-border/50">
-        <table className="w-full text-sm">
-          <tbody>
-            {rows.map((b) => (
-              <tr
-                key={`${b.keys} ${b.action}`}
-                className="border-border/30 border-b last:border-0"
+      <ul className="max-h-96 divide-y divide-border overflow-y-auto rounded-md border border-border">
+        {rows.map((b) => {
+          const { keys, action } = b;
+          const removeLabel = t`Remove ${action} from ${keys}`;
+          return (
+            <li
+              key={`${keys} ${action}`}
+              className="flex items-center gap-3 px-4 py-1"
+            >
+              <button
+                type="button"
+                onClick={() => onSelect(keys)}
+                title={keys}
+                className="w-44 shrink-0 truncate text-left font-mono text-xs underline-offset-4 hover:underline"
               >
-                <td className="w-48 px-2 py-1">
-                  <button
-                    type="button"
-                    onClick={() => onSelect(b.keys)}
-                    className="truncate font-mono text-xs underline-offset-4 hover:underline"
-                  >
-                    {b.keys}
-                  </button>
-                </td>
-                <td className="px-2 py-1 font-mono text-xs">{b.action}</td>
-                <td className="w-40 px-2 py-1 text-right">
-                  {b.source === "user" ? (
-                    <Badge variant="outline" className="text-[10px]">
-                      <Trans>yours</Trans>
-                    </Badge>
-                  ) : null}
-                  {conflicts.has(b.keys) ? (
-                    <Badge variant="outline" className="ml-1 text-[10px]">
-                      <Trans>shared key</Trans>
-                    </Badge>
-                  ) : null}
-                </td>
-                <td className="w-24 px-2 py-1 text-right">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => onRemove(b.keys, b.action)}
-                  >
-                    <Trans>Remove</Trans>
-                  </Button>
-                </td>
-              </tr>
-            ))}
-            {rows.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={4}
-                  className="px-2 py-4 text-center text-muted-foreground text-sm"
-                >
-                  <Trans>No binding matches that.</Trans>
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
+                {keys}
+              </button>
+              <span
+                className="min-w-0 flex-1 truncate font-mono text-xs"
+                title={action}
+              >
+                {action}
+              </span>
+              {b.source === "user" ? (
+                <Badge variant="outline" className="text-[10px]">
+                  <Trans>yours</Trans>
+                </Badge>
+              ) : null}
+              {conflicts.has(keys) ? (
+                <Badge variant="outline" className="text-[10px]">
+                  <Trans>shared key</Trans>
+                </Badge>
+              ) : null}
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
+                onClick={() => onRemove(keys, action)}
+                aria-label={removeLabel}
+                title={removeLabel}
+              >
+                <X className="size-3.5" />
+              </Button>
+            </li>
+          );
+        })}
+        {rows.length === 0 ? (
+          <li className="px-4 py-4 text-center text-muted-foreground text-sm">
+            <Trans>No binding matches that.</Trans>
+          </li>
+        ) : null}
+      </ul>
 
       <Collapsible>
         <CollapsibleTrigger className="text-muted-foreground text-xs underline-offset-4 hover:underline">

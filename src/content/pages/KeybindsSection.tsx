@@ -2,6 +2,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
+import { SettingList, SettingRow } from "@/components/SettingRow";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { useImportParam } from "../../deeplink/useImportParam";
 import { useSkirmishDraft } from "../../play/drafts";
@@ -25,6 +26,7 @@ import {
   removeBinding,
   resetKeys,
   resolveKeymap,
+  type SavedKeymap,
 } from "../keymap";
 import { BindingList } from "./components/BindingList";
 import { BrowserToolbar } from "./components/BrowserToolbar";
@@ -92,10 +94,18 @@ export default function KeybindsSection() {
     () => resolveKeymap({ gameText, userText }),
     [gameText, userText],
   );
+  // A keymap from a shared link, kept until it is saved or reverted. The link
+  // usually lands before the file and the game's bindings have loaded, so it
+  // is laid over each keymap they resolve to rather than applied once and
+  // then dropped by the reset below.
+  const [linked, setLinked] = useState<SavedKeymap | null>(null);
   const [keymap, setKeymap] = useState<Keymap>(resolved);
   // Edits are dropped when the target, game or file underneath them changes,
   // because they were edits to a different keymap.
-  useEffect(() => setKeymap(resolved), [resolved]);
+  useEffect(
+    () => setKeymap(linked ? fromSaved(linked, resolved) : resolved),
+    [resolved, linked],
+  );
 
   const [layer, setLayer] = useState<ModifierLayer>("");
   const [selectedKeys, setSelectedKeys] = useState<string | null>(null);
@@ -108,9 +118,7 @@ export default function KeybindsSection() {
   const { code } = useImportParam();
   useEffect(() => {
     if (!code) return;
-    setSaveError(
-      applyContainerText(code, (s) => setKeymap((km) => fromSaved(s, km))),
-    );
+    setSaveError(applyContainerText(code, setLinked));
   }, [code]);
 
   // What is dirty is what would be written, so compare the files rather than
@@ -121,8 +129,15 @@ export default function KeybindsSection() {
 
   async function onSave() {
     setSaving(true);
-    setSaveError(await file.write(text));
+    const error = await file.write(text);
+    setSaveError(error);
+    if (!error) setLinked(null);
     setSaving(false);
+  }
+
+  function onRevert() {
+    setLinked(null);
+    setKeymap(resolved);
   }
 
   if (targets.length === 0 && !loading) {
@@ -152,119 +167,142 @@ export default function KeybindsSection() {
   }
 
   return (
-    <div className="space-y-4">
-      <BrowserToolbar
-        targets={targets}
-        selectedKey={selectedKey}
-        onRescan={refresh}
-        scanning={loading}
-      />
-
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm text-muted-foreground">
-          <Trans>Bindings a game brings with it:</Trans>
-        </span>
-        <div className="w-72">
-          <GamePickerField
-            value={gameName}
-            onValueChange={setGameName}
-            games={games}
-            headers={gameHeaders}
-            placeholder={
-              scan.loading ? t`Reading games...` : t`No game selected`
-            }
-            ariaLabel={t`Game whose bindings to show`}
-            disabled={games.length === 0}
-            gamesLoading={scan.loading}
-          />
-        </div>
-      </div>
-
-      {scan.error ? <ScanFailed noun={t`games`} reason={scan.error} /> : null}
-      {file.error ? <ErrorBanner message={file.error} /> : null}
-      {saveError ? <ErrorBanner message={saveError} /> : null}
-
-      {keymap.includes.length > 0 ? (
-        <p className="rounded-md border border-border/50 bg-muted/30 p-2 text-xs text-muted-foreground">
-          <Trans>
-            This file loads {includedFiles} with keyload, which coilbox does not
-            follow, so bindings from there are not shown. Saving keeps the
-            keyload line.
-          </Trans>
-        </p>
-      ) : null}
-
-      {file.data?.exists && !file.data.ours ? (
-        <p className="rounded-md border border-border/50 bg-muted/30 p-2 text-xs text-muted-foreground">
-          <Trans>
-            This uikeys.txt was written by hand or by another tool. The first
-            save keeps a copy of it as uikeys.txt.bak.
-          </Trans>
-        </p>
-      ) : null}
-
-      <div className="flex gap-1">
-        {MODIFIER_LAYERS.map((m) => (
-          <Button
-            key={m.id || "plain"}
-            size="sm"
-            variant={m.id === layer ? "default" : "outline"}
-            onClick={() => {
-              setLayer(m.id);
-              setSelectedKeys(null);
-            }}
-          >
-            {m.label}
-          </Button>
-        ))}
-      </div>
-
-      <KeyboardMap
-        keymap={keymap}
-        layer={layer}
-        selected={selectedKeys}
-        onSelect={setSelectedKeys}
-      />
-
-      {selectedKeys ? (
-        <KeyBindingEditor
-          keymap={keymap}
-          keys={selectedKeys}
-          onAdd={(action) =>
-            setKeymap((km) => addBinding(km, selectedKeys, action))
-          }
-          onRemove={(action) =>
-            setKeymap((km) => removeBinding(km, selectedKeys, action))
-          }
-          onReset={() => setKeymap((km) => resetKeys(km, selectedKeys))}
-          onRebind={(nextKeys) => {
-            setKeymap((km) => {
-              const moving = bindingsFor(km, selectedKeys);
-              let next = km;
-              for (const b of moving) {
-                next = removeBinding(next, selectedKeys, b.action);
-                next = addBinding(next, nextKeys, b.action);
-              }
-              return next;
-            });
-            setSelectedKeys(nextKeys);
-          }}
+    <div className="flex flex-col gap-10">
+      <section className="flex flex-col gap-3">
+        <BrowserToolbar
+          targets={targets}
+          selectedKey={selectedKey}
+          onRescan={refresh}
+          scanning={loading}
         />
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          <Trans>
-            Pick a key above to see what it does, or find it in the list below.
-          </Trans>
-        </p>
-      )}
 
-      <BindingList
-        keymap={keymap}
-        onSelect={setSelectedKeys}
-        onRemove={(keys, action) =>
-          setKeymap((km) => removeBinding(km, keys, action))
-        }
-      />
+        <SettingList>
+          <SettingRow
+            label={t`Game`}
+            help={
+              <Trans>
+                The game's own bindings are the starting point. The engine reads
+                uikeys.txt instead of them, so saving writes the game's bindings
+                into the file along with your changes.
+              </Trans>
+            }
+            helpLabel={t`About the game's bindings`}
+          >
+            <div className="w-72">
+              <GamePickerField
+                value={gameName}
+                onValueChange={setGameName}
+                games={games}
+                headers={gameHeaders}
+                placeholder={
+                  scan.loading ? t`Reading games...` : t`No game selected`
+                }
+                ariaLabel={t`Game whose bindings to show`}
+                disabled={games.length === 0}
+                gamesLoading={scan.loading}
+              />
+            </div>
+          </SettingRow>
+        </SettingList>
+
+        {scan.error ? <ScanFailed noun={t`games`} reason={scan.error} /> : null}
+        {file.error ? <ErrorBanner message={file.error} /> : null}
+        {saveError ? <ErrorBanner message={saveError} /> : null}
+
+        {keymap.includes.length > 0 ? (
+          <p className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+            <Trans>
+              This file loads {includedFiles} with keyload, which coilbox does
+              not follow, so bindings from there are not shown. Saving keeps the
+              keyload line.
+            </Trans>
+          </p>
+        ) : null}
+
+        {file.data?.exists && !file.data.ours ? (
+          <p className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+            <Trans>
+              This uikeys.txt was written by hand or by another tool. The first
+              save keeps a copy of it as uikeys.txt.bak.
+            </Trans>
+          </p>
+        ) : null}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold">
+            <Trans>Keyboard</Trans>
+          </h2>
+          <div className="flex gap-1">
+            {MODIFIER_LAYERS.map((m) => (
+              <Button
+                key={m.id || "plain"}
+                size="sm"
+                variant={m.id === layer ? "default" : "outline"}
+                aria-pressed={m.id === layer}
+                onClick={() => {
+                  setLayer(m.id);
+                  setSelectedKeys(null);
+                }}
+              >
+                {m.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        <KeyboardMap
+          keymap={keymap}
+          layer={layer}
+          selected={selectedKeys}
+          onSelect={setSelectedKeys}
+        />
+
+        {selectedKeys ? (
+          <KeyBindingEditor
+            key={selectedKeys}
+            keymap={keymap}
+            keys={selectedKeys}
+            onAdd={(action) =>
+              setKeymap((km) => addBinding(km, selectedKeys, action))
+            }
+            onRemove={(action) =>
+              setKeymap((km) => removeBinding(km, selectedKeys, action))
+            }
+            onReset={() => setKeymap((km) => resetKeys(km, selectedKeys))}
+            onRebind={(nextKeys) => {
+              setKeymap((km) => {
+                const moving = bindingsFor(km, selectedKeys);
+                let next = km;
+                for (const b of moving) {
+                  next = removeBinding(next, selectedKeys, b.action);
+                  next = addBinding(next, nextKeys, b.action);
+                }
+                return next;
+              });
+              setSelectedKeys(nextKeys);
+            }}
+          />
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            <Trans>Pick a key to see what it does.</Trans>
+          </p>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold">
+          <Trans>All bindings</Trans>
+        </h2>
+        <BindingList
+          keymap={keymap}
+          onSelect={setSelectedKeys}
+          onRemove={(keys, action) =>
+            setKeymap((km) => removeBinding(km, keys, action))
+          }
+        />
+      </section>
 
       {rootPath ? (
         <KeymapsPanel
@@ -275,9 +313,12 @@ export default function KeybindsSection() {
         />
       ) : null}
 
-      <div className="flex flex-wrap items-center justify-between gap-2 border-border/50 border-t pt-3">
+      {/* Stays on screen, so Save is in reach from a key at the top. It
+          reaches down over the scroll box's bottom padding, so nothing shows
+          through below it. */}
+      <div className="sticky -bottom-8 z-10 -mb-8 flex flex-wrap items-center justify-between gap-2 border-border border-t bg-background pt-3 pb-8">
         <p
-          className="break-all font-mono text-xs text-muted-foreground"
+          className="min-w-0 flex-1 break-all font-mono text-xs text-muted-foreground"
           title={file.data?.path}
         >
           {file.data?.path ?? t`No config file yet`}
@@ -287,7 +328,7 @@ export default function KeybindsSection() {
             variant="outline"
             size="sm"
             disabled={!dirty || saving}
-            onClick={() => setKeymap(resolved)}
+            onClick={onRevert}
           >
             <Trans>Revert</Trans>
           </Button>

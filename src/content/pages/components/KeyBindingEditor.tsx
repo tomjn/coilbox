@@ -2,7 +2,9 @@ import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
+import { X } from "lucide-react";
 import { type KeyboardEvent, useState } from "react";
+import { HelpPopover } from "@/components/HelpPopover";
 import { type BindingSource, bindingsFor, type Keymap } from "../../keymap";
 
 /** What a source badge says, in the player's terms rather than ours. */
@@ -91,9 +93,19 @@ export function KeyBindingEditor({
   }
 
   return (
-    <div className="space-y-3 rounded-lg border border-border/50 bg-card p-3">
+    <div className="space-y-3 rounded-md border border-border p-4">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="font-mono text-sm">{keys}</h3>
+        <div className="flex min-w-0 items-center gap-1">
+          <h3 className="truncate font-mono text-sm font-medium">{keys}</h3>
+          {bindings.length > 1 ? (
+            <HelpPopover label={t`About keys with more than one action`}>
+              <Trans>
+                The engine tries these in order and runs the first one that
+                applies, which is how one key can mean two things.
+              </Trans>
+            </HelpPopover>
+          ) : null}
+        </div>
         <div className="flex gap-2">
           {capturing ? (
             <Button
@@ -136,40 +148,36 @@ export function KeyBindingEditor({
           <Trans>Nothing is bound to this key.</Trans>
         </p>
       ) : (
-        <ul className="space-y-1">
-          {bindings.map((b) => (
-            <li
-              key={`${b.keys} ${b.action}`}
-              className="flex items-center justify-between gap-2 rounded border border-border/40 px-2 py-1"
-            >
-              <span className="min-w-0 truncate font-mono text-xs">
-                {b.action}
-              </span>
-              <span className="flex shrink-0 items-center gap-2">
-                <span className="text-[11px] text-muted-foreground">
+        <ul className="divide-y divide-border rounded-md border border-border">
+          {bindings.map((b) => {
+            const bound = b.action;
+            const removeLabel = t`Remove ${bound}`;
+            return (
+              <li
+                key={`${b.keys} ${b.action}`}
+                className="flex items-center gap-3 py-1 ps-3 pe-1"
+              >
+                <span className="min-w-0 flex-1 truncate font-mono text-xs">
+                  {b.action}
+                </span>
+                <span className="shrink-0 text-[11px] text-muted-foreground">
                   {i18n._(SOURCE_LABEL[b.source])}
                 </span>
                 <Button
-                  size="sm"
+                  size="icon"
                   variant="ghost"
+                  className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
                   onClick={() => onRemove(b.action)}
+                  aria-label={removeLabel}
+                  title={removeLabel}
                 >
-                  <Trans>Remove</Trans>
+                  <X className="size-3.5" />
                 </Button>
-              </span>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       )}
-
-      {bindings.length > 1 ? (
-        <p className="text-xs text-muted-foreground">
-          <Trans>
-            The engine tries these in order and runs the first one that applies,
-            which is how one key can mean two things.
-          </Trans>
-        </p>
-      ) : null}
 
       <form
         className="flex gap-2"
@@ -184,6 +192,7 @@ export function KeyBindingEditor({
           value={action}
           onChange={(e) => setAction(e.target.value)}
           placeholder={t`Another action for this key, e.g. areaattack`}
+          aria-label={t`Action to add`}
           className="font-mono text-xs"
         />
         <Button type="submit" size="sm" disabled={!action.trim()}>
