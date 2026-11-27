@@ -69,6 +69,17 @@ export function describeUploadEnd(
   }
 
   const notUploaded = t`${label} was not uploaded`;
+  if (outcome.source === "hub" && outcome.code.startsWith("refused_")) {
+    const reason = outcome.code.slice("refused_".length);
+    return {
+      level: "error",
+      title: t`${label} was refused`,
+      body: describeReplayRefusal(reason) ?? outcome.said,
+      // Every other reason is about the file or what was read from it, so the
+      // same send would be refused again.
+      retry: reason === "wrong_file" || reason === "check_failed",
+    };
+  }
   switch (outcome.code) {
     case "duplicate": {
       const existing = outcome.duplicate;
@@ -129,6 +140,27 @@ export function describeUploadEnd(
         level: "warning",
         title: notUploaded,
         body: t`Someone else who was in the match is sending it right now. Try again later, and the hub links you to theirs once it is on the hub.`,
+        retry: true,
+      };
+    case "replay_removed":
+      return {
+        level: "error",
+        title: t`${label} was removed from the hub`,
+        body: t`The hub has taken this replay down.`,
+        retry: false,
+      };
+    case "lapsed":
+      return {
+        level: "warning",
+        title: notUploaded,
+        body: t`The upload did not finish in time. Send it again.`,
+        retry: true,
+      };
+    case "not_sent":
+      return {
+        level: "warning",
+        title: notUploaded,
+        body: t`The hub no longer has your upload. It may have run out of time, and somebody else may be sending this match. Try again later.`,
         retry: true,
       };
     case "not_kept":
@@ -208,5 +240,28 @@ export function describeUploadEnd(
         body: outcome.said,
         retry: false,
       };
+  }
+}
+
+/** The words for why the hub's check refused a replay, or nothing for a reason a
+ *  newer hub added. The codes are in coilbox-hub's `replay-uploads.md`. */
+function describeReplayRefusal(reason: string): string | undefined {
+  switch (reason) {
+    case "wrong_file":
+      return t`The file that reached the hub was not the one Coilbox described. You can send it again.`;
+    case "unreadable":
+      return t`The hub could not read the replay file. It may be damaged or too large.`;
+    case "wrong_game_id":
+      return t`The replay file belongs to a different match.`;
+    case "no_game_over":
+      return t`The replay stops before the match ended. The hub only takes finished matches.`;
+    case "no_end_of_game":
+      return t`The replay has no end of match results. The hub only takes finished matches.`;
+    case "summary_mismatch":
+      return t`What Coilbox sent about the match does not agree with the replay file.`;
+    case "sender_not_in_replay":
+      return t`The name this match was sent under did not play or watch it.`;
+    case "check_failed":
+      return t`The hub could not finish checking the replay. You can send it again.`;
   }
 }

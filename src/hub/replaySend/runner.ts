@@ -104,6 +104,9 @@ function worthAnotherTry(
     "unauthorised",
     "unreachable",
     "uploading",
+    // The upload did not get there in time, so a new one may.
+    "lapsed",
+    "not_sent",
     "no_replay_mirror",
     "not_configured",
     "unavailable",

@@ -251,6 +251,8 @@ pub struct Duplicate {
 ///   `bad_token`, `wrong_mirror`, `too_large`, `bad_request`, `write_failed`,
 ///   `internal_error`, `not_configured`, `uploads_disabled`, `bad_offset`,
 ///   `unreachable`
+/// - hub, for a replay it has stopped waiting for: `refused_<reason>` with the
+///   hub's refusal reason, `replay_removed`, `lapsed`, `not_sent`, `not_kept`
 /// - local: `unauthorised`, `unreachable`, `file_changed`, `unreadable`,
 ///   `bad_answer`
 ///
@@ -669,13 +671,13 @@ async fn replay_held(
 
 /// Wait for the hub's check of a replay (coilbox-hub #663).
 ///
-/// The hub has no status route for a replay, so the same request is made again
-/// and its answer read. `replay` is the match the hub holds, listed or still
-/// being checked. `200` with an upload is this sender's reservation, which
-/// waits for the mirror's report. `201` is a reservation made afresh, which
-/// means the hub no longer had the match: its check refused the file, or the
-/// reservation lapsed before the mirror's report arrived. The hub does not say
-/// which, or why.
+/// The hub's status route says how it went. A hub without that route is asked
+/// the old way, by making the same request again and reading its answer.
+/// `replay` is the match the hub holds, listed or still being checked. `200`
+/// with an upload is this sender's reservation, which waits for the mirror's
+/// report. `201` is a reservation made afresh, which means the hub no longer had
+/// the match: its check refused the file, or the reservation lapsed before the
+/// mirror's report arrived. Such a hub does not say which, or why.
 async fn replay_checked(
     env: &Env<'_>,
     client: &reqwest::Client,
@@ -684,6 +686,17 @@ async fn replay_checked(
 ) -> Result<(), End> {
     loop {
         tokio::time::sleep(env.pacing.poll_after).await;
+        if let Sending::Replay(replay) = sending {
+            match replay_status(env, client, &replay.game_id).await {
+                ReplayStatus::Listed(url) => {
+                    state.page_url = url;
+                    return Ok(());
+                }
+                ReplayStatus::Pending => continue,
+                ReplayStatus::Ended(stop) => return Err(stop.into()),
+                ReplayStatus::NoRoute => {}
+            }
+        }
         let raw = match ask_for_slot(env, client, sending).await {
             Ok(raw) => raw,
             Err(stop) if stop.code == "unauthorised" => return Err(stop.into()),
@@ -699,20 +712,104 @@ async fn replay_checked(
                     }
                 }
             }
-            201 => {
-                return Err(Stop {
-                    source: Source::Hub,
-                    code: "not_kept".to_owned(),
-                    status: Some(201),
-                    said: "The hub did not keep this replay. Its check may have refused the file, and the hub does not say why.".to_owned(),
-                    duplicate: None,
-                }
-                .into())
-            }
+            201 => return Err(not_kept(201).into()),
             401 | 409 | 422 => return Err(hub_stop(raw.status, &raw.body, env.hub_url).into()),
             _ => {}
         }
     }
+}
+
+/// What the hub's status route says about a replay this user sent.
+enum ReplayStatus {
+    /// Listed, with its page.
+    Listed(Option<String>),
+    /// Not decided yet, or the hub could not be asked just now.
+    Pending,
+    /// The hub is not going to list it from this send.
+    Ended(Stop),
+    /// The hub has no status route.
+    NoRoute,
+}
+
+/// Ask `GET /api/v1/replays/{game_id}/uploads/status`, which changes nothing on
+/// the hub. The shape is `hub-php/docs/replay-uploads.md` in coilbox-hub.
+async fn replay_status(env: &Env<'_>, client: &reqwest::Client, game_id: &str) -> ReplayStatus {
+    let path = format!("/api/v1/replays/{game_id}/uploads/status");
+    let Ok(url) = api_url(env.hub_url, &path, "Sending a replay to the hub") else {
+        return ReplayStatus::Pending;
+    };
+    let token = match (env.token)().await {
+        Ok(token) => token,
+        Err(stop) if stop.code == "unauthorised" => return ReplayStatus::Ended(stop),
+        Err(_) => return ReplayStatus::Pending,
+    };
+    let sent = send_once(&url, || {
+        client
+            .get(&url)
+            .timeout(REQUEST_TIMEOUT)
+            .header(reqwest::header::AUTHORIZATION, format!("Bearer {token}"))
+            .header(reqwest::header::ACCEPT, "application/json")
+    })
+    .await;
+    let Ok(raw) = sent else {
+        return ReplayStatus::Pending;
+    };
+    let reason = raw.body.get("reason").and_then(Value::as_str);
+    match (raw.status, reason) {
+        (200, _) => parse_status(&raw.body).unwrap_or(ReplayStatus::NoRoute),
+        (401, _) => ReplayStatus::Ended(hub_stop(raw.status, &raw.body, &url)),
+        (404, Some("not_sent")) => ReplayStatus::Ended(replay_stop(
+            404,
+            "not_sent",
+            "The hub has no record of this upload any more.",
+        )),
+        // A hub in trouble says nothing about the check, or about its routes.
+        (408 | 429 | 500..=599, _) => ReplayStatus::Pending,
+        _ => ReplayStatus::NoRoute,
+    }
+}
+
+/// The status route's `200`, or `None` when the body is not one.
+fn parse_status(body: &Value) -> Option<ReplayStatus> {
+    let replay = body.get("replay")?;
+    let ended = |code: &str, said: &str| ReplayStatus::Ended(replay_stop(200, code, said));
+    Some(match replay.get("state")?.as_str()? {
+        "listed" => {
+            ReplayStatus::Listed(replay.get("url").and_then(Value::as_str).map(str::to_owned))
+        }
+        "uploading" | "checking" => ReplayStatus::Pending,
+        "lapsed" => ended(
+            "lapsed",
+            "The upload ran out of time before the hub heard the file had arrived.",
+        ),
+        "refused" => {
+            let text = |key: &str| replay.get("refusal")?.get(key)?.as_str();
+            let reason = text("reason").unwrap_or("unknown");
+            ended(
+                &format!("refused_{reason}"),
+                text("message").unwrap_or("The hub's check refused this replay."),
+            )
+        }
+        "removed" => ended("replay_removed", "The hub has removed this replay."),
+        // A state a newer hub added. It is not one this side can wait on.
+        _ => ReplayStatus::Ended(not_kept(200)),
+    })
+}
+
+/// A replay the hub has stopped waiting on.
+fn replay_stop(status: u16, code: &str, said: &str) -> Stop {
+    Stop {
+        status: Some(status),
+        ..Stop::new(Source::Hub, code, said)
+    }
+}
+
+fn not_kept(status: u16) -> Stop {
+    replay_stop(
+        status,
+        "not_kept",
+        "The hub did not keep this replay. Its check may have refused the file, and the hub does not say why.",
+    )
 }
 
 fn parse_reservation(body: &Value) -> Option<Reservation> {

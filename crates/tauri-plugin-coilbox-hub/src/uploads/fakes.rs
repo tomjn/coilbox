@@ -137,6 +137,12 @@ struct HubState {
     replay_answers: VecDeque<Option<(u16, Value)>>,
     last_replay_answer: Option<(u16, Value)>,
     replay_requests: Vec<(Option<String>, String)>,
+    /// Answers to a replay's status route in turn. The last repeats. None set is
+    /// a hub without the route, which answers a plain 404.
+    status_answers: VecDeque<(u16, Value)>,
+    last_status_answer: Option<(u16, Value)>,
+    /// The authorization header of each status request.
+    status_requests: Vec<Option<String>>,
 }
 
 pub struct FakeHub {
@@ -185,6 +191,17 @@ impl FakeHub {
     pub fn replaying(self, answers: Vec<Option<(u16, Value)>>) -> Self {
         self.state.lock().unwrap().replay_answers = answers.into();
         self
+    }
+
+    /// What a replay's status route answers in turn, the last for ever after.
+    pub fn replay_status(self, answers: Vec<(u16, Value)>) -> Self {
+        self.state.lock().unwrap().status_answers = answers.into();
+        self
+    }
+
+    /// The authorization header of each status request.
+    pub fn status_requests(&self) -> Vec<Option<String>> {
+        self.state.lock().unwrap().status_requests.clone()
     }
 
     /// The authorization header and the body of each replay request.
@@ -256,6 +273,19 @@ fn hub_answer(state: &Mutex<HubState>, request: &Request) -> Reply {
                 "reserved_until": 2,
             }}),
         );
+    }
+    if request.method == "GET"
+        && request.path == "/api/v1/replays/9f2c4b1ad07e5386c1f4a92b6e8d0375/uploads/status"
+    {
+        state
+            .status_requests
+            .push(request.headers.get("authorization").cloned());
+        if let Some(next) = state.status_answers.pop_front() {
+            state.last_status_answer = Some(next);
+        }
+        if let Some((status, body)) = state.last_status_answer.clone() {
+            return Reply::Json(status, body);
+        }
     }
     if request.method == "GET" && request.path == format!("/api/v1/uploads/{UPLOAD_ID}") {
         state.polls += 1;

@@ -320,6 +320,8 @@ describe("sending finished matches", () => {
     ["hub", "http_429", 429],
     ["mirror", "write_failed", 500],
     ["hub", "unauthorised", 401],
+    ["hub", "lapsed", 200],
+    ["hub", "not_sent", 404],
   ] as const)("tries again after %s says %s, once the wait is over", async (source, code, status) => {
     stopped(source, code, status);
     finish();
@@ -363,6 +365,9 @@ describe("sending finished matches", () => {
 
   it.each([
     ["not_kept", 201],
+    ["refused_summary_mismatch", 200],
+    ["refused_check_failed", 200],
+    ["replay_removed", 200],
     ["not_in_replay", 422],
     ["bad_request", 400],
   ] as const)("gives up when the hub refuses with %s", async (code, status) => {

@@ -3863,6 +3863,14 @@ msgstr "{label} ble ikke sendt til hubben"
 msgid "{label} was not uploaded"
 msgstr "{label} ble ikke lastet opp"
 
+#: src/hub/upload/messages.ts
+msgid "{label} was refused"
+msgstr ""
+
+#: src/hub/upload/messages.ts
+msgid "{label} was removed from the hub"
+msgstr ""
+
 #: src/lego/pages/components/StatsSection.tsx
 #, fuzzy
 msgid "{label}, {referenceName}"
@@ -50209,6 +50217,10 @@ msgstr "Filen maler med {imagesUsed} teksturer der en Spring-enhet har én, så 
 msgid "The file pickers open in the folders you used last time. Turning this off forgets them."
 msgstr ""
 
+#: src/hub/upload/messages.ts
+msgid "The file that reached the hub was not the one Coilbox described. You can send it again."
+msgstr ""
+
 #: src/lego/moduleFile.ts
 #, fuzzy
 msgid "The file was made by a newer version of coilbox."
@@ -50772,10 +50784,18 @@ msgstr "Huben svarte på navn {index} med et annet navn."
 msgid "The hub could not answer."
 msgstr "Huben kunne ikke svare."
 
+#: src/hub/upload/messages.ts
+msgid "The hub could not finish checking the replay. You can send it again."
+msgstr ""
+
 #: src/hub/publish.ts
 #, fuzzy
 msgid "The hub could not publish it."
 msgstr "Huben kunne ikke publisere det."
+
+#: src/hub/upload/messages.ts
+msgid "The hub could not read the replay file. It may be damaged or too large."
+msgstr ""
 
 #: src/hub/upload/messages.ts
 #, fuzzy
@@ -50839,6 +50859,10 @@ msgstr "Huben har ingenting for dette spillet ennå. Denne utgaven av Coilbox vi
 msgid "The hub has nothing on it yet. Anything you share will show up here."
 msgstr "Huben har ingenting på seg ennå. Alt du deler, vises her."
 
+#: src/hub/upload/messages.ts
+msgid "The hub has taken this replay down."
+msgstr ""
+
 #: src/content/pages/components/SendReplayToHub.tsx
 msgid "The hub is checking it…"
 msgstr ""
@@ -50863,6 +50887,10 @@ msgstr "Huben våkner kanskje etter en rolig periode, noe som tar noen sekunder.
 #, fuzzy
 msgid "The hub named no download source for {label}."
 msgstr "Huben oppga ingen nedlastingskilde for {label}."
+
+#: src/hub/upload/messages.ts
+msgid "The hub no longer has your upload. It may have run out of time, and somebody else may be sending this match. Try again later."
+msgstr ""
 
 #: src/content/pages/components/SendReplayToHub.tsx
 msgid "The hub notes that you sent it, as {name}."
@@ -51431,6 +51459,10 @@ msgstr "Multiplikatoren for innkommende skade mens enhetens skript har satt den 
 msgid "The name others see"
 msgstr "Navnet andre ser"
 
+#: src/hub/upload/messages.ts
+msgid "The name this match was sent under did not play or watch it."
+msgstr ""
+
 #: src/multiplayer/admin/BotAccountsSection.tsx
 #, fuzzy
 msgid "The new account's password is copied, not set"
@@ -51757,6 +51789,14 @@ msgstr "Innlastingen på nytt mislyktes"
 msgid "The replay does not say which team {name} was on."
 msgstr ""
 
+#: src/hub/upload/messages.ts
+msgid "The replay file belongs to a different match."
+msgstr ""
+
+#: src/hub/upload/messages.ts
+msgid "The replay has no end of match results. The hub only takes finished matches."
+msgstr ""
+
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
 msgid "The replay itself records what was produced and lost, not what a player owned at any moment."
@@ -51774,6 +51814,10 @@ msgstr ""
 
 #: src/hub/replaySend/runner.ts
 msgid "The replay on {mapName}"
+msgstr ""
+
+#: src/hub/upload/messages.ts
+msgid "The replay stops before the match ended. The hub only takes finished matches."
 msgstr ""
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
@@ -52551,6 +52595,10 @@ msgstr "Enhetene i spillet til denne reprisen kunne ikke leses, så ingenting si
 
 #: src/content/pages/components/ReplayAwards.tsx
 msgid "The units of this replay's game could not be read, so the awards that need a cost are left out."
+msgstr ""
+
+#: src/hub/upload/messages.ts
+msgid "The upload did not finish in time. Send it again."
 msgstr ""
 
 #: src/downloads/pages/components/EngineUpload.tsx
@@ -57833,6 +57881,10 @@ msgstr "Hva er videresending via server?"
 #, fuzzy
 msgid "What builds it"
 msgstr "Hva som bygger den"
+
+#: src/hub/upload/messages.ts
+msgid "What Coilbox sent about the match does not agree with the replay file."
+msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy

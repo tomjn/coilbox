@@ -75,6 +75,8 @@ export interface ArchiveDuplicate {
  *   `wrong_mirror`, `too_large`, `bad_request`, `write_failed`,
  *   `internal_error`, `not_configured`, `uploads_disabled`, `bad_offset`,
  *   `unreachable`
+ * - hub, for a replay: `refused_<reason>`, `replay_removed`, `lapsed`,
+ *   `not_sent`, `not_kept`
  * - local: `unauthorised`, `unreachable`, `file_changed`, `unreadable`,
  *   `bad_answer`
  *

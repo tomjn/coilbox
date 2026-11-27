@@ -356,4 +356,48 @@ describe("send to hub on a replay's page", () => {
       await screen.findByText(/must be a list with at least one player/),
     ).toBeTruthy();
   });
+
+  it.each([
+    [
+      "says why the check refused it, with nothing to send again",
+      "refused_summary_mismatch",
+      /does not agree with the replay file/,
+      false,
+    ],
+    [
+      "offers to send again when the check did not finish",
+      "refused_check_failed",
+      /could not finish checking/,
+      true,
+    ],
+    [
+      "shows the hub's own words for a reason it does not know",
+      "refused_a_newer_reason",
+      /the hub's own words/,
+      false,
+    ],
+  ])("%s", async (_what, code, text, again) => {
+    render(<SendReplayToHub info={INFO} replayPath={PATH} />);
+    act(() =>
+      rememberUpload(
+        state({
+          phase: "done",
+          outcome: {
+            kind: "stopped",
+            source: "hub",
+            code,
+            status: 200,
+            said: "the hub's own words",
+          },
+        }),
+        subject,
+      ),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Not sent/ }));
+    expect(await screen.findByText(text)).toBeTruthy();
+    expect(screen.getByText("The replay on Tabula was refused")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Send again" }) !== null).toBe(
+      again,
+    );
+  });
 });
