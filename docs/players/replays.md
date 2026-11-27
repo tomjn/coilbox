@@ -135,7 +135,9 @@ After an analysis, five more map layers turn on. A Recorded events list appears,
 
 ## Awards
 
-An analysed replay has awards:
+A Beyond All Reason replay of a match that ended has the game's own awards, with no analysis needed. They are the same ones the game's replay site shows, with its figures, and include the golden cow for a player who won every other award.
+
+Any other analysed replay has awards worked out from the analysis:
 
 - Most enemy economy destroyed, by the metal cost of the economy buildings destroyed. Three places.
 - Most enemy fighting units destroyed, by the metal cost of the armed units and turrets destroyed. Units that can build, such as many commanders, are not counted. Three places.

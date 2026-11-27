@@ -25657,6 +25657,10 @@ msgstr "Går via mutatorvägen. Skrivning på plats hoppar över hela den här k
 msgid "Going away"
 msgstr "Avlägsnar sig"
 
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "Golden cow"
+msgstr ""
+
 #: src/content/index.ts
 #, fuzzy
 msgid "Graphics"
@@ -32110,6 +32114,10 @@ msgstr ""
 #, fuzzy
 msgid "Most of this game's PNG build pictures are {commonWidth} by {commonHeight} pixels. This one is {size} by {size}."
 msgstr "De flesta av spelets PNG-byggbilder är {commonWidth} gånger {commonHeight} pixlar. Den här är {size} gånger {size}."
+
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "Most resources produced"
+msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
 msgid "Motion and effects"
@@ -50207,6 +50215,10 @@ msgstr "Spelet {game} har inte längre med kartan som den här erövringen spela
 #, fuzzy
 msgid "The game changes this field as it loads. Its files say {fileValue} and it loads as {loadedValue}."
 msgstr "Spelet ändrar det här fältet när det laddas. Dess filer säger {fileValue} och det laddas som {loadedValue}."
+
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "The game chose these awards and worked out their figures, and wrote them into the replay when the match ended. The golden cow goes to a player who won every other award."
+msgstr ""
 
 #: src/multiplayer/battle/CompatHostExport.tsx
 #: src/multiplayer/battles/useHostCompat.ts

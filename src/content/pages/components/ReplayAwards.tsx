@@ -11,19 +11,23 @@ import {
   AWARD_KINDS,
   type Award,
   type AwardId,
+  type AwardSource,
   matchAwards,
   pickAwards,
 } from "../../replayAwards";
 import { type EventState, eventState } from "../../replayEventLayers";
 import { readReplayEvents } from "../../replayEventRead";
+import type { ReplaySource } from "../../replaySources";
+import { useReplayChat } from "../../useReplayChat";
 import { useReplayUnits } from "../../useReplayUnits";
 import { SectionHelp } from "./SectionHelp";
 import { StoredListNote } from "./UnitListNotes";
 
 /**
- * The match awards on the Summary tab (#5492). Nothing is shown for a replay
- * with no analysis. The map card and the analysis section already say how to
- * make one.
+ * The match awards on the Summary tab. A replay that recorded its game's own
+ * awards shows those (#5490). Any other shows the ones worked out from its
+ * analysis (#5492), and nothing without one: the map card and the analysis
+ * section already say how to make one.
  */
 
 const TITLE: Record<AwardId, MessageDescriptor> = {
@@ -36,13 +40,37 @@ const TITLE: Record<AwardId, MessageDescriptor> = {
   everything: msg`Won every award`,
 };
 
-export function ReplayAwards({ info }: { info: DemoInfo }) {
+/** The title and the score of a recorded award, where the game's differ. */
+const RECORDED_TITLE: Partial<Record<AwardId, MessageDescriptor>> = {
+  produced: msg`Most resources produced`,
+  everything: msg`Golden cow`,
+};
+
+export function ReplayAwards({
+  info,
+  replayPath,
+}: {
+  info: DemoInfo;
+  replayPath?: string;
+}) {
+  const chat = useReplayChat(replayPath ?? "");
+  const seats = useMemo(() => seatsByTeam(info), [info]);
   const analyses = useStoredAnalyses();
   const stored =
     info.remixed || !info.gameId ? undefined : analyses.get(info.gameId);
   const state = eventState(info, stored, analysisRunHidden());
+
+  // Worked out awards must not show first and then give way to recorded ones.
+  if (replayPath && chat.loading) return null;
+  const recorded = pickAwards({ recorded: chat.awards, analysed: null });
+  if (recorded)
+    return (
+      <Frame source="stream" help={<RecordedMethod />}>
+        <AwardList {...recorded} seats={seats} />
+      </Frame>
+    );
   if (state.kind !== "ready") return null;
-  return <AnalysedAwardsSection info={info} state={state} />;
+  return <AnalysedAwardsSection info={info} state={state} seats={seats} />;
 }
 
 type Read =
@@ -53,9 +81,11 @@ type Read =
 function AnalysedAwardsSection({
   info,
   state,
+  seats,
 }: {
   info: DemoInfo;
   state: Extract<EventState, { kind: "ready" }>;
+  seats: Seats;
 }) {
   const { t } = useLingui();
   const [read, setRead] = useState<Read>({ status: "loading" });
@@ -78,7 +108,6 @@ function AnalysedAwardsSection({
     };
   }, [gameId, atMs]);
 
-  const seats = useMemo(() => seatsByTeam(info), [info]);
   const analysed = useMemo(() => {
     if (read.status !== "done") return null;
     const allyTeams = new Map<number, number>();
@@ -93,7 +122,7 @@ function AnalysedAwardsSection({
 
   if (read.status === "failed")
     return (
-      <Frame>
+      <Frame source="log">
         <p className="text-xs text-destructive">
           <Trans>
             The events could not be read from this replay's analysis.
@@ -103,12 +132,11 @@ function AnalysedAwardsSection({
     );
   if (!analysed)
     return (
-      <Frame>
+      <Frame source="log">
         <Note>{t`Reading events…`}</Note>
       </Frame>
     );
 
-  // BAR's recorded awards go in here when something reads them (#5490).
   const shown = pickAwards({ recorded: null, analysed: analysed.awards });
   if (!shown) return null;
 
@@ -120,7 +148,7 @@ function AnalysedAwardsSection({
   const game = units.recorded || t`This replay's game`;
 
   return (
-    <Frame help={<Method />}>
+    <Frame source="log" help={<Method />}>
       {loadingUnits ? (
         <Note>{t`Reading unit definitions…`}</Note>
       ) : units.source?.kind === "notInstalled" ? (
@@ -150,23 +178,47 @@ function AnalysedAwardsSection({
           )}
         </>
       )}
-      <dl className="flex flex-col gap-2 rounded-lg border border-border/50 bg-card p-3 text-sm">
-        {shown.awards.map((award) => (
-          <AwardRow key={award.id} award={award} seats={seats} />
-        ))}
-      </dl>
+      <AwardList {...shown} seats={seats} />
     </Frame>
   );
 }
 
-function Frame({ help, children }: { help?: ReactNode; children: ReactNode }) {
+type Seats = ReturnType<typeof seatsByTeam>;
+
+function AwardList({
+  source,
+  awards,
+  seats,
+}: {
+  source: AwardSource;
+  awards: Award[];
+  seats: Seats;
+}) {
+  return (
+    <dl className="flex flex-col gap-2 rounded-lg border border-border/50 bg-card p-3 text-sm">
+      {awards.map((award) => (
+        <AwardRow key={award.id} source={source} award={award} seats={seats} />
+      ))}
+    </dl>
+  );
+}
+
+function Frame({
+  source,
+  help,
+  children,
+}: {
+  source: ReplaySource;
+  help?: ReactNode;
+  children: ReactNode;
+}) {
   const { t } = useLingui();
   return (
     <section aria-label={t`Awards`} className="flex flex-col gap-2">
       <div className="flex items-center gap-1">
         <h2 className="text-sm font-medium">{t`Awards`}</h2>
         {help && (
-          <SectionHelp section={t`awards`} source="log">
+          <SectionHelp section={t`awards`} source={source}>
             {help}
           </SectionHelp>
         )}
@@ -181,11 +233,13 @@ function Note({ children }: { children: ReactNode }) {
 }
 
 function AwardRow({
+  source,
   award,
   seats,
 }: {
+  source: AwardSource;
   award: Award;
-  seats: ReturnType<typeof seatsByTeam>;
+  seats: Seats;
 }) {
   const { t, i18n } = useLingui();
   const nameOf = (team: number) => {
@@ -197,7 +251,15 @@ function AwardRow({
         )
       : t`Team ${team}`;
   };
+  const recorded = source === "recorded";
+  const title = (recorded && RECORDED_TITLE[award.id]) || TITLE[award.id];
   const scoreOf = (score: number) => {
+    // The game does not say what unit its figures are in, apart from these two.
+    if (recorded && award.id !== "damageTaken" && award.id !== "noKill") {
+      return formatNumber(score, {
+        maximumFractionDigits: award.id === "efficiency" ? 3 : 0,
+      });
+    }
     switch (award.id) {
       case "efficiency": {
         const ratio = formatNumber(score, { maximumFractionDigits: 2 });
@@ -217,9 +279,7 @@ function AwardRow({
   };
   return (
     <div data-award={award.id} className="flex flex-col gap-0.5">
-      <dt className="text-xs text-muted-foreground">
-        {i18n._(TITLE[award.id])}
-      </dt>
+      <dt className="text-xs text-muted-foreground">{i18n._(title)}</dt>
       {award.places.map(({ place, team, score }) => (
         <dd key={team} className="flex items-baseline gap-2">
           <span className="w-4 shrink-0 text-xs tabular-nums text-muted-foreground">
@@ -237,7 +297,20 @@ function AwardRow({
   );
 }
 
-/** How each award is worked out, for the section's help. */
+/** Who decided the recorded awards, for the section's help. */
+function RecordedMethod() {
+  return (
+    <p>
+      <Trans>
+        The game chose these awards and worked out their figures, and wrote them
+        into the replay when the match ended. The golden cow goes to a player
+        who won every other award.
+      </Trans>
+    </p>
+  );
+}
+
+/** How each worked out award is reached, for the section's help. */
 function Method() {
   return (
     <>
