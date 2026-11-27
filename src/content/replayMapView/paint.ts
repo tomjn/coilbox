@@ -22,6 +22,9 @@ export interface PaintCounts {
   icons: number;
   /** Whether the unit asked to be ringed is in the picture. */
   highlighted: boolean;
+  /** Where the ring was drawn, in canvas pixels: its centre and radius. Null
+   *  when no unit is ringed. */
+  ring: { x: number; y: number; radius: number } | null;
 }
 
 /** The part of a 2D context the painter uses, so a test can hand it a
@@ -216,6 +219,7 @@ export function paintScene(
   paintProjectiles(ctx, scene, view);
   paintExplosions(ctx, scene, view);
 
+  let ring: PaintCounts["ring"] = null;
   if (ringed >= 0) {
     const iconEdge = icons?.edge(scene.unitDef[ringed], u) ?? 0;
     const reach =
@@ -238,6 +242,11 @@ export function paintScene(
     ctx.lineWidth = 1.5 * u;
     ctx.strokeStyle = RING;
     ctx.stroke();
+    ring = {
+      x: scene.unitX[ringed] * scale,
+      y: scene.unitZ[ringed] * scale,
+      radius: reach,
+    };
   }
 
   return {
@@ -247,6 +256,7 @@ export function paintScene(
     explosions: scene.blasts,
     icons: iconed,
     highlighted: ringed >= 0,
+    ring,
   };
 }
 
