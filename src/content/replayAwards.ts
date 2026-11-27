@@ -38,7 +38,8 @@ export interface AwardPlace {
   /** 1 is first. Teams with the same score share a place. */
   place: number;
   team: number;
-  /** Metal, a ratio, damage or seconds, by award. Null for winning them all. */
+  /** Metal, a ratio, damage or seconds, by award. A recorded award's is the
+   *  game's own figure. Null for winning them all. */
   score: number | null;
 }
 
@@ -60,7 +61,6 @@ export type AwardSource = "recorded" | "analysis";
 /**
  * The one place that picks which awards a replay shows. Awards a game recorded
  * in its replay win over ones worked out here, and the two are never mixed.
- * Nothing reads recorded awards yet (#5490), so the page passes null for them.
  */
 export function pickAwards(sources: {
   recorded: Award[] | null;

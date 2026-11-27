@@ -18,6 +18,7 @@ import type {
   StoredReplayAnalysis,
   UnitDatasetEntry,
 } from "../../bindings";
+import type { Award } from "../../replayAwards";
 
 /** The log the logger's own tests record. */
 const RECORDED: Record<string, unknown>[] = readFileSync(
@@ -31,9 +32,16 @@ const RECORDED: Record<string, unknown>[] = readFileSync(
 let EVENTS = RECORDED;
 let GAMES: GameItem[] = [];
 const eventsRead = vi.fn();
+let RECORDED_AWARDS: Award[] = [];
 
 vi.mock("../../bindings", async (original) => ({
   ...(await original<typeof import("../../bindings")>()),
+  contentDemoChat: async () => ({
+    messages: [],
+    incomplete: false,
+    events: [],
+    awards: RECORDED_AWARDS,
+  }),
   contentReplayAnalysisEvents: async (args: { kinds?: string[] }) => {
     eventsRead(args);
     return {
@@ -125,6 +133,7 @@ afterEach(() => {
   eventsRead.mockClear();
   EVENTS = RECORDED;
   GAMES = [];
+  RECORDED_AWARDS = [];
 });
 
 describe("the awards section", () => {
@@ -184,6 +193,61 @@ describe("the awards section", () => {
     EVENTS = [];
     const { container } = render(<ReplayAwards info={INFO} />);
     await waitFor(() => expect(container.innerHTML).toBe(""));
+  });
+
+  it("shows the awards the game recorded, with no analysis", async () => {
+    RECORDED_AWARDS = [
+      {
+        id: "economyKilled",
+        places: [
+          { place: 1, team: 1, score: 97270 },
+          { place: 2, team: 0, score: 29110 },
+        ],
+      },
+      {
+        id: "efficiency",
+        places: [{ place: 1, team: 0, score: 0.03360242 }],
+      },
+      { id: "produced", places: [{ place: 1, team: 1, score: 1567704.13 }] },
+      { id: "damageTaken", places: [{ place: 1, team: 1, score: 49397.7266 }] },
+      { id: "noKill", places: [{ place: 1, team: 0, score: 3119.86694 }] },
+      { id: "everything", places: [{ place: 1, team: 0, score: null }] },
+    ];
+    render(<ReplayAwards info={INFO} replayPath="/demos/a.sdfz" />);
+    await waitFor(() => expect(rows()).toHaveLength(6));
+    expect(rows()).toEqual([
+      [
+        "Most enemy economy destroyed",
+        "1 | Bot | 97,270",
+        "2 | Alice | 29,110",
+      ],
+      ["Most efficient", "1 | Alice | 0.034"],
+      ["Most resources produced", "1 | Bot | 1,567,704"],
+      ["Most damage taken", "1 | Bot | 49.4K damage"],
+      ["Longest time without a kill", "1 | Alice | 52:00"],
+      ["Golden cow", "1 | Alice"],
+    ]);
+    expect(eventsRead).not.toHaveBeenCalled();
+  });
+
+  it("shows the recorded awards and not the worked out ones", async () => {
+    analysed();
+    GAMES = [game];
+    RECORDED_AWARDS = [
+      { id: "produced", places: [{ place: 1, team: 1, score: 7 }] },
+    ];
+    render(<ReplayAwards info={INFO} replayPath="/demos/a.sdfz" />);
+    await waitFor(() =>
+      expect(rows()).toEqual([["Most resources produced", "1 | Bot | 7"]]),
+    );
+    expect(eventsRead).not.toHaveBeenCalled();
+  });
+
+  it("works the awards out for a replay that recorded none", async () => {
+    analysed();
+    render(<ReplayAwards info={INFO} replayPath="/demos/a.sdfz" />);
+    await waitFor(() => expect(rows().length).toBeGreaterThan(0));
+    expect(rows().map((r) => r[0])).toContain("Most metal produced");
   });
 
   it("says when the events cannot be read", async () => {

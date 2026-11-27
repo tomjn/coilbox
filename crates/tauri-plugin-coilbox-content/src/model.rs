@@ -219,6 +219,9 @@ pub struct DemoChat {
     /// Resignations, departures, pauses and the like, from the same walk as
     /// `messages`, so the timeline needs no second read of the file.
     pub events: Vec<TimelineEvent>,
+    /// The awards the game recorded in the replay, from the same walk. Empty
+    /// for a game that records none and for a match that never ended.
+    pub awards: Vec<RecordedAward>,
 }
 
 /// Something that happened to the match or its players, worth a mark on the
@@ -697,6 +700,45 @@ pub enum StreamEventKind {
         team: u8,
         name: String,
     },
+    /// Beyond All Reason's end of match awards, from a `NETMSG_LUAMSG`. Every
+    /// player's client sends its own copy.
+    #[serde(rename_all = "camelCase")]
+    MatchAwards { awards: Vec<RecordedAward> },
+}
+
+/// One award a game recorded in its replay.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RecordedAward {
+    pub id: RecordedAwardId,
+    /// Best first. Never empty: an award nobody won is not listed.
+    pub places: Vec<RecordedPlace>,
+}
+
+/// Which award, named as the awards coilbox works out from an analysis are.
+#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum RecordedAwardId {
+    EconomyKilled,
+    FightingKilled,
+    Efficiency,
+    Produced,
+    DamageTaken,
+    NoKill,
+    /// The golden cow, for winning every other award.
+    Everything,
+}
+
+/// One team's place in a [`RecordedAward`].
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RecordedPlace {
+    /// 1 is first.
+    pub place: u32,
+    /// The engine team id.
+    pub team: u32,
+    /// The game's own figure. `None` for the golden cow, which has none.
+    pub score: Option<f64>,
 }
 
 /// Why a player left, from `NETMSG_PLAYERLEFT`'s `bIntended` byte.
