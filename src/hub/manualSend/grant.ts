@@ -45,6 +45,23 @@ export async function beginEngineSend(filename: string): Promise<string> {
   return grant;
 }
 
+const hubReplaySendBegin = defineCommand<
+  { subject: { kind: "replay"; game_id: string } },
+  { grant: string }
+>("coilbox-hub", "hub_manual_send_begin");
+
+/**
+ * Open a grant for one replay somebody pressed send for, named by its game id.
+ * The uploads switch never admits a replay, so this grant is the only way one
+ * is sent.
+ */
+export async function beginReplaySend(gameId: string): Promise<string> {
+  const { grant } = await hubReplaySendBegin({
+    subject: { kind: "replay", game_id: gameId },
+  });
+  return grant;
+}
+
 /** Close a grant, however its send ended. */
 export async function endManualSend(grant: string): Promise<void> {
   await hubManualSendEnd({ grant });

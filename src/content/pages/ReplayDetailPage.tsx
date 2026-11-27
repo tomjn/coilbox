@@ -61,6 +61,7 @@ import {
   ReplayTimelineDock,
   TimelineKeysProvider,
 } from "./components/ReplayTimelineDock";
+import { SendReplayToHub } from "./components/SendReplayToHub";
 import { StaleRemixNotice } from "./components/StaleRemixNotice";
 import {
   DependencyBlocked,
@@ -357,6 +358,11 @@ export default function ReplayDetailPage() {
                 filename={filename}
                 factionsPending={factionsPending}
               />
+            )}
+            {/* The raw read, whose sides are the start script's: the hub
+             * checks the summary against the file. */}
+            {decoded.info && (
+              <SendReplayToHub info={decoded.info} replayPath={replay.path} />
             )}
             {info && (
               <WatchWithRewindButton

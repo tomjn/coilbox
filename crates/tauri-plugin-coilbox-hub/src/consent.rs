@@ -74,6 +74,9 @@ pub const GRANT_ENDED: &str = "This send to the hub has already ended.";
 pub const ENGINE_NEEDS_GRANT: &str =
     "An engine build is only sent when you press its upload button.";
 
+/// What a replay send without a grant says.
+pub const REPLAY_NEEDS_GRANT: &str = "A replay is only sent when you press its send button.";
+
 /// The one game, map or engine build a manual send is for.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -84,6 +87,8 @@ pub enum SendSubject {
     Map { map_name: String },
     /// An engine build, by its archive's file name.
     Engine { filename: String },
+    /// A match replay, by the game id in its header (issue #5493).
+    Replay { game_id: String },
 }
 
 impl SendSubject {
@@ -92,6 +97,7 @@ impl SendSubject {
             Self::Game { shortname } => shortname,
             Self::Map { map_name } => map_name,
             Self::Engine { filename } => filename,
+            Self::Replay { game_id } => game_id,
         }
     }
 
@@ -210,6 +216,16 @@ impl AssetUploadConsent {
             None => Err(ENGINE_NEEDS_GRANT.to_string()),
             Some(SendSubject::Engine { filename: granted }) if granted == filename => Ok(()),
             Some(subject) => Err(subject.refuse(filename)),
+        }
+    }
+
+    /// Whether this replay is this proof's subject. A replay is only ever sent by
+    /// a press of its send button, so the uploads switch never admits one.
+    pub fn admits_replay(&self, game_id: &str) -> Result<(), String> {
+        match &self.0 {
+            None => Err(REPLAY_NEEDS_GRANT.to_string()),
+            Some(SendSubject::Replay { game_id: granted }) if granted == game_id => Ok(()),
+            Some(subject) => Err(subject.refuse(game_id)),
         }
     }
 
@@ -480,6 +496,20 @@ mod tests {
         assert!(AssetUploadConsent::for_test_subject(game("bar"))
             .admits_engine(filename)
             .is_err());
+    }
+
+    #[test]
+    fn a_replay_needs_its_own_grant() {
+        let id = "9f2c4b1ad07e5386c1f4a92b6e8d0375";
+        let granted =
+            AssetUploadConsent::for_test_subject(SendSubject::Replay { game_id: id.into() });
+        assert!(granted.admits_replay(id).is_ok());
+        assert!(granted.admits_replay(&"0".repeat(32)).is_err());
+        assert!(granted.admits_game("bar").is_err());
+        assert_eq!(
+            AssetUploadConsent::for_test().admits_replay(id),
+            Err(REPLAY_NEEDS_GRANT.to_string())
+        );
     }
 
     #[test]
