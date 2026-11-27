@@ -143,7 +143,7 @@ When coilbox finishes downloading a map or a game, it tells the hub which one, s
 
 Coilbox also asks the hub about a map by its name, to show facts about maps you have not installed. If a map file you download is not what the hub lists for it, coilbox sends the hub a report of the difference.
 
-Coilbox sends nothing about your own games, maps, presets or other files unless you publish them or turn on the sharing in [Share your maps and games](#share-your-maps-and-games).
+Coilbox sends nothing about your own games, maps, presets, replays or other files unless you publish them, turn on the sharing in [Share your maps and games](#share-your-maps-and-games), or send a replay as [Send replays to the hub](#send-replays-to-the-hub) describes.
 
 Signing out only affects this computer. It does not remove anything you have already shared.
 
@@ -166,12 +166,77 @@ The two picture buttons share an hourly allowance with every other player, so a 
 
 With the switch on, opening a blueprint's page also sends pictures of the buildings in it that the hub does not have yet.
 
+## Send replays to the hub
+
+You can put the replay of a match you were in on the hub, so other people can download it. You send one replay at a time from its page, or turn on a setting that sends each match when it ends.
+
+Replays on the hub are public. Anyone can download one and see the players, the build orders and the totals. The hub notes that you sent it, under your lobby name.
+
+### Send one replay
+
+The Send to hub button is at the top of a replay's page, beside Watch. See [Open a replay](replays.md#open-a-replay). It is only there when:
+
+- you are signed in to the hub
+- you played in the match or watched it, under a lobby name you have signed in to coilbox with
+
+A remix has no Send to hub button.
+
+1. Select Send to hub. Coilbox reads the replay, which can take a moment.
+2. Read the box that says Send this replay to the hub?
+3. Select Send.
+
+While it goes, the button says Sending to hub…, then The hub is checking it… while the hub looks over what it received. Once the hub has kept it, the button says On the hub. Select it to open the replay's page on the hub website.
+
+If somebody else who was in the match sent it first, the hub already has it. Coilbox uploads nothing, and the button says On the hub and links to their copy. The hub notes that you sent it too.
+
+Once coilbox has seen a replay on the hub, the replay's page says On the hub from the start, and the replay carries an On hub badge on the Replays page.
+
+### When a replay is not sent
+
+If the hub refuses a replay, the button says Not sent. Select it to see why. Where trying again could help, for example when no mirror could take the file or the connection dropped, there is a Send again button.
+
+The hub can also decide not to keep a replay after its check. Coilbox then says the hub did not keep it. The hub does not yet say why.
+
+Sometimes coilbox cannot read what the hub needs from the replay, and the box says so in place of Send. The most common reasons are:
+
+- The recording stops before the end of the match. The hub only takes a whole match.
+- The game the match was played on is not installed, or another version of it is. Install the version it was played on, then try again.
+
+### Send your finished matches automatically
+
+Settings > Coilbox hub has Send my finished matches to the hub, under Replays. It is off until you turn it on. See [Settings](#settings).
+
+With it on, when a match ends coilbox sends its replay if:
+
+- you played in it or watched it
+- there were people on two or more sides, so a game against AIs only is not sent
+- it reached game over
+
+It sends nothing until you are signed in to the hub. A match that ended while you were signed out waits, and goes if you sign in within a week of it.
+
+If the hub or a mirror cannot take a replay, coilbox tries again later, waiting longer each time. It keeps trying for a week after the match. If the hub refuses the replay, or the week runs out, coilbox tells you the replay was not sent and why.
+
+Turning the setting off forgets every replay still waiting to be sent, and stops one that is being sent.
+
+### What a sent replay holds
+
+When you send a replay, coilbox sends the hub:
+
+- the replay file
+- a summary of the match: the game, map and engine, when it was played and how long it lasted
+- the players, their teams and the faction each one picked, and the spectators
+- who won, and each team's totals
+- where each player started
+- each player's build orders, with the list of units in them and what each unit costs
+- your hub account and the lobby name you were in the match under
+
 ## Settings
 
 Settings > Coilbox hub has:
 
 - Your hub account, with Sign in with Discord or Sign out
 - the controls in [Share your maps and games](#share-your-maps-and-games)
+- Send my finished matches to the hub, under Replays. See [Send your finished matches automatically](#send-your-finished-matches-automatically)
 
 Which hub coilbox uses is in Settings, then Library > Sources. It shows the hub address coilbox is using. Type in Your hub address to point coilbox at a different hub. Leave it blank to use the default. Clear override puts it back.
 

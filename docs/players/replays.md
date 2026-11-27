@@ -70,6 +70,7 @@ The other buttons at the top:
 - Refight this setup sets up the same match again, with every player replaced by an AI. Pick the AI, then select Refight now. You start as a spectator.
 - Remix writes a copy of the replay that plays on another version of the game you have installed. The original is left alone. A remix can fall out of step when the versions differ.
 - Delete removes the replay file for good, with its analysis and its recorded track.
+- Send to hub puts the replay on the Coilbox hub, for a match you were in. See [Send replays to the hub](hub.md#send-replays-to-the-hub).
 
 ## Details
 
