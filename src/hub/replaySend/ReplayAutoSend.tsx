@@ -7,6 +7,7 @@ import { useLastLogin, useLobbyAccounts } from "@/lobby-servers/config";
 import { isHubAssetUploadOffered } from "@/profile/profile";
 import { useHubAccount } from "../account";
 import { useHubUrl } from "../config";
+import { readReplayExtras, replayExtrasOn } from "../replayExtras/onHub";
 import {
   AUTO_SEND_REPLAYS_KEY,
   queueReplayExtras,
@@ -43,6 +44,7 @@ export default function ReplayAutoSend() {
  */
 function FinishedRuns() {
   const [since] = useState(Date.now);
+  const hubUrl = useHubUrl();
   const analyses = useStoredAnalyses();
   const tracks = useStoredTracks();
   const seen = useRef(new Set<string>());
@@ -58,10 +60,14 @@ function FinishedRuns() {
     for (const analysis of analyses.values()) {
       queue(analysis.gameId, analysis.analysedAtMs);
     }
+    // A track the hub is known to hold has nothing to be sent, which is every
+    // track downloaded from it (issue #5520).
+    const held = readReplayExtras();
     for (const track of tracks.values()) {
+      if (replayExtrasOn(held, hubUrl, track.gameId)?.track) continue;
       if (track.state === "current") queue(track.gameId, track.lastWatchedMs);
     }
-  }, [analyses, tracks, since]);
+  }, [analyses, tracks, since, hubUrl]);
   return null;
 }
 

@@ -48,6 +48,10 @@ let ENGINE_OUTPUT: string[] | null = null;
 let ENQUEUE: string | Error = "queued";
 /** What `content_unit_def_set` answers: the lists kept for the replay. */
 let UNIT_SETS: unknown = { links: [], sets: {} };
+/** What the hub is found to have, or an Error asking it fails with. */
+let HUB_TRACK: { size: number } | null | Error = null;
+/** What `content_replay_hub_track_download` answers, or fails with. */
+let HUB_DOWNLOAD: string | Error = "stored";
 
 // The frame's `useSetting`, held in memory.
 vi.mock("@picoframe/frame", async (importOriginal) => {
@@ -75,6 +79,12 @@ vi.mock("@picoframe/plugin-sdk", () => ({
           return { analyses: [] };
         case "content_unit_def_set":
           return UNIT_SETS;
+        case "content_replay_hub_track":
+          if (HUB_TRACK instanceof Error) throw HUB_TRACK;
+          return { track: HUB_TRACK };
+        case "content_replay_hub_track_download":
+          if (HUB_DOWNLOAD instanceof Error) throw HUB_DOWNLOAD;
+          return { outcome: HUB_DOWNLOAD };
         case "content_analysis_engine_output":
           return { lines: ENGINE_OUTPUT };
         case "content_metric_registry":
@@ -289,6 +299,8 @@ const enqueued = () =>
 beforeEach(() => {
   called.length = 0;
   HIDE = [];
+  HUB_TRACK = null;
+  HUB_DOWNLOAD = "stored";
   CHECK = {
     cannot: null,
     gameId: ID,
@@ -339,7 +351,7 @@ describe("a replay that has not been analysed or recorded", () => {
     );
   });
 
-  it("is one section with one button, and says nothing of a track it has no reason to", async () => {
+  it("is one section with one button that runs, and says nothing of a track it has no reason to", async () => {
     show();
 
     expect(screen.getAllByRole("region")).toHaveLength(1);
@@ -350,6 +362,7 @@ describe("a replay that has not been analysed or recorded", () => {
     expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
       "",
       FRESH,
+      "Look for a track on the hub",
     ]);
   });
 
@@ -1410,5 +1423,91 @@ describe("a distribution that hides analytics.run (#3869)", () => {
     expect(commands()).not.toContain("content_analysis_check");
     expect(screen.queryByRole("button", { name: /Analyse/ })).toBeNull();
     expect(screen.queryByRole("combobox")).toBeNull();
+  });
+});
+
+describe("the hub's track of a replay with none here (#5520)", () => {
+  const LOOK = "Look for a track on the hub";
+  const GET = /Download the hub's track/;
+  const press = (name: string | RegExp) =>
+    fireEvent.click(screen.getByRole("button", { name }));
+  const hubCommands = () =>
+    commands().filter((c) => c.startsWith("content_replay_hub"));
+
+  it("asks the hub nothing until the button is pressed", async () => {
+    show();
+    await waitFor(() =>
+      expect(analyseButton()).toHaveProperty("disabled", false),
+    );
+    expect(screen.getByRole("button", { name: LOOK })).toBeTruthy();
+    expect(hubCommands()).toEqual([]);
+    expect(help()).toContain("sends the hub the replay's game id");
+  });
+
+  it("offers the download in place of the run, then reads the tracks again", async () => {
+    HUB_TRACK = { size: 2 * MIB };
+    show();
+    press(LOOK);
+    await screen.findByRole("button", { name: GET });
+    expect(screen.queryByRole("button", { name: FRESH })).toBeNull();
+    expect(
+      called.find((c) => c.command === "content_replay_hub_track")?.args,
+    ).toEqual({ hubUrl: "https://hub.coilbox.org", gameId: ID });
+
+    called.length = 0;
+    press(GET);
+
+    await waitFor(() => expect(commands()).toContain("content_replay_tracks"));
+    expect(commands()[0]).toBe("content_replay_hub_track_download");
+    expect(commands()).not.toContain("content_analysis_enqueue");
+  });
+
+  it("offers it for a track that is out of date, and not for a current one", async () => {
+    HUB_TRACK = { size: MIB };
+    seedReplayTracksForTests([track({ state: "stale" })]);
+    show();
+    press(LOOK);
+    await screen.findByRole("button", { name: GET });
+    cleanup();
+
+    seedReplayTracksForTests([track()]);
+    show();
+    expect(screen.queryByRole("button", { name: LOOK })).toBeNull();
+  });
+
+  it("says the hub has none, and leaves the run on offer", async () => {
+    show();
+    press(LOOK);
+    await waitFor(() =>
+      expect(region()).toContain("The hub has no track of this match"),
+    );
+    expect(screen.queryByRole("button", { name: GET })).toBeNull();
+    expect(analyseButton()).toBeTruthy();
+  });
+
+  it("says what went wrong with a download, and offers both again", async () => {
+    HUB_TRACK = { size: MIB };
+    HUB_DOWNLOAD = new Error("the file did not match");
+    show();
+    press(LOOK);
+    await screen.findByRole("button", { name: GET });
+
+    press(GET);
+
+    await waitFor(() => expect(region()).toContain("the file did not match"));
+    expect(analyseButton()).toBeTruthy();
+    expect(screen.getByRole("button", { name: LOOK })).toBeTruthy();
+  });
+
+  it("is not offered where a distribution hides analytics.run, or for a remix", () => {
+    HIDE = ["analytics.run"];
+    seedReplayTracksForTests([track({ state: "stale" })]);
+    show();
+    expect(screen.queryByRole("button", { name: LOOK })).toBeNull();
+    cleanup();
+
+    HIDE = [];
+    show({ info: { ...INFO, remixed: true } });
+    expect(screen.queryByRole("button", { name: LOOK })).toBeNull();
   });
 });

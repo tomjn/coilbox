@@ -1777,6 +1777,26 @@ export const contentReplayTrackUploadFacts = defineCommand<
 >("coilbox-content", "content_replay_track_upload_facts");
 
 /**
+ * Whether the hub has a track of a match that this build can play (issue
+ * #5520). Null when it has none, or does not list the replay. Asking tells the
+ * hub the replay's game id, so only ask when the player does.
+ */
+export const contentReplayHubTrack = defineCommand<
+  { hubUrl: string; gameId: string },
+  { track: { size: number } | null }
+>("coilbox-content", "content_replay_hub_track");
+
+/**
+ * Download the hub's track of a match and store it as a recorded one is. The
+ * file must have the size and SHA-256 the hub gave. `unavailable` when the hub
+ * no longer has one to give. Call {@link contentReplayTracks} again after.
+ */
+export const contentReplayHubTrackDownload = defineCommand<
+  { hubUrl: string; gameId: string },
+  { outcome: "stored" | "unavailable" }
+>("coilbox-content", "content_replay_hub_track_download");
+
+/**
  * One recorded track on disk (issue #3786). `current` can be played. `stale`
  * was made by an older or newer recorder, or does not read as a track, and is
  * offered for recording again.

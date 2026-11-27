@@ -12763,6 +12763,10 @@ msgstr "Consultando o hub sobre {done} de {total}"
 msgid "Asking the hub about your maps"
 msgstr "Consultando o hub sobre seus mapas"
 
+#: src/content/pages/components/HubTrackOffer.tsx
+msgid "Asking the hub…"
+msgstr ""
+
 #: src/direct/ReachablePorts.tsx
 #, fuzzy
 msgid "Asking your router to open <0/>…"
@@ -18974,6 +18978,10 @@ msgstr "Não foi possível alcançar o hub em {host}."
 msgid "Could not reach the hub at {host}. Check your connection."
 msgstr "Não foi possível alcançar o hub em {host}. Verifique sua conexão."
 
+#: src/i18n/uiError.ts
+msgid "Could not reach the hub. Try again in a moment."
+msgstr ""
+
 #: src/lego/pages/components/ReferencePicker.tsx
 #, fuzzy
 msgid "Could not reach unitsync to read {object}. Showing the solar collector."
@@ -21335,6 +21343,10 @@ msgstr "Baixar a engine de que este replay precisa"
 msgid "Download the event log"
 msgstr "Baixar o log de eventos"
 
+#: src/content/pages/components/HubTrackOffer.tsx
+msgid "Download the hub's track ({size})"
+msgstr ""
+
 #: src/multiplayer/battles/BattleRowMapThumb.tsx
 #, fuzzy
 msgid "Download the map for {battleTitle}"
@@ -21404,6 +21416,10 @@ msgstr "Baixando uma importação"
 #, fuzzy
 msgid "Downloading map for {battleTitle}"
 msgstr "Baixando mapa de {battleTitle}"
+
+#: src/content/pages/components/HubTrackOffer.tsx
+msgid "Downloading the track…"
+msgstr ""
 
 #: src/campaign/pages/components/MissionNeedsPanel.tsx
 #: src/challenge/SubstitutedMapNote.tsx
@@ -30462,6 +30478,10 @@ msgstr "Maior duração"
 
 #: src/content/pages/components/ReplayAwards.tsx
 msgid "Longest time without a kill"
+msgstr ""
+
+#: src/content/pages/components/HubTrackOffer.tsx
+msgid "Look for a track on the hub"
 msgstr ""
 
 #: src/play/pages/EngineLogSection.tsx
@@ -47244,6 +47264,10 @@ msgstr "Outra pessoa abre uma votação para expulsar, banir ou mover você para
 msgid "Someone else is sending a track of this match right now. Try again later."
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Someone else may have sent a track of this match to the hub. Looking for one sends the hub the replay's game id, and coilbox asks nothing until you press the button. A downloaded track is played like one recorded here, and does not come with an analysis."
+msgstr ""
+
 #: src/hub/upload/messages.ts
 msgid "Someone else who was in the match is sending it right now. Try again later, and the hub links you to theirs once it is on the hub."
 msgstr ""
@@ -49901,6 +49925,10 @@ msgstr "O documento e a missão compilada vão para {gameName}. O Coilbox não g
 msgid "The download failed part way through."
 msgstr "O download falhou no meio."
 
+#: src/i18n/uiError.ts
+msgid "The downloaded file was not the track the hub described, so it was thrown away."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "The drag used once the aircraft is going down. Clamped to 0 up to 1."
@@ -50845,6 +50873,10 @@ msgstr ""
 msgid "The hub did not accept your sign-in. Sign in again, then upload it again."
 msgstr "O hub não aceitou o seu login. Entre de novo e envie de novo."
 
+#: src/i18n/uiError.ts
+msgid "The hub did not answer with its list of tracks. Try again in a moment."
+msgstr ""
+
 #: src/hub/upload/messages.ts
 msgid "The hub did not keep it. Its check may have found the replay did not match what Coilbox read from it, and the hub does not say why."
 msgstr ""
@@ -50897,6 +50929,10 @@ msgstr "O hub não tem esse item. Ele pode ter sido retirado."
 
 #: src/downloads/pages/components/HubEngineList.tsx
 msgid "The hub has no test builds for this computer."
+msgstr ""
+
+#: src/content/pages/components/HubTrackOffer.tsx
+msgid "The hub has no track of this match that this version of coilbox can play."
 msgstr ""
 
 #: src/hub/replayExtras/messages.ts
@@ -51073,6 +51109,10 @@ msgstr "A resposta {index} do hub não é um resultado."
 
 #: src/hub/replayExtras/messages.ts
 msgid "The hub's check found the analysis does not match the replay."
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "The hub's track is not a playable track of this match, so it was not kept."
 msgstr ""
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
@@ -52422,6 +52462,10 @@ msgstr "A grafia de Total Annihilation. Só é lida quando metalCost não existe
 #, fuzzy
 msgid "the track cannot be read: {message}"
 msgstr "não é possível ler a trilha: {message}"
+
+#: src/i18n/uiError.ts
+msgid "The track could not be downloaded. Try again in a moment."
+msgstr ""
 
 #: src/content/replayTrack/fault.ts
 #, fuzzy

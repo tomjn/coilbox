@@ -161,6 +161,17 @@ const MESSAGES: Record<string, (params: Params) => MessageDescriptor> = {
   "downloads.pack.not_a_pack": () =>
     msg`That address did not return a setup pack.`,
 
+  "content.hub_track.unreachable": () =>
+    msg`Could not reach the hub. Try again in a moment.`,
+  "content.hub_track.bad_answer": () =>
+    msg`The hub did not answer with its list of tracks. Try again in a moment.`,
+  "content.hub_track.fetch_failed": () =>
+    msg`The track could not be downloaded. Try again in a moment.`,
+  "content.hub_track.mismatch": () =>
+    msg`The downloaded file was not the track the hub described, so it was thrown away.`,
+  "content.hub_track.not_playable": () =>
+    msg`The hub's track is not a playable track of this match, so it was not kept.`,
+
   "hub.endpoint.not_a_hub": () =>
     msg`That address answered, but it is not a coilbox hub.`,
   "hub.endpoint.stopped_answering": () =>

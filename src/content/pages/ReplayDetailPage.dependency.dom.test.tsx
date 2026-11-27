@@ -108,6 +108,11 @@ vi.mock("../../downloads/pages/components/ProgressBar", () => ({
 vi.mock("../../mapconv/pages/components/MapPreview3D", () => ({
   MapPreview3D: () => null,
 }));
+vi.mock("./components/HubTrackOffer", () => ({
+  useHubTrack: () => ({ offered: false, found: false }),
+  HubTrackDownload: () => null,
+  HubTrackLook: () => null,
+}));
 vi.mock("./components/ReplayEventList", () => ({
   ReplayEventList: () => null,
 }));

@@ -77,11 +77,13 @@ import { budgetEffect, estimateRecording } from "../../replayRecordingEstimate";
 import {
   useRecordingCosts,
   useStoredTracks,
+  useStoredTracksRead,
   useTrackBudget,
   useTrackUsage,
 } from "../../replayTracks";
 import { useMetricRegistry } from "../../useMetricRegistry";
 import { useKeptUnitLinks } from "../../useReplayUnits";
+import { HubTrackDownload, HubTrackLook, useHubTrack } from "./HubTrackOffer";
 import { SectionHelp } from "./SectionHelp";
 
 type Check = Awaited<ReturnType<typeof contentAnalysisCheck>>;
@@ -185,6 +187,7 @@ function AnalysisBody({
   const queue = useAnalysisQueue();
   const analyses = useStoredAnalyses();
   const tracks = useStoredTracks();
+  const tracksRead = useStoredTracksRead();
   const costs = useRecordingCosts();
   const [check, setCheck] = useState<Check | undefined>(undefined);
   const [pending, setPending] = useState(false);
@@ -220,6 +223,9 @@ function AnalysisBody({
   const stored = gameId ? analyses.get(gameId) : undefined;
   const track = gameId ? tracks.get(gameId) : undefined;
   const { links, ready: linksKnown } = useKeptUnitLinks(gameId, !hidden);
+  const hubTrack = useHubTrack(
+    !hidden && tracksRead && track?.state !== "current" ? gameId : undefined,
+  );
   if (hidden && !stored && !track) return null;
 
   // With the run hidden there is nothing here to follow or to steer.
@@ -387,7 +393,10 @@ function AnalysisBody({
     ? t`Try with ${chosenLabel}`
     : t`Analyse and record with ${chosenLabel}`;
 
-  const offer = (
+  // A track the hub has takes the place of making one here (#5520).
+  const offer = hubTrack.found ? (
+    <HubTrackDownload hubTrack={hubTrack} />
+  ) : (
     <>
       {substitution && (
         <Substitution
@@ -433,6 +442,7 @@ function AnalysisBody({
         </ul>
       )}
       {check !== undefined && blockers.length > 0 && downloads}
+      <HubTrackLook hubTrack={hubTrack} />
     </>
   );
 
@@ -449,6 +459,7 @@ function AnalysisBody({
         <SectionHelp section={t`the analysis and recording`}>
           <AnalysisHelp
             canRun={!hidden}
+            canDownload={hubTrack.offered}
             matchSeconds={info.durationSec}
             estimate={estimate}
             hasEngineOptions={options.length > 0}
@@ -539,6 +550,7 @@ function AnalysisBody({
  */
 function AnalysisHelp({
   canRun,
+  canDownload,
   matchSeconds,
   estimate,
   hasEngineOptions,
@@ -547,6 +559,8 @@ function AnalysisHelp({
   diverged,
 }: {
   canRun: boolean;
+  /** The hub can be asked for a track of this match. */
+  canDownload: boolean;
   matchSeconds: number;
   estimate: Estimate;
   hasEngineOptions: boolean;
@@ -566,6 +580,16 @@ function AnalysisHelp({
           the whole match as a track, which is what the page shows and rewinds.
         </Trans>
       </p>
+      {canDownload && (
+        <p>
+          <Trans>
+            Someone else may have sent a track of this match to the hub. Looking
+            for one sends the hub the replay's game id, and coilbox asks nothing
+            until you press the button. A downloaded track is played like one
+            recorded here, and does not come with an analysis.
+          </Trans>
+        </p>
+      )}
       {canRun && (
         <>
           <p>
