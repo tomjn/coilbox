@@ -1,8 +1,8 @@
 /**
  * The Lua that runs inside the engine is offered under MIT or GPL version 2 or
  * later (issue #3981, notice in `lua/LICENSE.md`). Every `license` field in a
- * gadget or widget has to say so in the same words, so a new file cannot
- * quietly declare something else.
+ * gadget or widget has to say so in the same words, or say GPL version 2 or
+ * later alone, so a new file cannot quietly declare something else.
  */
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
@@ -29,15 +29,15 @@ function luaFiles(dir: string): string[] {
   return found;
 }
 
+/** The other `license` value a file may carry, for Lua offered under the GPL
+ *  alone, such as the Persepolis map's. */
+const GPL_ONLY = "GNU GPL, v2 or later";
+
 /** Lua the engine loads: everything under `lua/`, plus the probes in
- *  `scripts/` that are mounted into a game for a harness run. The Persepolis
- *  map's Lua under `scripts/town-models` ships in the map under its own GPL
- *  licence, so it is left out. */
+ *  `scripts/` that are mounted into a game for a harness run. */
 const FILES = [
   ...luaFiles(join(REPO, "lua")),
-  ...luaFiles(join(REPO, "scripts")).filter(
-    (path) => !relative(REPO, path).startsWith(join("scripts", "town-models")),
-  ),
+  ...luaFiles(join(REPO, "scripts")),
 ];
 
 function declared(path: string): string[] {
@@ -49,10 +49,10 @@ describe("the licence the Lua declares", () => {
     expect(FILES.length).toBeGreaterThan(0);
   });
 
-  it("is the same string in every file that declares one", () => {
+  it("is one of the accepted strings in every file that declares one", () => {
     const wrong = FILES.flatMap((path) =>
       declared(path)
-        .filter((value) => value !== LICENCE)
+        .filter((value) => value !== LICENCE && value !== GPL_ONLY)
         .map((value) => `${relative(REPO, path)}: ${value}`),
     );
     expect(wrong).toEqual([]);
