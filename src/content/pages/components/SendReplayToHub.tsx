@@ -9,6 +9,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useHubAccount } from "@/hub/account";
 import { startReplayUpload } from "@/hub/archiveUploads";
 import { useHubUrl } from "@/hub/config";
@@ -43,10 +49,12 @@ const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
 /**
  * "Send to hub" on a replay's page (issue #5493).
  *
- * Shown to a player signed in to the hub, for a replay of a battle they were
+ * Offered to a player signed in to the hub, for a replay of a battle they were
  * in: one of the lobby names they have signed in to Coilbox with is a player or
- * a spectator in it. Nothing is read until the panel opens, and nothing leaves
- * the machine until its Send button is pressed.
+ * a spectator in it. For any other replay the button is shown off, with the
+ * reason in a tooltip, so a player can tell why it is not offered. Nothing is
+ * read until the panel opens, and nothing leaves the machine until its Send
+ * button is pressed.
  *
  * The transfer belongs to the app, as an archive upload's does. The button
  * says how it is going: sending, waiting for the hub's check, on the hub with a
@@ -109,10 +117,6 @@ export function SendReplayToHub({
   const picksUnit = hubPickUnitIds(info.players).length > 0;
   const sides = useRecordedGameSides(info, wanted && picksUnit);
 
-  if (!info.gameId || info.remixed || !name) return null;
-  const gameId = info.gameId;
-  const label = t`The replay on ${info.mapName}`;
-
   const icons = (text: string) => (
     <>
       <CoilboxGlyph size={16} />
@@ -120,6 +124,40 @@ export function SendReplayToHub({
       <ArrowUp className="size-4" aria-hidden />
     </>
   );
+
+  // A disabled button gets no pointer events, so the reason is a tooltip on a
+  // wrapper that takes focus.
+  const unavailable = (reason: string) => (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          {/* biome-ignore lint/a11y/noNoninteractiveTabindex: focus shows why the button is off */}
+          <span tabIndex={0}>
+            <Button size="sm" variant="outline" className="gap-1.5" disabled>
+              {icons(t`Send to hub`)}
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>{reason}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+
+  if (!info.gameId) {
+    return unavailable(
+      t`This replay has no game ID, so the hub cannot take it.`,
+    );
+  }
+  if (info.remixed) {
+    return unavailable(t`A remixed replay cannot be sent to the hub.`);
+  }
+  if (!name) {
+    return unavailable(
+      t`None of the names you are signed in with played in or watched this match.`,
+    );
+  }
+  const gameId = info.gameId;
+  const label = t`The replay on ${info.mapName}`;
 
   if (running) {
     return (
@@ -159,8 +197,10 @@ export function SendReplayToHub({
     );
   }
 
-  // Only a signed in player can send, so nobody else is offered the button.
-  if (!ending && !account.signedIn) return null;
+  // Only a signed in player can send.
+  if (!ending && !account.signedIn) {
+    return unavailable(t`Sign in to the hub to send this replay.`);
+  }
 
   const failed = stats.error !== null || builds.failed;
   // A match with no build orders and no picked unit names no units, so it

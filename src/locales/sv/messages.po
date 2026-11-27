@@ -9605,6 +9605,10 @@ msgstr "En reläagent från en tidigare session körs fortfarande som process {p
 msgid "A remix has no analysis of its own. Analyse the original match."
 msgstr "En remix har ingen egen analys. Analysera den ursprungliga matchen."
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "A remixed replay cannot be sent to the hub."
+msgstr ""
+
 #: src/content/pages/components/UnitListNotes.tsx
 #, fuzzy
 msgid "A replay names a unit by a number that only means something in the build of the game it was played on. Coilbox keeps the unit list a replay was read against, so the replay still names its units after the game is updated or removed."
@@ -35496,6 +35500,10 @@ msgstr "Ingen av de {twoSides} matcherna mellan två lag har ett registrerat res
 msgid "None of the lines on the chart above gave orders of this kind."
 msgstr "Ingen av linjerna i diagrammet ovan gav order av den här typen."
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "None of the names you are signed in with played in or watched this match."
+msgstr ""
+
 #: src/content/pages/StatsPage.tsx
 #, fuzzy
 msgid "None of the replays in this set are in your library."
@@ -45132,7 +45140,7 @@ msgid "Send code"
 msgstr "Skicka kod"
 
 #: src/hub/replaySend/ReplayAutoSendControl.tsx
-msgid "Send my finished matches to the hub"
+msgid "Send my finished multiplayer matches to the hub"
 msgstr ""
 
 #: src/hub/pages/components/GamePicturesControl.tsx
@@ -46672,6 +46680,10 @@ msgstr "Logga in för att publicera härifrån. Eller kopiera koden och slutför
 #, fuzzy
 msgid "Sign in to the hub"
 msgstr "Logga in på hubben"
+
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Sign in to the hub to send this replay."
+msgstr ""
 
 #: src/hub/pages/components/AccountControl.tsx
 #, fuzzy
@@ -54144,6 +54156,10 @@ msgstr "Den här reprisen anger inte vilken motor som spelade in den."
 msgid "This replay has a recorded track."
 msgstr "Den här reprisen har ett inspelat spår."
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "This replay has no game ID, so the hub cannot take it."
+msgstr ""
+
 #: src/content/replayAnalysis.ts
 #, fuzzy
 msgid "This replay has no game id, so there is nothing to file an analysis under."
@@ -58247,7 +58263,7 @@ msgid "Wheels turning"
 msgstr "Roterande hjul"
 
 #: src/hub/replaySend/ReplayAutoSendControl.tsx
-msgid "When a match ends, Coilbox sends its replay if you played in it or watched it, people were on two or more sides, and it reached game over. Anyone can download it and see the players, the build orders and the totals, and the hub notes that you sent it."
+msgid "When a match ends, Coilbox sends its replay if you played in it or watched it, people were on two or more sides, and it reached game over. Single player matches and matches against AI alone are not sent. Anyone can download a replay and see the players, the build orders and the totals, and the hub notes that you sent it."
 msgstr ""
 
 #: src/content/pages/components/ReplayTracksStorage.tsx

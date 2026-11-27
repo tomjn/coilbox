@@ -197,3 +197,14 @@ it("opens the profile's hub in the browser without moving on", () => {
   expect(onSettle).not.toHaveBeenCalled();
   expect(screen.getByText("Sign in to the hub")).toBeTruthy();
 });
+
+it("offers the switch that sends finished multiplayer matches to the hub", async () => {
+  show();
+  const toggle = await screen.findByRole("switch", {
+    name: "Send my finished multiplayer matches to the hub",
+  });
+  expect(toggle.getAttribute("aria-checked")).toBe("false");
+  fireEvent.click(toggle);
+  await waitFor(() => expect(toggle.getAttribute("aria-checked")).toBe("true"));
+  expect(onSettle).not.toHaveBeenCalled();
+});

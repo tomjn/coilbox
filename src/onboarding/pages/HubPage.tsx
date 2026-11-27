@@ -5,6 +5,7 @@ import { openExternal } from "@/home/navItem";
 import { signInToHub, useHubAccount } from "@/hub/account";
 import { useHubUrl } from "@/hub/config";
 import { SignInButton } from "@/hub/pages/components/AccountControl";
+import { ReplayAutoSendControl } from "@/hub/replaySend/ReplayAutoSendControl";
 import { WIZARD_TITLE_ID } from "../ids";
 import type { WizardPageProps } from "./registry";
 
@@ -73,6 +74,9 @@ export default function HubPage({ next }: WizardPageProps) {
           <Button variant="outline" onClick={() => openExternal(hubUrl)}>
             {t`Open the hub`}
           </Button>
+        </div>
+        <div className="w-full">
+          <ReplayAutoSendControl heading={false} />
         </div>
         {busy && (
           <p className="text-xs text-muted-foreground">
