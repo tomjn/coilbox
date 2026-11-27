@@ -2245,7 +2245,7 @@ describe("the Heat window lane (#5309)", () => {
     expect(screen.queryByRole("button", { name: "Heat window" })).toBeNull();
   });
 
-  it("sets the window the map's layers read, which says so under the map", async () => {
+  it("sets the window from the lane, with no line about it under the map", async () => {
     ORDERS = {
       orders: [
         {
@@ -2289,13 +2289,13 @@ describe("the Heat window lane (#5309)", () => {
       );
     });
     await settle();
-    screen.getByText(/The whole match, 0:00 to 0:05\. 2 of 2 orders/);
-
     // The order at frame 10 is in the first second.
     const start = screen.getByRole("slider", { name: "Heat window start" });
     fireEvent.keyDown(start, { key: "ArrowRight" });
     await settle();
-    screen.getByText(/Orders given from 0:01 to 0:05\. 1 of 2 orders/);
+    expect(start.getAttribute("aria-valuenow")).toBe("1");
+    // What the window does to the layers is in `ReplayMapHeat.dom.test.tsx`.
+    expect(screen.queryByTestId("time-window")).toBeNull();
   });
 
   it("keeps an arrow on an end from also stepping the match", async () => {

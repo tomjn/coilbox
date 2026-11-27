@@ -25,7 +25,7 @@ import type { ReplayMapLayers } from "../../useReplayMapLayers";
 import { RailSwitch } from "./RailSwitch";
 import { EventLayerHelp } from "./ReplayEventLayers";
 import { StartUnitHelp } from "./ReplayStartUnitLayer";
-import { ReplayTimeWindowNote, TimeWindowHelp } from "./ReplayTimeWindowNote";
+import { TimeWindowHelp } from "./ReplayTimeWindowNote";
 import { SectionHelp } from "./SectionHelp";
 
 /**
@@ -50,25 +50,22 @@ const MAP_VIEW_HEIGHT =
  * The map and the rail beside it, in every mode of the map card. The rail holds
  * what steers the map and what the map is read by, so a mode puts its switches
  * there and, under them, the legend for each thing that is on. Below a wide
- * window the rail drops under the map. What belongs to the whole card width
- * goes in `under`.
+ * window the rail drops under the map.
  */
 export function ReplayMapLayout({
   shape,
   map,
   rail,
-  under,
 }: {
   /** The map's width and height, which give the box its shape. */
   shape: { width: number; height: number };
   map: ReactNode;
   rail: ReactNode;
-  under?: ReactNode;
 }) {
   return (
     // A container, so the rail goes beside the map when the card has the width
     // for it, which in the page's two columns is not a matter of the window's.
-    <div className="@container flex flex-col gap-3">
+    <div className="@container">
       <div className="flex flex-col gap-4 @xl:flex-row @xl:items-start">
         <div
           data-map-column
@@ -95,7 +92,6 @@ export function ReplayMapLayout({
           {rail}
         </div>
       </div>
-      {under}
     </div>
   );
 }
@@ -272,61 +268,6 @@ export function HeatLegends({ layers }: { layers: ReplayMapLayers }) {
         />
       )}
     </>
-  );
-}
-
-/** What the window covers, and how much of each layer falls inside it, straight
- *  under the map it filters. The window is set on the timeline dock's Heat
- *  window lane (#5309). It is shown while a layer that has a time is on. */
-export function MapTimeWindow({ layers }: { layers: ReplayMapLayers }) {
-  const { t } = useLingui();
-  const {
-    on,
-    buildLayer,
-    windowed,
-    ev,
-    endOfMatchSec,
-    timeWindow,
-    orderCount,
-    result,
-    placedCount,
-  } = layers;
-  if (!layers.layersShown || !(windowed || ev.active)) return null;
-  return (
-    <div data-map-window className="w-full max-w-3xl">
-      <ReplayTimeWindowNote
-        matchEndSec={endOfMatchSec}
-        window={timeWindow}
-        // With the order layer on as well there are two kinds of point to
-        // count, and each is counted under its own name.
-        count={
-          !windowed
-            ? null
-            : on.orderDensity && !buildLayer
-              ? orderCount
-              : result
-                ? placedCount
-                : null
-        }
-        noun={
-          on.orderDensity
-            ? buildLayer
-              ? t`building orders`
-              : t`orders on the map`
-            : undefined
-        }
-        also={
-          on.orderDensity && buildLayer
-            ? {
-                count: orderCount,
-                noun: t`orders on the map`,
-              }
-            : undefined
-        }
-        events={ev.counts}
-        subject={windowSubject(windowed, ev.active)}
-      />
-    </div>
   );
 }
 

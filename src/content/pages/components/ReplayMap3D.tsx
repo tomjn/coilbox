@@ -13,7 +13,6 @@ import {
   LayerSwitches,
   LayersHelp,
   MapHelp,
-  MapTimeWindow,
   ReadNotes,
   ReplayMapLayout,
   SCENE_LAYERS,
@@ -105,7 +104,6 @@ export function ReplayMap3D({
           </div>
         </>
       }
-      under={<MapTimeWindow layers={layers} />}
     />
   );
 }

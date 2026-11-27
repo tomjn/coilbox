@@ -26,7 +26,6 @@ import {
   LayerSwitches,
   LayersHelp,
   MapHelp,
-  MapTimeWindow,
   ReadNotes,
   ReplayMapLayout,
 } from "./ReplayMapRail";
@@ -395,7 +394,6 @@ export function ReplayMapHeat({
           )}
         </>
       }
-      under={layersShown && <MapTimeWindow layers={layers} />}
     />
   );
 }
