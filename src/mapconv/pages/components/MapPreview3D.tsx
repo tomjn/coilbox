@@ -247,7 +247,25 @@ const RIPPLE_WAVES: [number, number, number, number][] = [
   [3.35, 6.6, 0.35, 2.1],
 ];
 
-type Srcs = { height: string | null; texture: string | null };
+/** The scene as it stands before any of the map's own pictures are on it, and
+ *  the ways to put them there. */
+type Stage = {
+  handle: MapScene3D & {
+    terrain: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
+  };
+  renderer: THREE.WebGLRenderer;
+  /** Lift the ground by a height texture whose 0 and 1 are `min` and `max`
+   *  in engine heights, or lay it flat again with null. */
+  setRelief: (
+    relief: { tex: THREE.Texture; min: number; max: number } | null,
+  ) => void;
+  /** Drape the colour, with its detail texture, or take it off with null. */
+  setColour: (
+    colour: { tex: THREE.Texture; detail: THREE.Texture } | null,
+  ) => void;
+  /** The map's own sky, or null for the one built from its mapinfo. */
+  setSky: (sky: THREE.Texture | null) => void;
+};
 
 /**
  * The map's own heights as a displacement texture.
@@ -433,14 +451,24 @@ export function MapPreview3D({
   // itself follows the OS preference in its default "system" mode.
   const reduceMotion = useReduceMotion();
   const { t } = useLingui();
-  const [srcs, setSrcs] = useState<Srcs | null>(null);
   // The heightmap file read as words, for the mapconv flow, which hands over a
   // path rather than a grid. `heightWords` from the caller wins over it.
   const [pathWords, setPathWords] = useState<HeightWords | null>(null);
-  // True once the three.js scene is actually on screen. Drives the "building"
-  // overlay so it stays up through both the image fetch and the build (and while
-  // waiting on dimensions), rather than vanishing the moment the data lands.
-  const [built, setBuilt] = useState(false);
+  // The mapconv flow's pictures, for a heightmap that would not read as words
+  // and for the colour.
+  const [pathPicture, setPathPicture] = useState<string | null>(null);
+  const [pathTexture, setPathTexture] = useState<string | null>(null);
+  // The scene once it is on screen, sky, light and bare ground, before any of
+  // the map has arrived. The relief, the colour and the skybox are put on it
+  // as each lands.
+  const [stage, setStage] = useState<Stage | null>(null);
+  // The relief and colour the stage is drawing now, so the view knows when the
+  // map is whole.
+  // Each held as the stage it is on, so a rebuilt stage starts with neither.
+  const [reliefOnStage, setReliefOnStage] = useState<Stage | null>(null);
+  const [colourOnStage, setColourOnStage] = useState<Stage | null>(null);
+  const reliefOn = !!stage && reliefOnStage === stage;
+  const colourOn = !!stage && colourOnStage === stage;
   const [failed, setFailed] = useState(false);
   // Why the map's own skybox is not the sky, when it declared one (issue #1650).
   // Null both for a map that declared none and for one whose skybox is on screen.
@@ -461,6 +489,8 @@ export function MapPreview3D({
   // stale closure back.
   const onSceneRef = useRef(onScene);
   onSceneRef.current = onScene;
+  // Whether a view has the scene now, so it is withdrawn exactly once.
+  const handedOverRef = useRef(false);
   // Mirror current toggle state so a freshly (re)built scene starts consistent.
   const wantWater = useRef(water);
   wantWater.current = water;
@@ -486,77 +516,37 @@ export function MapPreview3D({
     skyboxSrc,
   ]);
 
-  // Fetch both maps as downscaled data URLs whenever the inputs change. When
-  // pre-resolved sources are supplied (the content flow already has downscaled
-  // data URLs), use them directly and skip the file-path fetch.
+  // The mapconv flow hands over file paths, which are read here. The content
+  // flow hands over data URLs and words, which need nothing more. Relief and
+  // colour are read separately, so each goes on the map as soon as it lands
+  // rather than both waiting on the slower one.
   //
-  // A caller that handed over the map's own words needs no height picture at
-  // all, so the relief is ready as soon as the colour is.
+  // The relief comes off the heightmap's own 16 bit words rather than a picture
+  // of them, because the picture would arrive eight bits deep and band the
+  // author's own terrain before they compiled it (issue #1730).
   useEffect(() => {
-    let cancelled = false;
-    setSrcs(null);
     setPathWords(null);
-    setFailed(false);
-    const height = heightWords ? null : (heightSrc ?? null);
-    const haveRelief = !!heightWords || !!height;
-    // A wireframe render uses no diffuse texture, so it builds from the relief
-    // alone and needn't wait on the minimap fetch.
-    if (forceWireframe && haveRelief) {
-      setSrcs({ height, texture: null });
-      return;
-    }
-    if (haveRelief && textureSrc) {
-      setSrcs({ height, texture: textureSrc });
-      return;
-    }
-    if (haveRelief && texturePath) {
-      getImageInfo(texturePath, TEXTURE_MAX)
-        .then((t) => {
-          if (!cancelled) setSrcs({ height, texture: t.thumb });
-        })
-        .catch(() => {
-          if (!cancelled) setFailed(true);
-        });
-      return () => {
-        cancelled = true;
-      };
-    }
-    if (!heightmapPath) return;
-    // The mapconv flow, which has a file for each. The relief comes off the
-    // heightmap's own 16 bit words rather than a picture of them, because the
-    // picture would arrive eight bits deep and band the author's own terrain
-    // before they compiled it (issue #1730).
-    const colour = forceWireframe
-      ? Promise.resolve(null)
-      : texturePath
-        ? getImageInfo(texturePath, TEXTURE_MAX).then((t) => t.thumb)
-        : null;
-    if (!colour) return;
+    setPathPicture(null);
+    if (heightWords || heightSrc || !heightmapPath) return;
+    let cancelled = false;
     (async () => {
       try {
-        const texture = await colour;
-        if (cancelled) return;
-        let words: HeightWords | null = null;
-        try {
-          words = await getHeightWords(heightmapPath, GRID_MAX);
-        } catch (why) {
-          // The relief is the one input with something to fall back to. A
-          // picture of the heightmap is what shipped before #1730: eight bits
-          // and prone to banding, but a preview rather than none. Said out loud
-          // because a silent downgrade is one nobody ever fixes.
-          console.warn(
-            `could not read ${heightmapPath} as heights, drawing a picture of it instead`,
-            why,
-          );
-        }
-        if (cancelled) return;
-        if (words) {
-          setPathWords(words);
-          setSrcs({ height: null, texture });
-          return;
-        }
+        const words = await getHeightWords(heightmapPath, GRID_MAX);
+        if (!cancelled) setPathWords(words);
+        return;
+      } catch (why) {
+        // The relief is the one input with something to fall back to. A
+        // picture of the heightmap is what shipped before #1730: eight bits
+        // and prone to banding, but a preview rather than none. Said out loud
+        // because a silent downgrade is one nobody ever fixes.
+        console.warn(
+          `could not read ${heightmapPath} as heights, drawing a picture of it instead`,
+          why,
+        );
+      }
+      try {
         const picture = await getImageInfo(heightmapPath, HEIGHT_MAX);
-        if (!cancelled) setSrcs({ height: picture.thumb, texture });
+        if (!cancelled) setPathPicture(picture.thumb);
       } catch {
         if (!cancelled) setFailed(true);
       }
@@ -564,22 +554,47 @@ export function MapPreview3D({
     return () => {
       cancelled = true;
     };
-  }, [
-    heightmapPath,
-    texturePath,
-    heightSrc,
-    heightWords,
-    textureSrc,
-    forceWireframe,
-  ]);
+  }, [heightmapPath, heightSrc, heightWords]);
+  useEffect(() => {
+    setPathTexture(null);
+    // A wireframe render uses no diffuse texture, so it never asks for one.
+    if (forceWireframe || textureSrc || !texturePath) return;
+    let cancelled = false;
+    getImageInfo(texturePath, TEXTURE_MAX)
+      .then((t) => {
+        if (!cancelled) setPathTexture(t.thumb);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [texturePath, textureSrc, forceWireframe]);
+  // A new map gets a fresh try, whatever the last one's sources did.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: these are what says the map changed, not values the effect reads
+  useEffect(() => {
+    setFailed(false);
+  }, [heightmapPath, texturePath, heightSrc, heightWords, textureSrc]);
+
+  // What the relief and the colour come from, once each is known. The words
+  // win over every picture.
+  const grid = heightWords ?? pathWords;
+  const heightPicture = grid ? null : (heightSrc ?? pathPicture);
+  const colourSrc = forceWireframe ? null : (textureSrc ?? pathTexture);
+  // What the height texture's 0 and 1 mean. The map's own words are already
+  // on the map's scale. A picture of them may have been rescaled into a
+  // narrower window and carries its own pair (issue #1730).
+  const reliefMin = grid ? minHeight : (heightRange?.min ?? minHeight);
+  const reliefMax = grid ? maxHeight : (heightRange?.max ?? maxHeight);
 
   // Build the three.js scene from the loaded maps + dimensions. The scene is
   // torn down on any dependency change or unmount. The canvas and its GL
   // context stay across a change and go on unmount.
   useCanvas3D(
     containerRef,
-    ({ renderer, host, resize: fitCanvas }) => {
-      if (!srcs || worldWidth <= 0 || worldHeight <= 0) return;
+    ({ renderer, host }) => {
+      if (worldWidth <= 0 || worldHeight <= 0) return;
 
       let cancelled = false;
       const disposables: { dispose(): void }[] = [];
@@ -588,97 +603,29 @@ export function MapPreview3D({
       let animationFrame: number | undefined;
       let spinStart: (() => void) | undefined;
       let spinEnd: (() => void) | undefined;
-      let handedOver = false;
       // Torn down in `dispose` when the wheel gate below was actually set up
       // (`interactive && enableZoom`).
       let stopWheelGate: (() => void) | undefined;
-      // Claim nothing about the sky until this build has tried to read one.
-      setSkyProblem(null);
 
       const longest = Math.max(worldWidth, worldHeight);
       const s = BASE / longest;
       const planeW = worldWidth * s;
       const planeH = worldHeight * s;
-      // What the height texture's 0 and 1 mean. The map's own words are already
-      // on the map's scale. A picture of them may have been rescaled into a
-      // narrower window and carries its own pair (issue #1730).
-      const grid = heightWords ?? pathWords;
-      const reliefMin = grid ? minHeight : (heightRange?.min ?? minHeight);
-      const reliefMax = grid ? maxHeight : (heightRange?.max ?? maxHeight);
+      // The height range the ground is lifted by. Flat at 0 until the relief
+      // arrives, then the relief's own pair.
+      let reliefLow = 0;
+      let reliefHigh = 0;
 
-      (async () => {
-        const loader = new THREE.TextureLoader();
-        let colorTex: THREE.Texture | null = null;
-        let heightTex: THREE.Texture;
-        try {
-          // The map's own words when the caller has them, else its picture.
-          const [color, height] = await Promise.all([
-            srcs.texture ? loader.loadAsync(srcs.texture) : null,
-            srcs.height ? loader.loadAsync(srcs.height) : null,
-          ]);
-          colorTex = color;
-          if (height) {
-            heightTex = height;
-          } else if (grid) {
-            heightTex = heightWordsTexture(grid, renderer);
-          } else {
-            throw new Error("no relief to displace the terrain with");
-          }
-        } catch {
-          if (!cancelled) setFailed(true);
-          return;
-        }
-        if (cancelled) {
-          colorTex?.dispose();
-          heightTex?.dispose();
-          return;
-        }
-        if (colorTex) {
-          colorTex.colorSpace = THREE.SRGBColorSpace;
-          disposables.push(colorTex);
-        }
-        heightTex.colorSpace = THREE.NoColorSpace;
-        disposables.push(heightTex);
-
-        // Detail texture: the map's own `detailtex` (data URL) when supplied, else a
-        // generic procedural one. Tiled and multiplied over the base colour below to
-        // break up the low-res base texture's blur when zoomed in.
-        let detailTex: THREE.Texture;
-        if (detailSrc) {
-          try {
-            detailTex = await loader.loadAsync(detailSrc);
-            detailTex.wrapS = THREE.RepeatWrapping;
-            detailTex.wrapT = THREE.RepeatWrapping;
-          } catch {
-            detailTex = makeProceduralDetail();
-          }
-        } else {
-          detailTex = makeProceduralDetail();
-        }
-        if (cancelled) {
-          detailTex.dispose();
-          return;
-        }
-        detailTex.colorSpace = THREE.NoColorSpace;
-        disposables.push(detailTex);
-
+      {
         const scene = new THREE.Scene();
-        // The map's own skybox when it ships one that reads, else a sky built
-        // from its mapinfo colours. Done before the water reflection capture
-        // below so the water mirrors the sky. A skybox that will not read says
-        // so on the preview rather than looking the same as a map that asked
-        // for no sky of its own (issue #1650). `showSky=false` stays
-        // transparent, so the canvas layers over whatever is behind it.
-        if (showSky) {
-          const own = skyboxSrc ? await loadSkybox(skyboxSrc) : null;
-          if (cancelled) {
-            own?.sky?.dispose();
-            return;
-          }
-          const sky = own?.sky ?? generatedSkyTexture(appearance);
-          scene.background = sky;
-          disposables.push(sky);
-          setSkyProblem(own?.problem ?? null);
+        // The sky built from the mapinfo colours, up straight away. The map's
+        // own skybox replaces it when it arrives and reads (`setSky`).
+        // `showSky=false` stays transparent, so the canvas layers over
+        // whatever is behind it.
+        const builtSky = showSky ? generatedSkyTexture(appearance) : null;
+        if (builtSky) {
+          scene.background = builtSky;
+          disposables.push(builtSky);
         }
 
         const segments = forceWireframe ? WIRE_SEGMENTS : SEGMENTS;
@@ -701,49 +648,51 @@ export function MapPreview3D({
         // shape on its own.
         // three logs a warning for any option handed to a material with undefined
         // behind it, so the optional ones are spread in only when they have a value.
+        // Until the colour arrives the ground is a plain grey, lit like the
+        // map will be.
+        const bareGround = forceWireframe ? 0x8fb3c9 : 0x8c8c8c;
         const material = new THREE.MeshStandardMaterial({
-          ...(!forceWireframe && colorTex ? { map: colorTex } : {}),
-          color: forceWireframe ? 0x8fb3c9 : 0xffffff,
-          displacementMap: heightTex,
-          displacementScale: (reliefMax - reliefMin) * s,
-          displacementBias: reliefMin * s,
+          color: bareGround,
           roughness: 1,
           metalness: 0,
           wireframe: forceWireframe || wantWire.current,
           ...(voidClip ? { clippingPlanes: voidClip } : {}),
         });
+        const plainCompile = material.onBeforeCompile;
         // Tiled detail-texture multiply, patched into the standard material: after
         // the base colour is sampled, modulate it by the detail texture sampled at a
-        // higher tiling frequency. `detail * 2` centres neutral at mid-grey (engine
-        // convention); `detailStrength` fades the whole effect. Skipped for the
-        // wireframe render, which has no diffuse to modulate.
-        if (!forceWireframe && colorTex)
-          material.onBeforeCompile = (shader) => {
-            shader.uniforms.detailMap = { value: detailTex };
-            shader.uniforms.detailRepeat = {
-              value: new THREE.Vector2(
-                (DETAIL_TILES * planeW) / BASE,
-                (DETAIL_TILES * planeH) / BASE,
-              ),
-            };
-            shader.uniforms.detailStrength = { value: DETAIL_STRENGTH };
-            shader.fragmentShader = shader.fragmentShader
-              .replace(
-                "#include <common>",
-                `#include <common>
+        // higher tiling frequency. `detail * 2` centres neutral at mid-grey, the
+        // engine's convention, and `detailStrength` fades the whole effect. Only
+        // on while there is a colour to modulate, so never on the wireframe.
+        const detailMap: { value: THREE.Texture | null } = { value: null };
+        const detailCompile = (
+          shader: THREE.WebGLProgramParametersWithUniforms,
+        ) => {
+          shader.uniforms.detailMap = detailMap;
+          shader.uniforms.detailRepeat = {
+            value: new THREE.Vector2(
+              (DETAIL_TILES * planeW) / BASE,
+              (DETAIL_TILES * planeH) / BASE,
+            ),
+          };
+          shader.uniforms.detailStrength = { value: DETAIL_STRENGTH };
+          shader.fragmentShader = shader.fragmentShader
+            .replace(
+              "#include <common>",
+              `#include <common>
 uniform sampler2D detailMap;
 uniform vec2 detailRepeat;
 uniform float detailStrength;`,
-              )
-              .replace(
-                "#include <map_fragment>",
-                `#include <map_fragment>
+            )
+            .replace(
+              "#include <map_fragment>",
+              `#include <map_fragment>
 {
   vec3 detail = texture2D( detailMap, vMapUv * detailRepeat ).rgb;
   diffuseColor.rgb *= mix( vec3( 1.0 ), detail * 2.0, detailStrength );
 }`,
-              );
-          };
+            );
+        };
         disposables.push(material);
         materialRef.current = material;
         const terrain = new THREE.Mesh(geo, material);
@@ -777,6 +726,10 @@ uniform float detailStrength;`,
         // Depth is in engine world units (elmos, unscaled), which is how `absorb` is
         // calibrated; the surface reflection is layered on top unchanged. Only enabled
         // when the map specifies `absorb`; otherwise the flat `waterColor` stands.
+        // Shared with the shader, so the relief can fill them in when it lands.
+        const wHeightTex: { value: THREE.Texture | null } = { value: null };
+        const wHeightScale = { value: 0 };
+        const wHeightBias = { value: 0 };
         if (appearance?.waterAbsorb) {
           const ab = appearance.waterAbsorb;
           const base = colorFrom(
@@ -787,14 +740,14 @@ uniform float detailStrength;`,
             ? colorFrom(appearance.waterMinColor, 0)
             : base.clone().multiplyScalar(0.2);
           waterMat.onBeforeCompile = (shader) => {
-            shader.uniforms.wHeightTex = { value: heightTex };
+            shader.uniforms.wHeightTex = wHeightTex;
             shader.uniforms.wAbsorb = {
               value: new THREE.Vector3(ab[0], ab[1], ab[2]),
             };
             shader.uniforms.wBase = { value: base };
             shader.uniforms.wMin = { value: min };
-            shader.uniforms.wHeightScale = { value: reliefMax - reliefMin };
-            shader.uniforms.wHeightBias = { value: reliefMin };
+            shader.uniforms.wHeightScale = wHeightScale;
+            shader.uniforms.wHeightBias = wHeightBias;
             shader.uniforms.wPlane = {
               value: new THREE.Vector2(planeW, planeH),
             };
@@ -834,7 +787,9 @@ uniform vec2 wPlane;`,
         }
         disposables.push(waterGeo, waterMat);
         const waterMesh = new THREE.Mesh(waterGeo, waterMat);
-        waterMesh.visible = wantWater.current;
+        // No water until there is relief for it to lie against: on bare flat
+        // ground at 0 the two would fight over every pixel.
+        waterMesh.visible = false;
         waterRef.current = waterMesh;
         scene.add(waterMesh);
 
@@ -867,6 +822,7 @@ uniform vec2 wPlane;`,
         // relief and wherever the caller opts out (`showClouds`, e.g. mission previews).
         // It drifts in the animation loop below (static under reduced motion).
         let cloudTex: THREE.Texture | undefined;
+        let cloudMesh: THREE.Mesh | undefined;
         const hasClouds =
           !!appearance?.cloudColor && showClouds && !forceWireframe;
         if (hasClouds) {
@@ -883,47 +839,63 @@ uniform vec2 wPlane;`,
           });
           const cloudGeo = new THREE.PlaneGeometry(planeW * 2, planeH * 2);
           cloudGeo.rotateX(-Math.PI / 2);
-          const cloudMesh = new THREE.Mesh(cloudGeo, cloudMat);
+          cloudMesh = new THREE.Mesh(cloudGeo, cloudMat);
           // Above the camera's max orbit distance (`maxDistance` is BASE * 3) so a
-          // top-down / zoomed-out view stays under the clouds — they read as a high
-          // ceiling, never a sheet drawn over the map.
-          cloudMesh.position.y = Math.max(maxHeight * s, 0) + BASE * 3.5;
+          // top-down or zoomed-out view stays under the clouds. They read as a high
+          // ceiling, never a sheet drawn over the map. Raised with the relief.
+          cloudMesh.position.y = BASE * 3.5;
           scene.add(cloudMesh);
           disposables.push(cloudGeo, cloudMat, cloudTex);
         }
 
         renderer.localClippingEnabled = voidWater; // honour the terrain clip plane
         renderer.setClearColor(0x000000, 0); // transparent; the card shows through
-        // Capture the terrain + sky into a prefiltered environment map once, so the
+        // Distance fog for maps that declare `atmosphere.fogColor`. Distances are
+        // approximate. Mapinfo expresses fogStart/fogEnd as fractions of the engine's
+        // viewRange, which a standalone preview lacks, so they're derived from the
+        // fixed scene scale. Taken off for the reflection capture below, so it
+        // never tints the water's environment map.
+        const fog =
+          appearance?.fogColor && !clearAir
+            ? new THREE.Fog(
+                colorFrom(appearance.fogColor, 0xb3b3cc),
+                BASE * 0.6,
+                BASE * 2.8,
+              )
+            : null;
+        scene.fog = fog;
+        // Capture the terrain and sky into a prefiltered environment map, so the
         // water reflects the actual islands and sky (image-based reflection). The
         // water is hidden during the capture and, if the map has no sky colour, a
-        // neutral sky is used just for the reflection so glossy water isn't mirror-
-        // black. Static (not re-rendered on orbit) — a good approximation for a
-        // slowly-orbited preview, and far cheaper than live planar reflections.
+        // neutral sky is used just for the reflection so glossy water isn't mirror
+        // black. Static, not re-rendered on orbit, which is a good approximation
+        // for a slowly orbited preview and far cheaper than live planar reflections.
+        // Taken again when the relief, the colour or the sky arrives, since each
+        // changes what the water would mirror. Only while there is relief, which
+        // is when the water can be seen at all.
         // Applied to the water material only (not `scene.environment`), so it never
-        // adds image-based light to the terrain — that must match the flat minimap.
-        const pmrem = new THREE.PMREMGenerator(renderer);
-        const prevBg = scene.background;
-        if (!prevBg) scene.background = new THREE.Color(0x9fb8cc);
-        waterMesh.visible = false;
-        const envRT = pmrem.fromScene(scene, 0, 0.1, 1000);
-        scene.background = prevBg;
-        waterMesh.visible = wantWater.current;
-        waterMat.envMap = envRT.texture;
-        waterMat.needsUpdate = true;
-        pmrem.dispose();
-        disposables.push(envRT);
-        // Distance fog for maps that declare `atmosphere.fogColor`. Distances are
-        // approximate — mapinfo expresses fogStart/fogEnd as fractions of the engine's
-        // viewRange, which a standalone preview lacks, so they're derived from the
-        // fixed scene scale. Attached only after the reflection capture above, so it
-        // never tints the water's environment map.
-        if (appearance?.fogColor && !clearAir)
-          scene.fog = new THREE.Fog(
-            colorFrom(appearance.fogColor, 0xb3b3cc),
-            BASE * 0.6,
-            BASE * 2.8,
-          );
+        // adds image-based light to the terrain, which must match the flat minimap.
+        let envRT: THREE.WebGLRenderTarget | undefined;
+        let reliefLive = false;
+        const captureReflection = () => {
+          if (!reliefLive) return;
+          const pmrem = new THREE.PMREMGenerator(renderer);
+          const prevBg = scene.background;
+          if (!prevBg) scene.background = new THREE.Color(0x9fb8cc);
+          scene.fog = null;
+          const shown = waterMesh.visible;
+          waterMesh.visible = false;
+          const next = pmrem.fromScene(scene, 0, 0.1, 1000);
+          scene.background = prevBg;
+          scene.fog = fog;
+          waterMesh.visible = shown;
+          envRT?.dispose();
+          envRT = next;
+          waterMat.envMap = next.texture;
+          waterMat.needsUpdate = true;
+          pmrem.dispose();
+        };
+        disposables.push({ dispose: () => envRT?.dispose() });
 
         const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
         camera.position.set(0, BASE * 0.7, BASE * 1.0);
@@ -978,11 +950,11 @@ uniform vec2 wPlane;`,
         }
 
         // Keep the camera above the terrain's highest point (peak displaced Y is
-        // `maxHeight * s`), with a small margin. OrbitControls' distance/angle
+        // the relief's top times `s`), with a small margin. OrbitControls' distance/angle
         // clamps are relative to the moving zoom-to-cursor target and can't see
         // the surface, so this hard Y floor is what actually stops you zooming
-        // under the map. Never below the water plane at y 0.
-        const camFloor = Math.max(maxHeight * s, 0) + BASE * 0.02;
+        // under the map. Never below the water plane at y 0. Raised with the relief.
+        let camFloor = BASE * 0.02;
         const render = () => {
           // A view that puts its own content on the map asks for a frame when
           // that content changes, including as it goes away. On unmount its
@@ -1033,7 +1005,6 @@ uniform vec2 wPlane;`,
         if (interactive && enableZoom) {
           const raycaster = new THREE.Raycaster();
           const pointer = new THREE.Vector2();
-          const groundY = ((reliefMin + reliefMax) / 2) * s;
           const halfWidth = planeW / 2;
           const halfDepth = planeH / 2;
           const coalescer = new WheelCoalescer();
@@ -1064,7 +1035,7 @@ uniform vec2 wPlane;`,
             const hit = groundHit(
               raycaster.ray.origin,
               raycaster.ray.direction,
-              groundY,
+              ((reliefLow + reliefHigh) / 2) * s,
               halfWidth,
               halfDepth,
             );
@@ -1178,14 +1149,46 @@ uniform vec2 wPlane;`,
           animationFrame = requestAnimationFrame(animate);
         }
 
-        fitCanvas();
-        if (cancelled) return;
-        // Hand the finished scene to whoever wants to put their own content on
-        // it. After the canvas fit, so the camera it may retune already has the
-        // right aspect.
-        if (onSceneRef.current) {
-          handedOver = true;
-          onSceneRef.current({
+        const setRelief: Stage["setRelief"] = (relief) => {
+          if (cancelled) return;
+          reliefLow = relief?.min ?? 0;
+          reliefHigh = relief?.max ?? 0;
+          material.displacementMap = relief?.tex ?? null;
+          material.displacementScale = (reliefHigh - reliefLow) * s;
+          material.displacementBias = reliefLow * s;
+          material.needsUpdate = true;
+          wHeightTex.value = relief?.tex ?? null;
+          wHeightScale.value = reliefHigh - reliefLow;
+          wHeightBias.value = reliefLow;
+          const peak = Math.max(reliefHigh * s, 0);
+          camFloor = peak + BASE * 0.02;
+          if (cloudMesh) cloudMesh.position.y = peak + BASE * 3.5;
+          reliefLive = !!relief;
+          waterMesh.visible = reliefLive && wantWater.current;
+          captureReflection();
+          render();
+        };
+        const setColour: Stage["setColour"] = (colour) => {
+          if (cancelled) return;
+          const on = !!colour && !forceWireframe;
+          material.map = on ? colour.tex : null;
+          material.color.set(on ? 0xffffff : bareGround);
+          detailMap.value = on ? colour.detail : null;
+          material.onBeforeCompile = on ? detailCompile : plainCompile;
+          material.needsUpdate = true;
+          captureReflection();
+          render();
+        };
+        const setSky: Stage["setSky"] = (sky) => {
+          if (cancelled || !showSky) return;
+          scene.background = sky ?? builtSky;
+          captureReflection();
+          render();
+        };
+        // The canvas fits the camera and draws the first frame once this
+        // returns, so the bare stage is on screen straight away.
+        setStage({
+          handle: {
             scene,
             camera,
             controls,
@@ -1195,20 +1198,26 @@ uniform vec2 wPlane;`,
             planeWidth: planeW,
             planeDepth: planeH,
             terrain,
-          });
-        }
-        setBuilt(true);
-      })();
+          },
+          renderer,
+          setRelief,
+          setColour,
+          setSky,
+        });
+      }
 
       return {
         render: () => renderRef.current?.(),
         resize: (width, height) => fitCamera?.(width, height),
         dispose: () => {
           cancelled = true;
-          setBuilt(false);
+          setStage(null);
           // Withdraw the scene first, so a view drops its references to objects
           // that are about to be disposed below.
-          if (handedOver) onSceneRef.current?.(null);
+          if (handedOverRef.current) {
+            handedOverRef.current = false;
+            onSceneRef.current?.(null);
+          }
           if (animationFrame !== undefined)
             cancelAnimationFrame(animationFrame);
           stopWheelGate?.();
@@ -1230,19 +1239,12 @@ uniform vec2 wPlane;`,
     // `appearance` is tracked through the stable `appSig`. `autoSpin` and
     // `initialWater` are applied live below, so they seed the build without
     // forcing a rebuild.
+    // The relief, the colour and the skybox are not here: they go onto the
+    // stage as they arrive, below, without building it again.
     [
-      srcs,
-      heightWords,
-      pathWords,
-      heightRange?.min,
-      heightRange?.max,
-      detailSrc,
-      minHeight,
-      maxHeight,
       worldWidth,
       worldHeight,
       appSig,
-      skyboxSrc,
       forceWireframe,
       showSky,
       interactive,
@@ -1252,10 +1254,125 @@ uniform vec2 wPlane;`,
       clearAir,
       reduceMotion,
     ],
-    // Nothing to build until the sources have resolved and the map has a size,
-    // so no renderer is made for the steps before that.
-    !!srcs && worldWidth > 0 && worldHeight > 0,
+    // Nothing to build until the map has a size, so no renderer is made for
+    // the steps before that.
+    worldWidth > 0 && worldHeight > 0,
   );
+
+  // The relief, onto the stage as soon as it is here: the map's own words,
+  // else a picture of them.
+  useEffect(() => {
+    if (!stage || (!grid && !heightPicture)) return;
+    let cancelled = false;
+    let tex: THREE.Texture | undefined;
+    const lay = (loaded: THREE.Texture) => {
+      tex = loaded;
+      if (cancelled) return loaded.dispose();
+      loaded.colorSpace = THREE.NoColorSpace;
+      stage.setRelief({ tex: loaded, min: reliefMin, max: reliefMax });
+      setReliefOnStage(stage);
+    };
+    if (grid) lay(heightWordsTexture(grid, stage.renderer));
+    else if (heightPicture)
+      new THREE.TextureLoader()
+        .loadAsync(heightPicture)
+        .then(lay)
+        .catch(() => {
+          if (!cancelled) setFailed(true);
+        });
+    return () => {
+      cancelled = true;
+      setReliefOnStage((on) => (on === stage ? null : on));
+      stage.setRelief(null);
+      tex?.dispose();
+    };
+  }, [stage, grid, heightPicture, reliefMin, reliefMax]);
+
+  // The colour, with its detail texture: the map's own `detailtex` when it has
+  // one, else a generic procedural one, tiled over the colour to break up its
+  // blur when zoomed in.
+  useEffect(() => {
+    if (!stage || !colourSrc) return;
+    let cancelled = false;
+    const owned: THREE.Texture[] = [];
+    const loader = new THREE.TextureLoader();
+    (async () => {
+      let tex: THREE.Texture;
+      try {
+        tex = await loader.loadAsync(colourSrc);
+      } catch {
+        if (!cancelled) setFailed(true);
+        return;
+      }
+      owned.push(tex);
+      let detail: THREE.Texture;
+      try {
+        if (!detailSrc) throw new Error("no detail texture of its own");
+        detail = await loader.loadAsync(detailSrc);
+        detail.wrapS = THREE.RepeatWrapping;
+        detail.wrapT = THREE.RepeatWrapping;
+      } catch {
+        detail = makeProceduralDetail();
+      }
+      owned.push(detail);
+      if (cancelled) {
+        for (const t of owned) t.dispose();
+        return;
+      }
+      tex.colorSpace = THREE.SRGBColorSpace;
+      detail.colorSpace = THREE.NoColorSpace;
+      stage.setColour({ tex, detail });
+      setColourOnStage(stage);
+    })();
+    return () => {
+      cancelled = true;
+      setColourOnStage((on) => (on === stage ? null : on));
+      stage.setColour(null);
+      for (const t of owned) t.dispose();
+    };
+  }, [stage, colourSrc, detailSrc]);
+
+  // The map's own skybox when it ships one that reads. A skybox that will not
+  // read says so on the preview rather than looking the same as a map that
+  // asked for no sky of its own (issue #1650).
+  useEffect(() => {
+    setSkyProblem(null);
+    if (!stage || !showSky || !skyboxSrc) return;
+    let cancelled = false;
+    let sky: THREE.Texture | undefined;
+    loadSkybox(skyboxSrc).then((own) => {
+      if (cancelled) return own.sky?.dispose();
+      setSkyProblem(own.problem ?? null);
+      if (!own.sky) return;
+      sky = own.sky;
+      stage.setSky(sky);
+    });
+    return () => {
+      cancelled = true;
+      stage.setSky(null);
+      sky?.dispose();
+    };
+  }, [stage, showSky, skyboxSrc]);
+
+  // The scene goes to a view that puts its own content on it once the ground
+  // has its relief, since a layer that lies on the ground copies the relief
+  // from the terrain (`heatmapLayer.ts`). New relief hands it over again. The
+  // colour changes nothing a layer holds, so it is not waited for.
+  useEffect(() => {
+    if (!stage || !reliefOn || !onSceneRef.current) return;
+    handedOverRef.current = true;
+    onSceneRef.current(stage.handle);
+    return () => {
+      if (!handedOverRef.current) return;
+      handedOverRef.current = false;
+      onSceneRef.current?.(null);
+    };
+  }, [stage, reliefOn]);
+  // What is on its way to the ground and not there yet. A wireframe render
+  // has no colour to wait for.
+  const reliefPending = !reliefOn && !!(grid || heightPicture || heightmapPath);
+  const colourPending =
+    !colourOn && !forceWireframe && !!(colourSrc || texturePath);
 
   // Spring's water plane sits at world height 0, so water is only visible where
   // terrain drops below it. Default the toggle off for a "dry" map (lowest point
@@ -1294,10 +1411,10 @@ uniform vec2 wPlane;`,
   }, [wireframe, forceWireframe]);
   useEffect(() => {
     if (waterRef.current) {
-      waterRef.current.visible = water;
+      waterRef.current.visible = water && reliefOn;
       renderRef.current?.();
     }
-  }, [water]);
+  }, [water, reliefOn]);
 
   // Esc leaves fullscreen.
   useEffect(() => {
@@ -1338,7 +1455,7 @@ uniform vec2 wPlane;`,
     >
       <div ref={containerRef} className="absolute inset-0" />
 
-      {chrome && built && (
+      {chrome && stage && (
         <button
           type="button"
           onClick={() => setExpanded((e) => !e)}
@@ -1349,14 +1466,21 @@ uniform vec2 wPlane;`,
         </button>
       )}
 
-      {!built && (
+      {!stage && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
           <Loader2 size={22} className="animate-spin opacity-40" />
-          {srcs ? t`Building 3D preview…` : t`Loading map preview…`}
+          {t`Loading map preview…`}
         </div>
       )}
 
-      {chrome && built && (
+      {chrome && stage && (reliefPending || colourPending) && (
+        <p className="pointer-events-none absolute top-2 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded bg-card/70 px-2 py-1 font-mono text-[11px] text-muted-foreground backdrop-blur">
+          <Loader2 size={12} className="animate-spin" />
+          {reliefPending ? t`Loading terrain…` : t`Loading colour…`}
+        </p>
+      )}
+
+      {chrome && stage && (
         <>
           <div className="absolute right-2 top-2 flex flex-col gap-1.5 rounded-md border border-border bg-card/80 px-2.5 py-2 text-xs backdrop-blur">
             {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the <Checkbox> control (implicit label association) */}
@@ -1376,12 +1500,14 @@ uniform vec2 wPlane;`,
               <Trans>Wireframe</Trans>
             </label>
           </div>
-          <p className="pointer-events-none absolute bottom-2 left-2 flex items-center gap-1.5 rounded bg-card/70 px-2 py-1 font-mono text-[11px] text-muted-foreground backdrop-blur">
-            <Box size={12} />{" "}
-            <Trans>
-              height {minHeight} → {maxHeight} · drag to orbit
-            </Trans>
-          </p>
+          {reliefOn && (
+            <p className="pointer-events-none absolute bottom-2 left-2 flex items-center gap-1.5 rounded bg-card/70 px-2 py-1 font-mono text-[11px] text-muted-foreground backdrop-blur">
+              <Box size={12} />{" "}
+              <Trans>
+                height {minHeight} → {maxHeight} · drag to orbit
+              </Trans>
+            </p>
+          )}
           {sky && (
             <p
               title={sky.title}

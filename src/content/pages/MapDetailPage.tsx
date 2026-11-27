@@ -264,20 +264,20 @@ export default function MapDetailPage() {
     minimap.url ?? (minimap.loading ? thumbs.get(decoded)?.url : undefined);
 
   // The 3D preview, on the overview and again on the gameplay tab, where the
-  // picture of every match drapes over it.
+  // picture of every match drapes over it. Up as soon as the map's size is
+  // known, with the relief and the colour put on it as each arrives.
   const preview3D = (onScene?: (scene: MapScene3D | null) => void) =>
-    heightmap.data &&
-    heightmap.url &&
-    minimap.url && (
+    world.worldWidth > 0 &&
+    world.worldHeight > 0 && (
       <MapPreview3D
         className="w-full min-w-0 lg:flex-1"
-        heightSrc={heightmap.url}
+        heightSrc={(heightmap.data && heightmap.url) || undefined}
         heightRange={heightmap.range}
-        textureSrc={minimap.url}
+        textureSrc={minimap.url ?? undefined}
         appearance={minimap.appearance}
         skyboxSrc={skybox.dataUrl}
-        minHeight={heightmap.data.minHeight ?? 0}
-        maxHeight={heightmap.data.maxHeight ?? 0}
+        minHeight={heightmap.data?.minHeight ?? 0}
+        maxHeight={heightmap.data?.maxHeight ?? 0}
         worldWidth={world.worldWidth || 16}
         worldHeight={world.worldHeight || 16}
         onScene={onScene}
