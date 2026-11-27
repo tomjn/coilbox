@@ -119,7 +119,7 @@ float lmNoise3(vec3 p) {
 
 #ifdef RELIEF
 // How deep a seam or a mortar joint is cut, a rib's groove and a recessed
-// panel. The Persepolis bake (docs/reports/town-models/townkit.ts) cuts the
+// panel. The Persepolis bake (scripts/town-models/townkit.ts) cuts the
 // same, so a building lights alike in the app and in the game.
 #define SEAM_DEPTH ${SEAM_DEPTH.toFixed(4)}
 #define GROOVE_DEPTH ${GROOVE_DEPTH.toFixed(4)}

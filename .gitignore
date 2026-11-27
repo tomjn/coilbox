@@ -31,7 +31,9 @@ docs/mockups/
 
 # Reports agents write while investigating something. They are a snapshot of one
 # run, so they go stale the moment the code moves and there is nothing to review
-# in them. Kept out of the repo root so `git status` stays readable.
+# in them. Kept out of the repo root so `git status` stays readable. The town
+# model and Persepolis bakes in scripts/town-models/ write their output and
+# bake cache to docs/reports/town-models/ for the same reason.
 docs/reports/
 
 # Working notes from the orchestrate-milestone skill, one file per milestone.
