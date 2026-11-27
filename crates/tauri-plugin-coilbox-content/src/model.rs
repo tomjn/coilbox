@@ -577,10 +577,23 @@ pub struct DemoStream {
     /// Packets of a kind the walk reads whose bytes did not fit that kind's
     /// layout. Each was skipped by its declared length and produced no event.
     pub undecoded: u32,
+    /// The Lua messages among those packets, one count for all of them and one
+    /// for each decoder that claimed any.
+    pub lua_messages: LuaMessageCounts,
     /// Set when the walk stopped before the end of the stream. The events up to
     /// that point are still good, and so is the trailer, which is found from
     /// the header and not from where the walk got to.
     pub stopped: Option<StreamStop>,
+}
+
+/// How many `NETMSG_LUAMSG` packets a walk read, and who wanted them. A
+/// message no decoder claimed is in `total` and nowhere else.
+#[derive(Serialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct LuaMessageCounts {
+    pub total: u32,
+    /// Messages claimed, by decoder name.
+    pub claimed: std::collections::BTreeMap<&'static str, u32>,
 }
 
 /// Where and why a stream walk stopped early.
