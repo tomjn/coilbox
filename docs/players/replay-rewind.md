@@ -24,6 +24,8 @@ The recording only counts if the engine reproduces the match exactly. Coilbox ch
 
 The "Analysis and recording" section is where you record a replay on its own. One button runs the engine once and makes both the analysis (the list of units made and lost) and the track. Its label depends on what the replay already has, for example "Analyse and record this replay", "Record this replay" or "Analyse and record again".
 
+If somebody else has sent a track of the match to the hub, you can download it and skip the recording run. See [Download a recorded track](hub.md#download-a-recorded-track).
+
 While it runs you see a progress bar and "Cancel". You can leave the page and the run carries on. "What the engine is saying" shows the engine's output as it runs. A replay waits in a queue if another is ahead of it, or if you are playing a game.
 
 If the replay's own engine is not installed, the section can offer another installed engine, newest first. Different engines often compute a different match, so the result is kept only if it matches exactly.

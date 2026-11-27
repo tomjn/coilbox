@@ -141,6 +141,8 @@ When you import something from the hub, coilbox tells the hub that the item was 
 
 When coilbox finishes downloading a map or a game, it tells the hub which one, so the hub can count downloads. This happens for every finished download, including ones coilbox starts for you, such as a map a lobby needs. It has no account and nothing that points back to you. Engine downloads send nothing.
 
+When you select Look for a track on the hub on a replay's page, coilbox sends the hub the replay's game id, a number that identifies the match. It has no account. Opening the page sends nothing. See [Download a recorded track](#download-a-recorded-track).
+
 Coilbox also asks the hub about a map by its name, to show facts about maps you have not installed. If a map file you download is not what the hub lists for it, coilbox sends the hub a report of the difference.
 
 Coilbox sends nothing about your own games, maps, presets, replays or other files unless you publish them, turn on the sharing in [Share your maps and games](#share-your-maps-and-games), or send a replay as [Send replays to the hub](#send-replays-to-the-hub) describes.
@@ -218,6 +220,22 @@ If the hub refuses the analysis, the button says Analysis refused. Select it to 
 If the track is not sent, the button says Track not sent. Select it to see why. Where trying again could help, for example when someone else is sending a track of the same match, there is a Send again button.
 
 Sending the same analysis twice does nothing new. The hub answers with what it made of the first one.
+
+### Download a recorded track
+
+Recording a replay for [replay rewind](replay-rewind.md) means playing the whole match again. If somebody has already sent the match's track to the hub, you can download it instead. You do not need to sign in, and you do not need to have been in the match.
+
+1. Open the replay's page and go to the Analysis and recording section.
+2. Select Look for a track on the hub. It is there when the replay has no up to date recording.
+3. If the hub has one, the button to record is replaced by Download the hub's track, with the file's size. Select it.
+
+The replay then has Watch with rewind and the Recorded match section, as if you had recorded it yourself. A download makes no analysis. You can still select Analyse this replay.
+
+Coilbox checks that the file is the one the hub described before keeping it, and throws it away if not. A downloaded track counts towards the [disk space for tracks](replay-rewind.md#disk-space).
+
+The page says the hub has no track when nobody has sent one, when the hub is still checking the one it was sent, when the place it is kept cannot be reached, and when it came from another version of the recorder than yours.
+
+A distribution that turns recording off has no Look for a track on the hub button.
 
 ### Send your finished matches automatically
 
