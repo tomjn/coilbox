@@ -751,6 +751,108 @@ fn demo_files_in(base: &Path) -> Vec<DemoFileEntry> {
     out
 }
 
+// ---- adding a replay file ---------------------------------------------------
+
+/// A replay file from outside the library, read and ready to add to it.
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReplayFileOffer {
+    pub file_name: String,
+    /// The folder it would be copied into, the root's `demos/`.
+    pub dest_dir: String,
+    pub map_name: String,
+    pub game_type: String,
+    /// The file name of the library's replay of the same match, when it has one.
+    /// Nothing is copied then.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub in_library: Option<String>,
+}
+
+/// Read a replay file the player handed to coilbox and say where it would go
+/// in the library, without copying it. Fails with the reason when the file is
+/// not a replay coilbox can read, or when a different file of that name is
+/// already in the root's `demos/`.
+///
+/// `library` is every replay in the library as its canonical path and game id
+/// (see [`library_game_ids`]). A remix shares its original's game id, so a
+/// remix is never matched against it.
+pub fn plan_replay_add(
+    source: &Path,
+    root: &Path,
+    library: &[(PathBuf, String)],
+) -> Result<ReplayFileOffer, String> {
+    let file_name = source
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    if !is_replay_path(source) {
+        return Err(format!("{file_name} is not a .sdfz replay."));
+    }
+    let info = demo_info(None, source)
+        .map_err(|e| format!("{file_name} is not a replay coilbox can read: {e}"))?;
+    let dest_dir = root.join(GATHER_DIR);
+    let in_library = if info.remixed {
+        None
+    } else {
+        info.game_id.as_ref().and_then(|id| {
+            library
+                .iter()
+                .find(|(_, held)| held == id)
+                .and_then(|(path, _)| path.file_name())
+                .map(|n| n.to_string_lossy().into_owned())
+        })
+    };
+    if in_library.is_none() && dest_dir.join(&file_name).exists() {
+        return Err(format!(
+            "A different replay called {file_name} is already in {}.",
+            dest_dir.display()
+        ));
+    }
+    Ok(ReplayFileOffer {
+        file_name,
+        dest_dir: dest_dir.display().to_string(),
+        map_name: info.map_name,
+        game_type: info.game_type,
+        in_library,
+    })
+}
+
+/// Copy a replay file into the root's `demos/`, where the library lists it.
+/// A file already there is never replaced, and a copy that fails part way is
+/// removed. Answers the copy's path.
+pub fn add_replay(source: &Path, root: &Path) -> Result<PathBuf, String> {
+    let file_name = source
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    if !is_replay_path(source) {
+        return Err(format!("{file_name} is not a .sdfz replay."));
+    }
+    let dest_dir = root.join(GATHER_DIR);
+    std::fs::create_dir_all(&dest_dir)
+        .map_err(|e| format!("Could not create {}: {e}", dest_dir.display()))?;
+    let dest = dest_dir.join(&file_name);
+    let mut from =
+        std::fs::File::open(source).map_err(|e| format!("Could not read {file_name}: {e}"))?;
+    let mut to = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&dest)
+        .map_err(|e| match e.kind() {
+            std::io::ErrorKind::AlreadyExists => format!(
+                "{file_name} is already in {}. Nothing was copied.",
+                dest_dir.display()
+            ),
+            _ => format!("Could not write {}: {e}", dest.display()),
+        })?;
+    if let Err(e) = std::io::copy(&mut from, &mut to).and_then(|_| to.sync_all()) {
+        drop(to);
+        let _ = std::fs::remove_file(&dest);
+        return Err(format!("Could not copy {file_name}: {e}"));
+    }
+    Ok(dest)
+}
+
 // ---- decoding --------------------------------------------------------------
 
 /// Decode one replay: native header + start-script + trailer, with `demotool`
@@ -2580,6 +2682,42 @@ pub(crate) async fn content_gather_replays(root: String, apply: bool) -> CliResu
     match tauri::async_runtime::spawn_blocking(move || gather_replays(&p, apply, now_ms)).await {
         Ok(summary) => CliResult::ok(json!({ "summary": summary })),
         Err(e) => CliResult::err(format!("gather replays task failed: {e}")),
+    }
+}
+
+/// `content_inspect_replay_file`: read a replay file dropped on the window and
+/// say where it would go in `root`'s library, and whether the library already
+/// has that match. Copies nothing. See [`plan_replay_add`].
+#[tauri::command]
+pub(crate) async fn content_inspect_replay_file<R: Runtime>(
+    app: AppHandle<R>,
+    path: String,
+    root: String,
+) -> CliResult {
+    match tauri::async_runtime::spawn_blocking(move || {
+        let library = library_game_ids(&app);
+        plan_replay_add(Path::new(&path), Path::new(&root), &library)
+    })
+    .await
+    {
+        Ok(Ok(offer)) => CliResult::ok(json!({ "offer": offer })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("inspect replay task failed: {e}")),
+    }
+}
+
+/// `content_add_replay_file`: copy a replay file into `root`'s `demos/`. See
+/// [`add_replay`].
+#[tauri::command]
+pub(crate) async fn content_add_replay_file(path: String, root: String) -> CliResult {
+    let root = PathBuf::from(&root);
+    if let Err(e) = coilbox_portable::refuse_read_only(&root) {
+        return CliResult::err(e);
+    }
+    match tauri::async_runtime::spawn_blocking(move || add_replay(Path::new(&path), &root)).await {
+        Ok(Ok(dest)) => CliResult::ok(json!({ "path": dest.display().to_string() })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("add replay task failed: {e}")),
     }
 }
 
@@ -4682,6 +4820,71 @@ mod tests {
         assert!(summary.skipped.is_empty());
         assert!(root.join("demos/only.sdfz").is_file());
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A scratch folder holding one dropped replay and an empty library root.
+    fn dropped_replay(name: &str, bytes: &[u8]) -> (PathBuf, PathBuf) {
+        let base = std::env::temp_dir().join(name);
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(base.join("downloads")).unwrap();
+        std::fs::create_dir_all(base.join("root")).unwrap();
+        let file = base.join("downloads").join("match.sdfz");
+        std::fs::write(&file, bytes).unwrap();
+        (file, base.join("root"))
+    }
+
+    /// A readable replay is offered for the root's `demos/` with what it is.
+    #[test]
+    fn a_dropped_replay_is_offered_for_demos() {
+        let (file, root) = dropped_replay("coilbox_add_offer_test", &build_demo(SCRIPT, true));
+        let offer = plan_replay_add(&file, &root, &[]).unwrap();
+        assert_eq!(offer.file_name, "match.sdfz");
+        assert_eq!(offer.dest_dir, root.join("demos").display().to_string());
+        assert!(!offer.map_name.is_empty());
+        assert!(offer.in_library.is_none());
+        assert!(!root.join("demos").exists(), "planning copies nothing");
+    }
+
+    /// A file that is not a replay is refused, by its name or its contents.
+    #[test]
+    fn a_dropped_non_replay_is_refused() {
+        let (file, root) = dropped_replay("coilbox_add_garbage_test", b"not a replay at all");
+        let err = plan_replay_add(&file, &root, &[]).unwrap_err();
+        assert!(err.contains("not a replay coilbox can read"), "{err}");
+
+        let text = file.with_extension("txt");
+        std::fs::write(&text, build_demo(SCRIPT, true)).unwrap();
+        assert!(plan_replay_add(&text, &root, &[]).is_err());
+        assert!(add_replay(&text, &root).is_err());
+    }
+
+    /// A match the library already has is named rather than copied again.
+    #[test]
+    fn a_dropped_replay_of_a_held_match_names_the_held_one() {
+        let (file, root) = dropped_replay("coilbox_add_held_test", &build_demo(SCRIPT, true));
+        let id = demo_info(None, &file).unwrap().game_id.unwrap();
+        let library = vec![(root.join("demos").join("2026-01-01_mine.sdfz"), id)];
+        let offer = plan_replay_add(&file, &root, &library).unwrap();
+        assert_eq!(offer.in_library.as_deref(), Some("2026-01-01_mine.sdfz"));
+    }
+
+    /// Adding copies the file into `demos/`, leaves the original, and never
+    /// replaces a file of the same name.
+    #[test]
+    fn adding_a_replay_copies_it_and_never_replaces() {
+        let bytes = build_demo(SCRIPT, true);
+        let (file, root) = dropped_replay("coilbox_add_copy_test", &bytes);
+        let dest = add_replay(&file, &root).unwrap();
+        assert_eq!(dest, root.join("demos").join("match.sdfz"));
+        assert_eq!(std::fs::read(&dest).unwrap(), bytes);
+        assert!(file.is_file(), "the original stays");
+
+        std::fs::write(&dest, b"the one already there").unwrap();
+        let err = add_replay(&file, &root).unwrap_err();
+        assert!(err.contains("already in"), "{err}");
+        assert_eq!(std::fs::read(&dest).unwrap(), b"the one already there");
+        let err = plan_replay_add(&file, &root, &[]).unwrap_err();
+        assert!(err.contains("already in"), "{err}");
     }
 
     /// Write an executable `/bin/sh` script standing in for demotool.

@@ -1318,6 +1318,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             bundle::content_bundle_install_engine,
             bundle::content_bundle_cancel,
             demo::content_gather_replays,
+            demo::content_inspect_replay_file,
+            demo::content_add_replay_file,
             savegame::content_list_saves,
             savegame::content_delete_save,
             settings_backup::content_config_profiles,

@@ -991,10 +991,20 @@ msgstr "{0, plural, one {# zone} other {# zones}}"
 msgid "{0, plural, one {across # model} other {across # models}}"
 msgstr "{0, plural, one {across # model} other {across # models}}"
 
+#. placeholder {0}: offers.length
+#: src/deeplink/replayFiles.ts
+msgid "{0, plural, one {Add # replay} other {Add # replays}}"
+msgstr "{0, plural, one {Add # replay} other {Add # replays}}"
+
 #. placeholder {0}: result.droppedUnits.length
 #: src/workshop/pages/components/CollectionsPanel.tsx
 msgid "{0, plural, one {Added \"{addedName}\". This game doesn't have this unit, so it was left out: {dropped}.} other {Added \"{addedName}\". This game doesn't have these units, so they were left out: {dropped}.}}"
 msgstr "{0, plural, one {Added \"{addedName}\". This game doesn't have this unit, so it was left out: {dropped}.} other {Added \"{addedName}\". This game doesn't have these units, so they were left out: {dropped}.}}"
+
+#. placeholder {0}: added.length
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "{0, plural, one {Added a replay to your library} other {Added # replays to your library}}"
+msgstr "{0, plural, one {Added a replay to your library} other {Added # replays to your library}}"
 
 #. placeholder {0}: missions.length
 #: src/content/pages/components/MissionRuntimeSection.tsx
@@ -2386,6 +2396,10 @@ msgstr "{filename} · {mirrorCount}"
 msgid "{fileName} includes {includes}, which could not be found beside it or in a scripts folder above it, so it cannot be converted."
 msgstr "{fileName} includes {includes}, which could not be found beside it or in a scripts folder above it, so it cannot be converted."
 
+#: src/deeplink/replayFiles.ts
+msgid "{fileName} is a match already in your replay library, as {inLibrary}."
+msgstr "{fileName} is a match already in your replay library, as {inLibrary}."
+
 #: src/downloads/pages/components/EngineUpload.tsx
 msgid "{filename} is listed on the hub."
 msgstr "{filename} is listed on the hub."
@@ -2401,6 +2415,10 @@ msgstr "{filename} is not what the hub says it is. Coilbox could not tell the hu
 #: src/downloads/hubMismatch.ts
 msgid "{filename} is not what the hub says it is. The hub has been told. The file stays installed."
 msgstr "{filename} is not what the hub says it is. The hub has been told. The file stays installed."
+
+#: src/deeplink/replayFiles.ts
+msgid "{fileName}, {gameType} on {mapName}."
+msgstr "{fileName}, {gameType} on {mapName}."
 
 #: src/downloads/installArchive.ts
 msgid "{fileName}, a game, goes in {destDir}."
@@ -7268,6 +7286,10 @@ msgstr "A construction unit reaching one way, stopping, then reaching the other,
 msgid "A copy called \"{trimmed}\" already exists. Replace it?"
 msgstr "A copy called \"{trimmed}\" already exists. Replace it?"
 
+#: src/deeplink/replayFiles.ts
+msgid "A copy goes in {destDir}."
+msgstr "A copy goes in {destDir}."
+
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 msgid "A copy holds this content folder's <0>springsettings.cfg</0>, <1>LuaUI/Config</1> and <2>uikeys.txt</2>, including the ones inside each engine folder. Restoring one puts all of them back."
 msgstr "A copy holds this content folder's <0>springsettings.cfg</0>, <1>LuaUI/Config</1> and <2>uikeys.txt</2>, including the ones inside each engine folder. Restoring one puts all of them back."
@@ -8834,6 +8856,10 @@ msgstr "Add a piece to the selection, or take it out"
 msgid "Add a private note"
 msgstr "Add a private note"
 
+#: src/deeplink/replayFiles.ts
+msgid "Add a replay"
+msgstr "Add a replay"
+
 #: src/scenario/pages/components/StartConditions.tsx
 msgid "Add a start unit for {participantName}"
 msgstr "Add a start unit for {participantName}"
@@ -8987,10 +9013,15 @@ msgstr "Add tag…"
 msgid "Add the {0} shown"
 msgstr "Add the {0} shown"
 
+#: src/deeplink/replayFiles.ts
+msgid "Add the replay of {gameType} on {mapName} to your replay library?"
+msgstr "Add the replay of {gameType} on {mapName} to your replay library?"
+
 #: src/multiplayer/invite/InviteLinkHost.tsx
 msgid "Add this server"
 msgstr "Add this server"
 
+#: src/deeplink/DeepLinkHandler.tsx
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
 msgid "Add to library"
 msgstr "Add to library"
@@ -9506,6 +9537,10 @@ msgstr "Already attached"
 #: src/campaign/pages/components/ArchiveMediaImportButton.tsx
 msgid "Already imported from this archive earlier this session. Import again to add a second copy."
 msgstr "Already imported from this archive earlier this session. Import again to add a second copy."
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Already in your library"
+msgstr "Already in your library"
 
 #: src/lego/compounds.ts
 msgid "Already on the unit: {present}."
@@ -15119,6 +15154,10 @@ msgstr "Copies"
 msgid "Copies <0>{copySource}</0> as it stands into the project's weapon library, and {usesCopy}. Changing the copy changes no other unit."
 msgstr "Copies <0>{copySource}</0> as it stands into the project's weapon library, and {usesCopy}. Changing the copy changes no other unit."
 
+#: src/deeplink/replayFiles.ts
+msgid "Copies go in {destDir}."
+msgstr "Copies go in {destDir}."
+
 #: src/lego/pages/components/SymmetryPopover.tsx
 msgid "Copies round the axis"
 msgstr "Copies round the axis"
@@ -15326,6 +15365,10 @@ msgstr "Costs and kinds"
 #: src/lego/pages/BuilderPage.tsx
 msgid "Could not add a build arm"
 msgstr "Could not add a build arm"
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Could not add a replay"
+msgstr "Could not add a replay"
 
 #: src/lego/pages/BuilderPage.tsx
 msgid "Could not add a weapon"
@@ -17713,6 +17756,10 @@ msgstr "Drop a .smf, .sdz, .sd7, or .sdd folder."
 #: src/lego/scriptMarks.ts
 msgid "Drop stand-in"
 msgstr "Drop stand-in"
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Drop to add to your replays"
+msgstr "Drop to add to your replays"
 
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Drop to install"
@@ -29836,6 +29883,10 @@ msgstr "Nothing turned."
 msgid "Nothing used yet."
 msgstr "Nothing used yet."
 
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Nothing was added"
+msgstr "Nothing was added"
+
 #: src/conquest/pages/GalaxyPage.tsx
 msgid "Nothing was changed. {reason}"
 msgstr "Nothing was changed. {reason}"
@@ -30667,6 +30718,7 @@ msgstr "Open in the builder"
 msgid "Open in the Timeline tab"
 msgstr "Open in the Timeline tab"
 
+#: src/deeplink/DeepLinkHandler.tsx
 #: src/scenario/pages/components/BlueprintPanel.tsx
 msgid "Open it"
 msgstr "Open it"
@@ -43127,6 +43179,10 @@ msgstr "There are no blueprints in this file that coilbox can read."
 #: src/multiplayer/admin/BansSection.tsx
 msgid "There is no command to change a ban's reason or length. Lift it and ban again instead."
 msgstr "There is no command to change a ban's reason or length. Lift it and ban again instead."
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "There is no content folder to keep replays in. Choose one in Settings > Sources."
+msgstr "There is no content folder to keep replays in. Choose one in Settings > Sources."
 
 #: src/profile/health.ts
 msgid "There is no engine in engine/, so players download one on first run. Copy engine/<platform>/<version>/ from a working install to bundle it."

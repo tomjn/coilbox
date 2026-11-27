@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
-import { Loader2, PackagePlus } from "lucide-react";
+import { Clapperboard, Loader2, PackagePlus } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import {
@@ -16,7 +16,12 @@ import {
 } from "@/components/ui/dialog";
 import { fileDropClaimed } from "@/lib/fileDropClaim";
 import { containerKindPhrase } from "../container/names";
-import { invalidateScans } from "../content/config";
+import {
+  contentAddReplayFile,
+  contentInspectReplayFile,
+} from "../content/bindings";
+import { invalidateScans, useScanTargetSelection } from "../content/config";
+import { loadReplays } from "../content/replayList";
 import { dlInspectArchive, dlInstallArchive } from "../downloads/bindings";
 import { useArchiveInstallSettings, useWriteRoot } from "../downloads/config";
 import {
@@ -49,6 +54,15 @@ import { ConfirmDialog, type Pending } from "./ConfirmDialog";
 import { fetchImportPlan } from "./fetchImport";
 import { fetchImportText } from "./fetchText";
 import { openScreenRoute, parseDeepLink } from "./parse";
+import {
+  addReplays,
+  describeReplayOffers,
+  heldLine,
+  isReplayPath,
+  planReplays,
+  type ReplayOffer,
+  replayRoute,
+} from "./replayFiles";
 
 /**
  * The `coilbox://` deep-link handler (issue #388). Mounted app-wide as the
@@ -116,10 +130,12 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
     pending: boolean;
     fetching: boolean;
     archives: boolean;
+    replays: boolean;
   }>({
     pending: false,
     fetching: false,
     archives: false,
+    replays: false,
   });
   const setPending = useCallback((next: Pending | null) => {
     open.current.pending = next !== null;
@@ -128,6 +144,13 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
   const setFetching = useCallback((host: string | null) => {
     open.current.fetching = host !== null;
     setFetchingState(host);
+  }, []);
+  // Whether archives are being read or copied, as state too, so replays from
+  // the same drop wait until the archives are done.
+  const [archivesOpen, setArchivesOpenState] = useState(false);
+  const setArchivesOpen = useCallback((next: boolean) => {
+    open.current.archives = next;
+    setArchivesOpenState(next);
   }, []);
 
   const gamesRoot = useWriteRoot("games");
@@ -139,36 +162,58 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
   // What is being copied right now, for the notice that covers a copy. A game
   // can be most of a gigabyte, and the dialog has closed by the time it starts.
   const [installing, setInstalling] = useState<string | null>(null);
-  // True while an archive is being dragged over the window.
-  const [dragging, setDragging] = useState(false);
+  // What is being dragged over the window: archives to install, replays to
+  // add, or nothing coilbox takes.
+  const [dragging, setDragging] = useState<"install" | "add" | null>(null);
 
-  // Take a set of files to install. Nothing is read or copied here: the effect
-  // below reads them, and the dialog it opens does the copying.
-  const offerArchives = useCallback((paths: string[]) => {
-    if (paths.length === 0) return;
-    if (
-      open.current.pending ||
-      open.current.fetching ||
-      open.current.archives ||
-      invitePromptOpen()
-    ) {
-      notify({
-        title: t`Ignored a file`,
-        // The refusal for a file, worded like the one for a link below.
-        body: t`Another prompt is still open. Answer or close it, then open this file again.`,
-        level: "error",
-      });
-      return;
-    }
-    open.current.archives = true;
-    setQueued(paths);
-  }, []);
+  // Replay files handed over and not yet read. They wait for any archive
+  // prompt from the same drop to be answered, and for the library's folder.
+  const { selected } = useScanTargetSelection();
+  const writeRoot = useWriteRoot();
+  // The folder the replay library lists, as `useReplaysRoot` picks it.
+  const replaysRoot = selected?.rootPath ?? writeRoot.path;
+  const [replayQueue, setReplayQueue] = useState<string[] | null>(null);
+
+  // Take a set of files to install or add. Nothing is read or copied here: the
+  // effects below read them, and the dialogs they open do the copying. Archives
+  // and replays dropped together are asked about one after the other.
+  const offerArchives = useCallback(
+    (paths: string[]) => {
+      if (paths.length === 0) return;
+      if (
+        open.current.pending ||
+        open.current.fetching ||
+        open.current.archives ||
+        open.current.replays ||
+        invitePromptOpen()
+      ) {
+        notify({
+          title: t`Ignored a file`,
+          // The refusal for a file, worded like the one for a link below.
+          body: t`Another prompt is still open. Answer or close it, then open this file again.`,
+          level: "error",
+        });
+        return;
+      }
+      const replays = paths.filter(isReplayPath);
+      const archives = paths.filter((p) => !isReplayPath(p));
+      if (archives.length > 0) {
+        setArchivesOpen(true);
+        setQueued(archives);
+      }
+      if (replays.length > 0) {
+        open.current.replays = true;
+        setReplayQueue(replays);
+      }
+    },
+    [setArchivesOpen],
+  );
 
   const runInstall = useCallback(
     async (offers: ArchiveOffer[], roots: ArchiveRoots, move: boolean) => {
       // A copy holds the one prompt, like a fetch does, so nothing else is
       // asked over the top of it.
-      open.current.archives = true;
+      setArchivesOpen(true);
       setInstalling(
         offers.length === 1
           ? offers[0].fileName
@@ -180,7 +225,7 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
         move,
         dlInstallArchive,
       );
-      open.current.archives = false;
+      setArchivesOpen(false);
       setInstalling(null);
       if (installed.length > 0) {
         // The game and map lists read the disk again, so the new one shows
@@ -223,7 +268,7 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
         });
       }
     },
-    [],
+    [setArchivesOpen],
   );
 
   useEffect(() => {
@@ -232,7 +277,7 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
     setQueued(null);
     void planArchives(queued, roots, dlInspectArchive).then(
       ({ offers, refused }) => {
-        open.current.archives = false;
+        setArchivesOpen(false);
         if (offers.length === 0) {
           notify({
             title: t`Nothing was installed`,
@@ -279,7 +324,109 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
         });
       },
     );
-  }, [queued, gamesRoot, mapsRoot, archiveSettings, runInstall, setPending]);
+  }, [
+    queued,
+    gamesRoot,
+    mapsRoot,
+    archiveSettings,
+    runInstall,
+    setPending,
+    setArchivesOpen,
+  ]);
+
+  const runAddReplays = useCallback(
+    async (offers: ReplayOffer[], root: string) => {
+      const { added, failed } = await addReplays(
+        offers,
+        root,
+        contentAddReplayFile,
+      );
+      if (added.length > 0) {
+        // The library reads its folder again, so the new one is listed.
+        loadReplays(root, true).catch(() => {});
+        const route =
+          added.length === 1 ? replayRoute(added[0].fileName) : "/play/replays";
+        notify({
+          title: plural(added.length, {
+            one: "Added a replay to your library",
+            other: "Added # replays to your library",
+          }),
+          body: added.map((o) => o.fileName).join(", "),
+          level: "success",
+          to: route,
+          action: { label: t`Open`, onClick: () => navigate(route) },
+        });
+      }
+      if (failed.length > 0) {
+        notify({
+          title: t`Could not add a replay`,
+          body: failed.join(" "),
+          level: "error",
+        });
+      }
+    },
+    [navigate],
+  );
+
+  useEffect(() => {
+    // An archive prompt from the same drop is answered first.
+    if (!replayQueue || archivesOpen || pending) return;
+    if (!replaysRoot) {
+      if (writeRoot.loading) return;
+      setReplayQueue(null);
+      open.current.replays = false;
+      notify({
+        title: t`Nothing was added`,
+        body: t`There is no content folder to keep replays in. Choose one in Settings > Sources.`,
+        level: "error",
+      });
+      return;
+    }
+    const root = replaysRoot;
+    setReplayQueue(null);
+    void planReplays(replayQueue, root, contentInspectReplayFile).then(
+      ({ offers, held, refused }) => {
+        open.current.replays = false;
+        const notes = [...held.map(heldLine), ...refused];
+        if (offers.length > 0) {
+          setPending({
+            ...describeReplayOffers(offers),
+            warnings: notes,
+            confirmLabel: t`Add to library`,
+            icon: Clapperboard,
+            run: () => void runAddReplays(offers, root),
+          });
+          return;
+        }
+        if (held.length === 1) {
+          const route = replayRoute(held[0].inLibrary ?? "");
+          setPending({
+            title: t`Already in your library`,
+            lines: [heldLine(held[0])],
+            warnings: refused,
+            confirmLabel: t`Open it`,
+            icon: Clapperboard,
+            run: () => navigate(route),
+          });
+          return;
+        }
+        notify({
+          title: t`Nothing was added`,
+          body: notes.join(" "),
+          level: held.length > 0 && refused.length === 0 ? "info" : "error",
+        });
+      },
+    );
+  }, [
+    replayQueue,
+    archivesOpen,
+    pending,
+    replaysRoot,
+    writeRoot.loading,
+    runAddReplays,
+    setPending,
+    navigate,
+  ]);
 
   // Build the second (apply) confirmation for a resolved import plan. `host` is
   // set for a fetch-URL import so the dialog says where the content came from.
@@ -354,6 +501,7 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
         open.current.pending ||
         open.current.fetching ||
         open.current.archives ||
+        open.current.replays ||
         invitePromptOpen()
       ) {
         notify({
@@ -536,13 +684,20 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
           const p = event.payload;
           // A page that takes dropped files for itself is on screen.
           if (fileDropClaimed()) {
-            setDragging(false);
+            setDragging(null);
             return;
           }
-          if (p.type === "enter") setDragging(p.paths.some(isArchivePath));
-          else if (p.type === "leave") setDragging(false);
+          if (p.type === "enter") {
+            setDragging(
+              p.paths.some(isArchivePath)
+                ? "install"
+                : p.paths.some(isReplayPath)
+                  ? "add"
+                  : null,
+            );
+          } else if (p.type === "leave") setDragging(null);
           else if (p.type === "drop") {
-            setDragging(false);
+            setDragging(null);
             offerArchives(p.paths);
           }
         }),
@@ -630,8 +785,17 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
       {dragging && (
         <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-background/80">
           <p className="flex items-center gap-2 rounded-md border bg-card px-4 py-3 text-sm font-medium">
-            <PackagePlus className="size-4 text-muted-foreground" />
-            <Trans>Drop to install</Trans>
+            {dragging === "install" ? (
+              <>
+                <PackagePlus className="size-4 text-muted-foreground" />
+                <Trans>Drop to install</Trans>
+              </>
+            ) : (
+              <>
+                <Clapperboard className="size-4 text-muted-foreground" />
+                <Trans>Drop to add to your replays</Trans>
+              </>
+            )}
           </p>
         </div>
       )}

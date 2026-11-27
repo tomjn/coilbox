@@ -62,6 +62,8 @@ const COMMANDS: &[&str] = &[
     "content_bundle_install_engine",
     "content_bundle_cancel",
     "content_gather_replays",
+    "content_inspect_replay_file",
+    "content_add_replay_file",
     "content_list_saves",
     "content_delete_save",
     "content_config_profiles",
