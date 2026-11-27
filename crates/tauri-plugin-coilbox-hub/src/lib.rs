@@ -498,12 +498,8 @@ async fn hub_replay_upload_start<R: Runtime>(
         Ok(consent) => consent,
         Err(refused) => return CliResult::err(refused),
     };
-    if game_id.len() != 32
-        || !game_id
-            .bytes()
-            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-    {
-        return CliResult::err("This replay has no game id the hub can file it under.");
+    if !hub_game_id(&game_id) {
+        return CliResult::err(NO_GAME_ID);
     }
     let file = std::path::PathBuf::from(&path);
     let read = file.clone();
@@ -521,6 +517,95 @@ async fn hub_replay_upload_start<R: Runtime>(
         summary,
     };
     match uploads::begin_replay(app, hub_url, file, request, &consent) {
+        Ok(state) => CliResult::ok(json!({ "upload": state })),
+        Err(said) => CliResult::err(said),
+    }
+}
+
+const NO_GAME_ID: &str = "This replay has no game id the hub can file it under.";
+
+/// Whether this is a game id as the hub files replays under: 32 lower case hex
+/// characters.
+fn hub_game_id(game_id: &str) -> bool {
+    game_id.len() == 32
+        && game_id
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+}
+
+/// `hub_replay_analysis_send`: send a match's analysis to the hub, as whoever
+/// is signed in (issue #5495).
+///
+/// `events` is the run's log, only the logger's lines, and `logger_version` is
+/// the version of the logger that wrote it, as `content_replay_analysis_log`
+/// answers. Answers `answer`, with `kind` `sent` and the hub's `state`, or
+/// `stopped` and a `code`. Sending the same log again answers with how the
+/// first send's check has gone, which is how its end is learned. `grant` is the
+/// one a press of the analysis's send button opened. Without one the switch
+/// that sends finished matches has to be on.
+#[tauri::command]
+async fn hub_replay_analysis_send<R: Runtime>(
+    app: AppHandle<R>,
+    hub_url: String,
+    game_id: String,
+    logger_version: u32,
+    events: String,
+    grant: Option<String>,
+) -> CliResult {
+    let consent = match consent::AssetUploadConsent::check_replay(&app, grant.as_deref()) {
+        Ok(consent) => consent,
+        Err(refused) => return CliResult::err(refused),
+    };
+    if !hub_game_id(&game_id) {
+        return CliResult::err(NO_GAME_ID);
+    }
+    match uploads::analysis::send_signed_in(hub_url, &game_id, logger_version, &events, &consent)
+        .await
+    {
+        Ok(answer) => CliResult::ok(json!({ "answer": answer })),
+        Err(said) => CliResult::err(said),
+    }
+}
+
+/// `hub_replay_track_upload_start`: send a match's recorded track to the hub,
+/// as whoever is signed in (issue #5495).
+///
+/// `path` is the stored track and `format_version` the one in its header, as
+/// `content_replay_track_upload_facts` answers. The file's hash and size are
+/// worked out here. The upload is followed as an archive's is, with `kind`
+/// `track`. `grant` is the one a press of the track's send button opened.
+/// Without one the switch that sends finished matches has to be on.
+#[tauri::command]
+async fn hub_replay_track_upload_start<R: Runtime>(
+    app: AppHandle<R>,
+    hub_url: String,
+    game_id: String,
+    path: String,
+    format_version: u16,
+    grant: Option<String>,
+) -> CliResult {
+    let consent = match consent::AssetUploadConsent::check_replay(&app, grant.as_deref()) {
+        Ok(consent) => consent,
+        Err(refused) => return CliResult::err(refused),
+    };
+    if !hub_game_id(&game_id) {
+        return CliResult::err(NO_GAME_ID);
+    }
+    let file = std::path::PathBuf::from(&path);
+    let read = file.clone();
+    let hashed = tauri::async_runtime::spawn_blocking(move || uploads::hash_file(&read)).await;
+    let (sha256, size) = match hashed {
+        Ok(Ok(hashed)) => hashed,
+        Ok(Err(said)) => return CliResult::err(said),
+        Err(e) => return CliResult::err(e.to_string()),
+    };
+    let request = uploads::TrackRequest {
+        game_id,
+        format_version,
+        sha256,
+        size,
+    };
+    match uploads::begin_track(app, hub_url, file, request, &consent) {
         Ok(state) => CliResult::ok(json!({ "upload": state })),
         Err(said) => CliResult::err(said),
     }
@@ -563,6 +648,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             hub_manual_send_end,
             hub_archive_upload_start,
             hub_replay_upload_start,
+            hub_replay_analysis_send,
+            hub_replay_track_upload_start,
             hub_archive_upload_list,
             hub_archive_upload_cancel
         ])

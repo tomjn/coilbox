@@ -966,3 +966,259 @@ fn a_replay_file_is_hashed_whole() {
     );
     assert_eq!(size, 3);
 }
+
+// -------------------------------------------------------------------- tracks
+
+fn track_request(size: u64) -> TrackRequest {
+    TrackRequest {
+        game_id: GAME_ID.into(),
+        format_version: 1,
+        sha256: "d".repeat(64),
+        size,
+    }
+}
+
+fn track_held(state: &str) -> Option<(u16, Value)> {
+    Some((
+        200,
+        json!({ "track": {
+            "game_id": GAME_ID, "format_version": 1, "state": state,
+            "recorder_version": 5, "size": 10, "sha256": "d".repeat(64),
+            "url": "https://mirror.example/tracks/x.cbtrack",
+        }}),
+    ))
+}
+
+impl Rig {
+    async fn run_track(&self) -> (UploadState, Vec<UploadState>) {
+        let reports = Mutex::new(Vec::new());
+        let report = |state: &UploadState| reports.lock().unwrap().push(state.clone());
+        let token = || -> TokenFuture { Box::pin(async { Ok("hub-bearer".to_owned()) }) };
+        let env = Env {
+            hub_url: &self.hub.base,
+            token: &token,
+            pacing: self.pacing,
+            cancel: &self.cancel,
+            report: &report,
+        };
+        let request = track_request(ARCHIVE.len() as u64);
+        let mut state = state_for(&self.facts, &self.hub.base);
+        state.kind = ArchiveKind::Track;
+        let state = run(&env, state, &self.path, &Sending::Track(&request)).await;
+        (state, reports.into_inner().unwrap())
+    }
+}
+
+#[tokio::test]
+async fn a_track_goes_to_its_replay_s_route_then_waits_for_the_check_to_list_it() {
+    let rig = Rig::new("track-sent", 1 << 20).with_hub(|hub| {
+        hub.tracking(vec![
+            None,
+            None,
+            track_held("checking"),
+            track_held("listed"),
+        ])
+    });
+
+    let (state, reports) = rig.run_track().await;
+
+    assert_eq!(state.outcome, Some(Outcome::Listed));
+    assert_eq!(rig.mirror.held(), ARCHIVE);
+    assert!(!state.held_already);
+    assert_eq!(
+        state.page_url, None,
+        "a track's url is a download, not a page"
+    );
+    assert!(reports.iter().any(|r| r.phase == Phase::Waiting));
+    let requests = rig.hub.track_requests();
+    assert_eq!(requests.len(), 4);
+    assert_eq!(
+        requests[0].0,
+        format!("/api/v1/replays/{GAME_ID}/tracks/uploads")
+    );
+    assert_eq!(requests[0].1.as_deref(), Some("Bearer hub-bearer"));
+    let sent: Value = serde_json::from_str(&requests[0].2).unwrap();
+    assert_eq!(
+        sent,
+        json!({ "format_version": 1, "sha256": "d".repeat(64), "size": ARCHIVE.len() })
+    );
+    assert!(rig.hub.replay_requests().is_empty());
+}
+
+#[tokio::test]
+async fn a_track_the_hub_has_already_uploads_nothing() {
+    let rig =
+        Rig::new("track-held", 1 << 20).with_hub(|hub| hub.tracking(vec![track_held("listed")]));
+
+    let (state, _) = rig.run_track().await;
+
+    assert_eq!(state.outcome, Some(Outcome::Listed));
+    assert!(state.held_already);
+    assert!(rig.mirror.posts().is_empty());
+    assert_eq!(rig.hub.track_requests().len(), 1);
+}
+
+#[tokio::test]
+async fn a_track_sent_before_any_analysis_passed_stops_with_no_analysis() {
+    let rig = Rig::new("track-early", 1 << 20).with_hub(|hub| {
+        hub.tracking(vec![Some((
+            409,
+            json!({ "error": "No analysis of this match has passed yet.", "reason": "no_analysis" }),
+        ))])
+    });
+
+    let (state, _) = rig.run_track().await;
+
+    assert_eq!(stopped(&state), (Source::Hub, "no_analysis".to_owned()));
+    assert!(rig.mirror.posts().is_empty());
+}
+
+#[tokio::test]
+async fn a_track_someone_else_is_sending_stops_with_uploading() {
+    let rig = Rig::new("track-busy", 1 << 20).with_hub(|hub| {
+        hub.tracking(vec![Some((
+            409,
+            json!({ "error": "Someone else is sending this track.", "reason": "uploading", "reserved_until": 3 }),
+        ))])
+    });
+
+    let (state, _) = rig.run_track().await;
+
+    assert_eq!(stopped(&state), (Source::Hub, "uploading".to_owned()));
+    assert!(rig.mirror.posts().is_empty());
+}
+
+#[test]
+fn a_track_is_not_sent_without_its_own_consent() {
+    let request = track_request(1);
+    assert!(AssetUploadConsent::for_test()
+        .admits_track(&request.game_id)
+        .is_err());
+}
+
+// ------------------------------------------------------------------ analyses
+
+const EVENTS: &str = "{\"kind\":\"header\",\"format\":1}\n{\"kind\":\"game_over\",\"frame\":30}\n";
+
+async fn send_analysis(hub: &FakeHub) -> analysis::AnalysisAnswer {
+    let token = || -> TokenFuture { Box::pin(async { Ok("hub-bearer".to_owned()) }) };
+    analysis::send(
+        &hub.base,
+        &token,
+        Duration::from_millis(1),
+        GAME_ID,
+        8,
+        EVENTS,
+    )
+    .await
+}
+
+fn sent(state: &str, reason: Option<&str>, again: bool) -> analysis::AnalysisAnswer {
+    analysis::AnalysisAnswer::Sent {
+        id: Some(1),
+        state: state.into(),
+        reason: reason.map(str::to_owned),
+        again,
+    }
+}
+
+#[tokio::test]
+async fn an_analysis_is_sent_with_its_logger_version_and_log_and_is_checked() {
+    let hub = FakeHub::new("http://127.0.0.1:1");
+
+    let answer = send_analysis(&hub).await;
+
+    assert_eq!(answer, sent("checking", None, false));
+    let requests = hub.analysis_requests();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(requests[0].0, format!("/api/v1/replays/{GAME_ID}/analyses"));
+    assert_eq!(requests[0].1.as_deref(), Some("Bearer hub-bearer"));
+    let body: Value = serde_json::from_str(&requests[0].2).unwrap();
+    assert_eq!(body, json!({ "logger_version": 8, "events": EVENTS }));
+}
+
+#[tokio::test]
+async fn sending_the_same_analysis_again_answers_with_the_first_send_and_its_check() {
+    let hub =
+        FakeHub::new("http://127.0.0.1:1").checking_analyses(&[("checking", None), ("kept", None)]);
+
+    let first = send_analysis(&hub).await;
+    let second = send_analysis(&hub).await;
+    let third = send_analysis(&hub).await;
+
+    assert_eq!(first, sent("checking", None, false));
+    assert_eq!(second, sent("checking", None, true));
+    assert_eq!(third, sent("kept", None, true));
+}
+
+#[tokio::test]
+async fn a_refused_analysis_carries_the_check_s_reason() {
+    let hub = FakeHub::new("http://127.0.0.1:1")
+        .checking_analyses(&[("refused", Some("total_mismatch"))]);
+
+    send_analysis(&hub).await;
+    let again = send_analysis(&hub).await;
+
+    assert_eq!(again, sent("refused", Some("total_mismatch"), true));
+}
+
+#[tokio::test]
+async fn an_analysis_of_a_replay_the_hub_does_not_list_stops_with_not_listed() {
+    let hub = FakeHub::new("http://127.0.0.1:1").refusing_analyses(
+        404,
+        json!({ "error": "The hub lists no replay with this game id.", "reason": "not_listed" }),
+    );
+
+    let answer = send_analysis(&hub).await;
+
+    let analysis::AnalysisAnswer::Stopped {
+        source,
+        code,
+        status,
+        ..
+    } = answer
+    else {
+        panic!("expected a stop, got {answer:?}");
+    };
+    assert_eq!(
+        (source, code.as_str(), status),
+        (Source::Hub, "not_listed", Some(404))
+    );
+}
+
+#[tokio::test]
+async fn an_analysis_with_a_sign_in_the_hub_refuses_stops_with_unauthorised() {
+    let hub = FakeHub::new("http://127.0.0.1:1").refusing_analyses(401, json!({}));
+
+    let answer = send_analysis(&hub).await;
+
+    assert!(matches!(
+        answer,
+        analysis::AnalysisAnswer::Stopped { ref code, .. } if code == "unauthorised"
+    ));
+}
+
+#[tokio::test]
+async fn an_analysis_is_tried_again_while_the_hub_fails_on_its_own_side() {
+    let hub = FakeHub::new("http://127.0.0.1:1").refusing_analyses(503, json!({}));
+
+    let answer = send_analysis(&hub).await;
+
+    assert!(matches!(
+        answer,
+        analysis::AnalysisAnswer::Stopped {
+            status: Some(503),
+            ..
+        }
+    ));
+    assert_eq!(hub.analysis_requests().len(), UPLOAD_ATTEMPTS as usize);
+}
+
+#[test]
+fn an_analysis_answer_has_the_shape_the_page_reads() {
+    let value = serde_json::to_value(sent("kept", None, true)).unwrap();
+    assert_eq!(
+        value,
+        json!({ "kind": "sent", "id": 1, "state": "kept", "reason": null, "again": true })
+    );
+}
