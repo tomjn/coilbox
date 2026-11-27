@@ -33921,6 +33921,7 @@ msgstr ""
 msgid "Reference unit"
 msgstr ""
 
+#: src/content/pages/components/RefightPanel.tsx
 #: src/content/pages/PlayerDossierPage.tsx
 #: src/content/pages/ReplaysPage.tsx
 msgid "Refight"
@@ -33928,10 +33929,6 @@ msgstr ""
 
 #: src/content/pages/components/RefightPanel.tsx
 msgid "Refight now"
-msgstr ""
-
-#: src/content/pages/components/RefightPanel.tsx
-msgid "Refight this setup"
 msgstr ""
 
 #: src/content/pages/components/RefightPanel.tsx
