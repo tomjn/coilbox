@@ -1,30 +1,42 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
-import { Download, Loader2 } from "lucide-react";
+import { ChevronDown, Download, Loader2 } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { isCompatContentName } from "@/multiplayer/battle/compatBattle";
 import { useWriteRoot, useWriteRootPath } from "../../../downloads/config";
 import { QueueProgress } from "../../../downloads/pages/components/ProgressBar";
 import { useQueuedDownload } from "../../../downloads/useQueuedDownload";
 import type { ReplayEngineNotice } from "../../replayEngine";
 import type { ReplayEngine } from "../../useReplayEngine";
 
-/** Best-effort game download (rapid). The demo's `gameType` is a display string,
- * not a rapid tag, so an exact-version match isn't guaranteed — surfaced honestly. */
+/** Game download from any source, as a battle room does it. The demo's
+ * `gameType` is the game's name and version, which `downloadGameAnySource`
+ * matches exactly. A compat mutator has no source, so it has no button. */
 function GameDownload({ gameType }: { gameType: string }) {
   const { t } = useLingui();
   const writePath = useWriteRootPath("games");
-  const gameDl = useQueuedDownload({
-    kind: "rapid",
-    label: t`Game: ${gameType}`,
-    args: { tag: gameType, writePath },
-  });
+  const gameDl = useQueuedDownload(
+    isCompatContentName(gameType)
+      ? null
+      : {
+          kind: "game",
+          label: t`Game: ${gameType}`,
+          args: { gameName: gameType, writePath },
+        },
+  );
 
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-2">
         <Button
           onClick={() => gameDl.start()}
-          disabled={gameDl.busy || !writePath}
+          disabled={gameDl.busy || !writePath || isCompatContentName(gameType)}
           className="gap-1.5"
         >
           {gameDl.busy ? (
@@ -34,9 +46,6 @@ function GameDownload({ gameType }: { gameType: string }) {
           )}
           <Trans>Download game</Trans>
         </Button>
-        <span className="text-xs text-muted-foreground">
-          <Trans>Best effort — an exact version match isn't guaranteed.</Trans>
-        </span>
       </div>
       <QueueProgress item={gameDl} className="max-w-xs" />
       {gameDl.status === "done" && (
@@ -214,6 +223,7 @@ export function MissingContentNotice({
   onMapDownloaded: () => void;
 }) {
   const { t } = useLingui();
+  const [open, setOpen] = useState(false);
   const engineNotice =
     engine.notice.kind === "download" || engine.notice.kind === "unavailable"
       ? engine.notice
@@ -234,15 +244,27 @@ export function MissingContentNotice({
                 ? t`Map not installed`
                 : t`Engine not installed`;
   return (
-    <section className="flex flex-col gap-2 rounded-lg border border-dashed border-amber-500/40 bg-amber-500/5 p-3">
-      <div className="flex items-center gap-1.5 text-sm font-medium text-amber-700 dark:text-amber-400">
-        <Download className="size-4" /> {label}
-      </div>
-      {missingGame && <GameDownload gameType={gameType} />}
-      {missingMap && mapName && (
-        <MapDownload mapName={mapName} onDownloaded={onMapDownloaded} />
-      )}
-      {engineNotice && <EngineDownload notice={engineNotice} engine={engine} />}
-    </section>
+    <Collapsible
+      open={open}
+      onOpenChange={setOpen}
+      className="rounded-lg border border-dashed border-amber-500/40 bg-amber-500/5"
+    >
+      <CollapsibleTrigger className="flex w-full items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-700 dark:text-amber-400">
+        <Download className="size-4" />
+        <span className="flex-1 text-left">{label}</span>
+        <ChevronDown
+          className={`size-4 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="flex flex-col gap-2 px-3 pb-3">
+        {missingGame && <GameDownload gameType={gameType} />}
+        {missingMap && mapName && (
+          <MapDownload mapName={mapName} onDownloaded={onMapDownloaded} />
+        )}
+        {engineNotice && (
+          <EngineDownload notice={engineNotice} engine={engine} />
+        )}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

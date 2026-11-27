@@ -11292,10 +11292,6 @@ msgstr "bench"
 msgid "Bench"
 msgstr "Bench"
 
-#: src/content/pages/components/MissingContentNotice.tsx
-msgid "Best effort — an exact version match isn't guaranteed."
-msgstr "Best effort — an exact version match isn't guaranteed."
-
 #: src/content/unitFieldNotes.ts
 msgid "Best protected direction"
 msgstr "Best protected direction"

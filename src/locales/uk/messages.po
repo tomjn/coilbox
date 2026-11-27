@@ -13853,11 +13853,6 @@ msgstr "запас"
 msgid "Bench"
 msgstr ""
 
-#: src/content/pages/components/MissingContentNotice.tsx
-#, fuzzy
-msgid "Best effort — an exact version match isn't guaranteed."
-msgstr "Наскільки можливо – точний збіг версії не гарантовано."
-
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Best protected direction"

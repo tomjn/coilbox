@@ -97,6 +97,17 @@ pub struct DownloadOutcome {
     pub message: String,
 }
 
+/// What pr-downloader ends on when a download fails, with the number of failed
+/// downloads after the colon. It names no reason.
+const FAILURE_COUNT: &str = "Error occurred while downloading:";
+
+/// Shown in place of the bare failure count.
+const NO_SOURCE_HAD_IT: &str = "No download source had this file.";
+
+fn is_failure_count(line: &str) -> bool {
+    line.contains(FAILURE_COUNT)
+}
+
 /// Interpret a finished `pr-downloader` download. Exit code is authoritative for
 /// success; the message is the most relevant log line (it has no structured
 /// output). `stdout`/`stderr` are searched together since pr-downloader logs to
@@ -127,6 +138,19 @@ pub fn parse_download(stdout: &str, stderr: &str, exit_code: Option<i32>) -> Dow
         }
     } else {
         let message = contains("error")
+            .map(|line| {
+                if !is_failure_count(line) {
+                    return line;
+                }
+                // The count says nothing on its own. Keep a more specific
+                // error pr-downloader printed before it.
+                combined
+                    .iter()
+                    .rev()
+                    .find(|l| l.starts_with("[Error]") && !is_failure_count(l))
+                    .copied()
+                    .unwrap_or(NO_SOURCE_HAD_IT)
+            })
             .or_else(|| contains("failed"))
             .map(str::to_string)
             .unwrap_or_else(|| match exit_code {
@@ -557,8 +581,18 @@ mod fixture_tests {
     fn an_engine_with_no_build_for_this_platform_fails() {
         let o = parse_download(ENGINE_MISSING_OUT, ENGINE_MISSING_ERR, Some(1));
         assert!(!o.success);
+        assert_eq!(o.message, "No download source had this file.");
+    }
+
+    /// The count is only a fallback. A reason pr-downloader printed wins.
+    #[test]
+    fn a_specific_error_line_beats_the_failure_count() {
+        let err = "[Error] /src/Downloader/Http/HttpDownloader.cpp:90:download():Could not resolve host\n\
+                   [Error] /src/main.cpp:187:main():Error occurred while downloading: 1\n";
+        let o = parse_download("", err, Some(1));
+        assert!(!o.success);
         assert!(
-            o.message.ends_with("Error occurred while downloading: 1"),
+            o.message.ends_with("Could not resolve host"),
             "{}",
             o.message
         );

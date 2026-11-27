@@ -638,13 +638,14 @@ describe("the figures at the scrubber's time (#5319)", () => {
     expect(screen.queryByRole("radio")).toBeNull();
   });
 
-  it("waits for the scrubber to settle: a drag changes nothing until it ends", async () => {
+  it("follows a drag of the scrubber, and holds the settled figure when it ends", async () => {
     open();
     await screen.findByRole("columnheader", { name: new RegExp(LABEL_A) });
     choose(/^At /);
     seek(0);
     act(() => clock.playback.seek(frameOf(35), { settle: false, pause: true }));
-    expect(figure("Ann")).toBe("0");
+    // Updates are at most one every 150 ms, so the figure may arrive late.
+    await waitFor(() => expect(figure("Ann")).toBe("200"));
     act(() => clock.playback.settle());
     expect(figure("Ann")).toBe("200");
   });

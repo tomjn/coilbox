@@ -267,16 +267,19 @@ export function useSettledFrame(): number {
   return useSyncExternalStore(settled.subscribe, settled.get);
 }
 
+/** The least time between updates of a table while the scrubber is dragged. */
+export const SCRUB_UPDATE_MS = 150;
+
 /**
  * Something worked out from the frame, which re-renders only when `select`
  * answers something different. For a table that follows the match as it plays
  * but changes less often than the frame does: select the second, or the sample
  * a time falls in, and the component renders when that changes.
  *
- * While the match plays this follows the clock. At any other time it follows
- * the settled frame, so a drag on the scrubber changes nothing until it ends.
- * `select` must answer a string, number, boolean or null, which is what is
- * compared.
+ * While the match plays this follows the clock. During a drag, when the clock
+ * has moved off the settled frame, it follows the clock too, at most once every
+ * {@link SCRUB_UPDATE_MS}. At rest it follows the settled frame. `select` must
+ * answer a string, number, boolean or null, which is what is compared.
  */
 export function useMatchFrameValue<T extends string | number | boolean | null>(
   select: (frame: number) => T,
@@ -284,19 +287,39 @@ export function useMatchFrameValue<T extends string | number | boolean | null>(
   const { clock, playback, settled } = useMatchClock();
   const subscribe = useCallback(
     (listener: () => void) => {
+      let last = Number.NEGATIVE_INFINITY;
+      let timer: ReturnType<typeof setTimeout> | null = null;
+      const fire = () => {
+        timer = null;
+        last = Date.now();
+        listener();
+      };
+      const onClock = () => {
+        // Playback already renders at the pace of the value changing.
+        if (playback.getSnapshot().playing) return listener();
+        if (timer !== null) return;
+        const wait = SCRUB_UPDATE_MS - (Date.now() - last);
+        if (wait <= 0) fire();
+        else timer = setTimeout(fire, wait);
+      };
       const stops = [
-        clock.subscribe(listener),
+        clock.subscribe(onClock),
         playback.subscribe(listener),
         settled.subscribe(listener),
       ];
       return () => {
         for (const stop of stops) stop();
+        if (timer !== null) clearTimeout(timer);
       };
     },
     [clock, playback, settled],
   );
   return useSyncExternalStore(subscribe, () =>
-    select(playback.getSnapshot().playing ? clock.frame : settled.get()),
+    select(
+      playback.getSnapshot().playing || clock.frame !== settled.get()
+        ? clock.frame
+        : settled.get(),
+    ),
   );
 }
 

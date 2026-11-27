@@ -13854,11 +13854,6 @@ msgstr "banco"
 msgid "Bench"
 msgstr ""
 
-#: src/content/pages/components/MissingContentNotice.tsx
-#, fuzzy
-msgid "Best effort — an exact version match isn't guaranteed."
-msgstr "Melhor esforço — não há garantia de versão exata."
-
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Best protected direction"
