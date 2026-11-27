@@ -9434,6 +9434,10 @@ msgstr "Ένας καθρέφτης έχει ήδη αρχείο με αυτό �
 msgid "A model holds piece names, the tree they hang in and where each one sits. Everything else the project had was never in the file."
 msgstr "Ένα μοντέλο περιέχει ονόματα τμημάτων, το δέντρο στο οποίο κρέμονται και πού βρίσκεται το καθένα. Τίποτα άλλο από όσα είχε το έργο δεν υπήρξε ποτέ στο αρχείο."
 
+#: src/hub/upload/messages.ts
+msgid "A moderator took this match down from the hub, so it cannot be sent again."
+msgstr ""
+
 #: src/lego/moduleFileIo.ts
 #, fuzzy
 msgid "A module with this id is already installed: {installedName}."
@@ -48832,6 +48836,10 @@ msgstr "Καταλήφθηκε"
 msgid "Taken {takenWhen}, {takenSize} by {takenSize} pixels."
 msgstr "Τραβήχτηκε {takenWhen}, {takenSize} επί {takenSize} pixel."
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Taken down from the hub"
+msgstr ""
+
 #: src/workshop/pages/components/UnitTextPanel.tsx
 #, fuzzy
 msgid "Taken from {redirect}, which this unit's definition names as its i18nfromunit. Rename {redirect} to change it."
@@ -50937,10 +50945,6 @@ msgstr "Το hub δεν έχει ακόμη τίποτα για αυτό το π
 #, fuzzy
 msgid "The hub has nothing on it yet. Anything you share will show up here."
 msgstr "Το hub δεν έχει ακόμη τίποτα. Ό,τι κοινοποιήσετε θα εμφανιστεί εδώ."
-
-#: src/hub/upload/messages.ts
-msgid "The hub has taken this replay down."
-msgstr ""
 
 #: src/content/pages/components/SendReplayToHub.tsx
 msgid "The hub is checking it…"

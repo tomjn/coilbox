@@ -7644,6 +7644,10 @@ msgstr "A mirror already has a file with this name that the hub has not listed, 
 msgid "A model holds piece names, the tree they hang in and where each one sits. Everything else the project had was never in the file."
 msgstr "A model holds piece names, the tree they hang in and where each one sits. Everything else the project had was never in the file."
 
+#: src/hub/upload/messages.ts
+msgid "A moderator took this match down from the hub, so it cannot be sent again."
+msgstr "A moderator took this match down from the hub, so it cannot be sent again."
+
 #: src/lego/moduleFileIo.ts
 msgid "A module with this id is already installed: {installedName}."
 msgstr "A module with this id is already installed: {installedName}."
@@ -39826,6 +39830,10 @@ msgstr "Taken"
 msgid "Taken {takenWhen}, {takenSize} by {takenSize} pixels."
 msgstr "Taken {takenWhen}, {takenSize} by {takenSize} pixels."
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Taken down from the hub"
+msgstr "Taken down from the hub"
+
 #: src/workshop/pages/components/UnitTextPanel.tsx
 msgid "Taken from {redirect}, which this unit's definition names as its i18nfromunit. Rename {redirect} to change it."
 msgstr "Taken from {redirect}, which this unit's definition names as its i18nfromunit. Rename {redirect} to change it."
@@ -41539,10 +41547,6 @@ msgstr "The hub has nothing for this game yet. This copy of Coilbox lists only t
 #: src/hub/pages/BrowsePage.tsx
 msgid "The hub has nothing on it yet. Anything you share will show up here."
 msgstr "The hub has nothing on it yet. Anything you share will show up here."
-
-#: src/hub/upload/messages.ts
-msgid "The hub has taken this replay down."
-msgstr "The hub has taken this replay down."
 
 #: src/content/pages/components/SendReplayToHub.tsx
 msgid "The hub is checking it…"

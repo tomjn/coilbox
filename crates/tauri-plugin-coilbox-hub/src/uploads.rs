@@ -768,7 +768,9 @@ async fn replay_checked(
                 }
             }
             201 => return Err(not_kept(201, sending.what()).into()),
-            401 | 409 | 422 => return Err(hub_stop(raw.status, &raw.body, env.hub_url).into()),
+            401 | 409 | 410 | 422 => {
+                return Err(hub_stop(raw.status, &raw.body, env.hub_url).into())
+            }
             _ => {}
         }
     }
@@ -939,6 +941,9 @@ fn hub_stop(status: u16, body: &Value, url: &str) -> Stop {
     let code = match (status, reason) {
         (401, _) => "unauthorised".to_owned(),
         (404, _) => "not_found".to_owned(),
+        // A moderator took the match down (coilbox-hub #671). Told apart from a
+        // mirror's `removed`, which is about an archive.
+        (410, Some("removed")) => "replay_removed".to_owned(),
         (_, Some(reason)) => reason.to_owned(),
         (400, None) => "bad_request".to_owned(),
         _ => format!("http_{status}"),

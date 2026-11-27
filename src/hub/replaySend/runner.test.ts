@@ -367,7 +367,7 @@ describe("sending finished matches", () => {
     ["not_kept", 201],
     ["refused_summary_mismatch", 200],
     ["refused_check_failed", 200],
-    ["replay_removed", 200],
+    ["replay_removed", 410],
     ["not_in_replay", 422],
     ["bad_request", 400],
   ] as const)("gives up when the hub refuses with %s", async (code, status) => {
@@ -380,6 +380,17 @@ describe("sending finished matches", () => {
       title: "The replay on Tabula was not sent",
     });
     expect(marked).not.toHaveBeenCalled();
+  });
+
+  it("never sends a replay again once the hub has taken it down", async () => {
+    stopped("hub", "replay_removed", 410);
+    finish();
+    await runDueReplaySends(context());
+    finish();
+    await runDueReplaySends(context());
+    expect(started).toHaveBeenCalledTimes(1);
+    expect(readReplaySendQueue()).toEqual([]);
+    expect(notified).toHaveBeenCalledTimes(1);
   });
 
   it("drops an upload the user stopped", async () => {

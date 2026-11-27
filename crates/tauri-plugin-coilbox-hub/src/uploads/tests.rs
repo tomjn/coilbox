@@ -1086,6 +1086,39 @@ async fn a_replay_refused_at_the_start_carries_the_hub_s_reason() {
     assert!(rig.mirror.posts().is_empty());
 }
 
+fn gone() -> Option<(u16, Value)> {
+    Some((
+        410,
+        json!({ "error": "A moderator took this match down.", "reason": "removed" }),
+    ))
+}
+
+#[tokio::test]
+async fn a_replay_a_moderator_removed_uploads_nothing() {
+    let rig = Rig::new("replay-gone", 1 << 20).with_hub(|hub| hub.replaying(vec![gone()]));
+
+    let (state, _) = rig.run_replay().await;
+
+    assert_eq!(stopped(&state), (Source::Hub, "replay_removed".to_owned()));
+    let Some(Outcome::Stopped { said, status, .. }) = &state.outcome else {
+        unreachable!()
+    };
+    assert_eq!(said, "A moderator took this match down.");
+    assert_eq!(*status, Some(410));
+    assert!(rig.mirror.posts().is_empty());
+    assert_eq!(rig.hub.replay_requests().len(), 1);
+}
+
+#[tokio::test]
+async fn a_replay_removed_while_it_is_asked_about_again_stops_waiting() {
+    let rig =
+        Rig::new("replay-gone-later", 1 << 20).with_hub(|hub| hub.replaying(vec![None, gone()]));
+
+    let (state, _) = rig.run_replay().await;
+
+    assert_eq!(stopped(&state), (Source::Hub, "replay_removed".to_owned()));
+}
+
 #[tokio::test]
 async fn a_replay_someone_else_is_sending_stops_with_uploading() {
     let rig = Rig::new("replay-busy", 1 << 20).with_hub(|hub| {

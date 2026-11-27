@@ -11,7 +11,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { HubAccount } from "@/hub/account";
 import type { ArchiveUploadState } from "@/hub/archiveUploads";
-import type { ReplaysOnHub } from "@/hub/replaysOnHub";
+import type { ReplaysOnHub, ReplaysRemoved } from "@/hub/replaysOnHub";
 import type {
   DemoBuildOrders,
   DemoInfo,
@@ -38,10 +38,13 @@ vi.mock("@/hub/manualSend/status", () => ({
 }));
 vi.mock("@/hub/maps/lookup", () => ({ fetchMapFacts: async () => ({}) }));
 let held: ReplaysOnHub = {};
+let removed: ReplaysRemoved = {};
 vi.mock("@/hub/replaysOnHub", async (actual) => ({
   ...(await actual<typeof import("@/hub/replaysOnHub")>()),
   useReplaysOnHub: () => held,
   rememberReplayOnHub: () => {},
+  useReplaysRemoved: () => removed,
+  rememberReplayRemoved: () => {},
 }));
 vi.mock("@/notify/notify", () => ({ notify: () => {} }));
 const opened = vi.fn(async (_url: string) => {});
@@ -193,6 +196,7 @@ beforeEach(() => {
   account = signedIn();
   logins = [{ serverId: "s", username: "Alice", lastUsedAt: 1 }];
   held = {};
+  removed = {};
   started.mockReset();
   started.mockResolvedValue(state());
   begun.mockClear();
@@ -399,5 +403,34 @@ describe("send to hub on a replay's page", () => {
     expect(screen.queryByRole("button", { name: "Send again" }) !== null).toBe(
       again,
     );
+  });
+
+  it("offers nothing to send once a moderator takes the replay down", () => {
+    render(<SendReplayToHub info={INFO} replayPath={PATH} />);
+    act(() =>
+      rememberUpload(
+        state({
+          phase: "done",
+          outcome: {
+            kind: "stopped",
+            source: "hub",
+            code: "replay_removed",
+            status: 410,
+            said: "said",
+          },
+        }),
+        subject,
+      ),
+    );
+    const button = screen.getByRole("button", { name: /Taken down/ });
+    expect(button.hasAttribute("disabled")).toBe(true);
+    expect(screen.queryByRole("button", { name: /Send/ })).toBeNull();
+  });
+
+  it("still shows a replay as taken down after a restart", () => {
+    removed = { [GAME_ID]: { hubUrl: "https://hub.test/" } };
+    render(<SendReplayToHub info={INFO} replayPath={PATH} />);
+    expect(screen.getByRole("button", { name: /Taken down/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Send/ })).toBeNull();
   });
 });

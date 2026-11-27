@@ -9434,6 +9434,10 @@ msgstr "Et speil har allerede en fil med dette navnet som hubben ikke har listet
 msgid "A model holds piece names, the tree they hang in and where each one sits. Everything else the project had was never in the file."
 msgstr "En modell har delenavn, treet de henger i og hvor hver av dem sitter. Alt annet prosjektet hadde, var aldri i filen."
 
+#: src/hub/upload/messages.ts
+msgid "A moderator took this match down from the hub, so it cannot be sent again."
+msgstr ""
+
 #: src/lego/moduleFileIo.ts
 #, fuzzy
 msgid "A module with this id is already installed: {installedName}."
@@ -48832,6 +48836,10 @@ msgstr "Tatt"
 msgid "Taken {takenWhen}, {takenSize} by {takenSize} pixels."
 msgstr "Tatt {takenWhen}, {takenSize} ganger {takenSize} piksler."
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Taken down from the hub"
+msgstr ""
+
 #: src/workshop/pages/components/UnitTextPanel.tsx
 #, fuzzy
 msgid "Taken from {redirect}, which this unit's definition names as its i18nfromunit. Rename {redirect} to change it."
@@ -50937,10 +50945,6 @@ msgstr "Huben har ingenting for dette spillet ennå. Denne utgaven av Coilbox vi
 #, fuzzy
 msgid "The hub has nothing on it yet. Anything you share will show up here."
 msgstr "Huben har ingenting på seg ennå. Alt du deler, vises her."
-
-#: src/hub/upload/messages.ts
-msgid "The hub has taken this replay down."
-msgstr ""
 
 #: src/content/pages/components/SendReplayToHub.tsx
 msgid "The hub is checking it…"

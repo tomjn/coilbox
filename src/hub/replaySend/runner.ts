@@ -34,8 +34,11 @@ import {
 } from "../replayExtras/send";
 import {
   readReplaysOnHub,
+  readReplaysRemoved,
   rememberReplayOnHub,
+  rememberReplayRemoved,
   replayOnHub,
+  replayRemoved,
 } from "../replaysOnHub";
 import { describeUploadEnd } from "../upload/messages";
 import {
@@ -192,6 +195,9 @@ async function send(item: QueuedReplay, context: SendContext): Promise<Step> {
     ) {
       return { kind: "done" };
     }
+    if (replayRemoved(readReplaysRemoved(), context.hubUrl, gameId)) {
+      return { kind: "done" };
+    }
     if (context.account !== "in") return { kind: "wait" };
 
     await followArchiveUploads();
@@ -245,6 +251,9 @@ async function send(item: QueuedReplay, context: SendContext): Promise<Step> {
           url: state.pageUrl,
         });
         return { kind: "done" };
+      }
+      if (outcome.code === "replay_removed") {
+        rememberReplayRemoved(gameId, state.hubUrl);
       }
       const again = worthAnotherTry(outcome);
       // A send from the replay's page has already said why it was refused.

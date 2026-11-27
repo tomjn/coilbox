@@ -9433,6 +9433,10 @@ msgstr "На дзеркалі вже є файл із такою назвою, �
 msgid "A model holds piece names, the tree they hang in and where each one sits. Everything else the project had was never in the file."
 msgstr "Модель містить назви елементів, дерево, у якому вони висять, і положення кожного. Усього іншого, що мав проєкт, у файлі ніколи не було."
 
+#: src/hub/upload/messages.ts
+msgid "A moderator took this match down from the hub, so it cannot be sent again."
+msgstr ""
+
 #: src/lego/moduleFileIo.ts
 #, fuzzy
 msgid "A module with this id is already installed: {installedName}."
@@ -48802,6 +48806,10 @@ msgstr "Зайнято"
 msgid "Taken {takenWhen}, {takenSize} by {takenSize} pixels."
 msgstr "Знято {takenWhen}, {takenSize} на {takenSize} пікселів."
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Taken down from the hub"
+msgstr ""
+
 #: src/workshop/pages/components/UnitTextPanel.tsx
 #, fuzzy
 msgid "Taken from {redirect}, which this unit's definition names as its i18nfromunit. Rename {redirect} to change it."
@@ -50907,10 +50915,6 @@ msgstr "У хабі ще немає нічого для цієї гри. Ця к
 #, fuzzy
 msgid "The hub has nothing on it yet. Anything you share will show up here."
 msgstr "У хабі ще нічого немає. Усе, чим ви поділитеся, з’явиться тут."
-
-#: src/hub/upload/messages.ts
-msgid "The hub has taken this replay down."
-msgstr ""
 
 #: src/content/pages/components/SendReplayToHub.tsx
 msgid "The hub is checking it…"

@@ -146,7 +146,7 @@ export function describeUploadEnd(
       return {
         level: "error",
         title: t`${label} was removed from the hub`,
-        body: t`The hub has taken this replay down.`,
+        body: t`A moderator took this match down from the hub, so it cannot be sent again.`,
         retry: false,
       };
     case "lapsed":

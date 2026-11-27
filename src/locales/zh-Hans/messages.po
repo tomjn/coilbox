@@ -9433,6 +9433,10 @@ msgstr "某个镜像已有同名文件，而中心尚未列出它，因此中心
 msgid "A model holds piece names, the tree they hang in and where each one sits. Everything else the project had was never in the file."
 msgstr "模型保存部件名称、部件的层级树以及每个部件的位置。项目中的其他内容从来不在此文件中。"
 
+#: src/hub/upload/messages.ts
+msgid "A moderator took this match down from the hub, so it cannot be sent again."
+msgstr ""
+
 #: src/lego/moduleFileIo.ts
 #, fuzzy
 msgid "A module with this id is already installed: {installedName}."
@@ -48802,6 +48806,10 @@ msgstr "已占用"
 msgid "Taken {takenWhen}, {takenSize} by {takenSize} pixels."
 msgstr "拍摄于 {takenWhen}，{takenSize} × {takenSize} 像素。"
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Taken down from the hub"
+msgstr ""
+
 #: src/workshop/pages/components/UnitTextPanel.tsx
 #, fuzzy
 msgid "Taken from {redirect}, which this unit's definition names as its i18nfromunit. Rename {redirect} to change it."
@@ -50907,10 +50915,6 @@ msgstr "中心上还没有此游戏的内容。此版本 Coilbox 只列出该游
 #, fuzzy
 msgid "The hub has nothing on it yet. Anything you share will show up here."
 msgstr "中心上还没有任何内容。你分享的任何内容都会显示在这里。"
-
-#: src/hub/upload/messages.ts
-msgid "The hub has taken this replay down."
-msgstr ""
 
 #: src/content/pages/components/SendReplayToHub.tsx
 msgid "The hub is checking it…"

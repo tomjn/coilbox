@@ -9434,6 +9434,10 @@ msgstr "Un mirror ha già un file con questo nome che l’hub non ha elencato, q
 msgid "A model holds piece names, the tree they hang in and where each one sits. Everything else the project had was never in the file."
 msgstr "Un modello contiene i nomi dei pezzi, l’albero in cui sono appesi e dove si trova ciascuno. Tutto il resto del progetto non è mai stato nel file."
 
+#: src/hub/upload/messages.ts
+msgid "A moderator took this match down from the hub, so it cannot be sent again."
+msgstr ""
+
 #: src/lego/moduleFileIo.ts
 #, fuzzy
 msgid "A module with this id is already installed: {installedName}."
@@ -48832,6 +48836,10 @@ msgstr "Occupate"
 msgid "Taken {takenWhen}, {takenSize} by {takenSize} pixels."
 msgstr "Scattata {takenWhen}, {takenSize} per {takenSize} pixel."
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Taken down from the hub"
+msgstr ""
+
 #: src/workshop/pages/components/UnitTextPanel.tsx
 #, fuzzy
 msgid "Taken from {redirect}, which this unit's definition names as its i18nfromunit. Rename {redirect} to change it."
@@ -50937,10 +50945,6 @@ msgstr "L’hub non ha ancora nulla per questo gioco. Questa copia di Coilbox el
 #, fuzzy
 msgid "The hub has nothing on it yet. Anything you share will show up here."
 msgstr "L’hub è ancora vuoto. Tutto ciò che condividi comparirà qui."
-
-#: src/hub/upload/messages.ts
-msgid "The hub has taken this replay down."
-msgstr ""
 
 #: src/content/pages/components/SendReplayToHub.tsx
 msgid "The hub is checking it…"
