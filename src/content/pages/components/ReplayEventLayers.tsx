@@ -287,11 +287,7 @@ export function EventLayerNotes({ ev }: { ev: EventLayers }) {
 
       {ev.deathsOn && ev.deathRead.status === "done" && (
         <>
-          {ev.deaths.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              <Trans>No unit died in this analysis.</Trans>
-            </p>
-          ) : (
+          {ev.deaths.length > 0 && (
             <p className="text-xs text-muted-foreground">
               <Plural
                 value={diedCount}
@@ -396,14 +392,7 @@ function DamageNotes({ ev }: { ev: EventLayers }) {
         </button>
       </p>
     );
-  if (ev.damageSums.landed === 0)
-    return (
-      <p className="text-xs text-muted-foreground" data-testid="damage">
-        {ev.windowed
-          ? t`No damage was recorded in this window.`
-          : t`No damage was recorded.`}
-      </p>
-    );
+  if (ev.damageSums.landed === 0) return null;
   if (!ev.damageFits)
     return (
       <p

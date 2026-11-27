@@ -2723,17 +2723,19 @@ describe("start boxes and start positions in Units (#5312)", () => {
     expect(boxes().map(outline)).toEqual(["#0080ff", "#ff0000", "#94a3b8"]);
   });
 
-  it("shows no box for a match that set none, and says so", async () => {
+  it("shows no box for a match that set none, and has no note", async () => {
     await open(NO_BOXES);
     expect(boxes()).toHaveLength(0);
-    screen.getByText("This match set no start boxes.");
+    expect(screen.queryByText("This match set no start boxes.")).toBeNull();
     expect(dotMarks()).toHaveLength(2);
   });
 
-  it("says a replay recorded no start positions, and draws no dot", async () => {
+  it("draws no dot, and has no note, for a replay that recorded no start positions", async () => {
     await open({ ...SETUP, startPositions: [] } as Partial<DemoInfo>);
     expect(dotMarks()).toHaveLength(0);
-    screen.getByText("This replay recorded no start positions.");
+    expect(
+      screen.queryByText("This replay recorded no start positions."),
+    ).toBeNull();
   });
 
   it("still draws the boxes, with no switches, when the profile hides the layers", async () => {

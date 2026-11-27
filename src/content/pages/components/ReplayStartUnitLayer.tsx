@@ -288,12 +288,7 @@ export function StartUnitNotes({
     );
 
   const { tracks, startEnds, startPaths } = ev;
-  if (tracks.length === 0)
-    return (
-      <p className="text-xs text-muted-foreground" data-testid="start-units">
-        <Trans>This analysis recorded no starting unit.</Trans>
-      </p>
-    );
+  if (tracks.length === 0) return null;
 
   const removed = startEnds.filter((e) => e.cause === "removed").length;
   const upgraded = ev.startUpgrades.length;

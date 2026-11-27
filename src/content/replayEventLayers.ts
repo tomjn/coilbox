@@ -255,31 +255,30 @@ export function windowSubject(
 
 /** The legend of a deaths field: what is counted and what the peak holds. */
 export function deathLegend(
-  field: { peakWithinRadius?: number; radius: number },
+  field: { peakWithinRadius?: number },
   weighted: boolean,
   inWindow: boolean,
 ): { label: string; peak: string } {
   const peak = Math.round(field.peakWithinRadius ?? 0);
-  const radius = formatNumber(Math.round(field.radius));
   if (weighted) {
     const metal = formatNumber(peak);
     return {
       label: t`Where metal was lost`,
       peak: inWindow
-        ? t`${metal} metal of units lost within ${radius} elmos of one spot in this window`
-        : t`${metal} metal of units lost within ${radius} elmos of one spot`,
+        ? t`${metal} metal of units lost in one spot in this window`
+        : t`${metal} metal of units lost in one spot`,
     };
   }
   return {
     label: t`Where units died`,
     peak: inWindow
       ? plural(peak, {
-          one: `# death within ${radius} elmos of one spot in this window`,
-          other: `# deaths within ${radius} elmos of one spot in this window`,
+          one: `# death in one spot in this window`,
+          other: `# deaths in one spot in this window`,
         })
       : plural(peak, {
-          one: `# death within ${radius} elmos of one spot`,
-          other: `# deaths within ${radius} elmos of one spot`,
+          one: `# death in one spot`,
+          other: `# deaths in one spot`,
         }),
   };
 }

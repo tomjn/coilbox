@@ -395,8 +395,6 @@ function UnitsView({
     info,
     extent: on.startBoxes ? extent : null,
   });
-  const hasBoxes = startAreas.loading || startAreas.areas.length > 0;
-  const noStarts = on.starts && (info.startPositions?.length ?? 0) === 0;
   const primary = usePrimaryPlayer();
   const meTeam = primary ? playerTeam(info, primary) : undefined;
   // Where each starting unit appeared, as the flat map's dots are placed (#5346).
@@ -680,18 +678,6 @@ function UnitsView({
           {layers.layersShown ? (
             <div data-map-controls className="flex flex-col gap-3">
               <LayerSwitches layers={layers} only={UNIT_MAP_LAYERS} />
-              <div data-map-notes className="flex flex-col gap-2">
-                {on.startBoxes && !hasBoxes && (
-                  <p className="text-xs text-muted-foreground">
-                    <Trans>This match set no start boxes.</Trans>
-                  </p>
-                )}
-                {noStarts && (
-                  <p className="text-xs text-muted-foreground">
-                    <Trans>This replay recorded no start positions.</Trans>
-                  </p>
-                )}
-              </div>
             </div>
           ) : (
             on.startBoxes &&

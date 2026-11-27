@@ -374,7 +374,7 @@ describe("deaths", () => {
     show();
     fireEvent.click(toggle("Deaths"));
     expect(
-      await screen.findByText(/Most is 2 deaths within 128 elmos of one spot/),
+      await screen.findByText(/Most is 2 deaths in one spot/),
     ).toBeTruthy();
     expect(screen.getByText("Where units died")).toBeTruthy();
     expect(layer("deaths")).toBeTruthy();
@@ -412,14 +412,15 @@ describe("deaths", () => {
     expect(help().getByText(/Every player's deaths are counted/)).toBeTruthy();
   });
 
-  it("says so, and draws nothing, when nothing died", async () => {
+  it("draws nothing, and has no note, when nothing died", async () => {
     analysed();
     EVENTS = [];
     show();
     fireEvent.click(toggle("Deaths"));
-    expect(
-      await screen.findByText(/No unit died in this analysis/),
-    ).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.queryByText(/Reading events/)).toBeNull(),
+    );
+    expect(screen.queryByText(/No unit died/)).toBeNull();
     expect(layer("deaths")).toBeNull();
     expect(screen.queryByText("Least")).toBeNull();
   });
@@ -509,9 +510,7 @@ describe("metal cost", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Metal cost lost" }));
     // The first two deaths are a factory (600) and a tank (100), 700 together.
     expect(
-      await screen.findByText(
-        /Most is 700 metal of units lost within 128 elmos of one spot/,
-      ),
+      await screen.findByText(/Most is 700 metal of units lost in one spot/),
     ).toBeTruthy();
     expect(screen.getByText("Where metal was lost")).toBeTruthy();
     expect(screen.queryByText(/where value was lost/)).toBeNull();
@@ -618,15 +617,12 @@ describe("buildings finished", () => {
 describe("the time window with events", () => {
   const press = pressWindowPreset;
 
-  it("counts deaths in deaths, and says the window is when each happened", async () => {
+  it("says in the help that the window is when each event happened", async () => {
     analysed();
     EVENTS = DEATHS;
     show();
     fireEvent.click(toggle("Deaths"));
-    expect(await screen.findByText(/3 of 3 deaths/)).toBeTruthy();
-    expect(
-      screen.getByText(/Events from|The whole match, 0:00 to 30:00/),
-    ).toBeTruthy();
+    expect(await screen.findByText(/Most is 2 deaths/)).toBeTruthy();
     expect(
       screen.queryByText(/The window is when each event happened/),
     ).toBeNull();
@@ -635,7 +631,6 @@ describe("the time window with events", () => {
         /The window is when each event happened in the playback\./,
       ),
     ).toBeTruthy();
-    expect(screen.queryByText(/of \d+ orders/)).toBeNull();
   });
 
   it("narrows the layer and its legend to the window", async () => {
@@ -643,37 +638,34 @@ describe("the time window with events", () => {
     EVENTS = DEATHS;
     show();
     fireEvent.click(toggle("Deaths"));
-    await screen.findByText(/3 of 3 deaths/);
+    await screen.findByText(/Most is 2 deaths in one spot\./);
     press("First 5 minutes");
     // Both close deaths are before five minutes and the late one is not.
-    expect(await screen.findByText(/2 of 3 deaths/)).toBeTruthy();
     expect(
-      screen.getByText(
-        /Most is 2 deaths within 128 elmos of one spot in this window/,
-      ),
+      await screen.findByText(/Most is 2 deaths in one spot in this window/),
     ).toBeTruthy();
-    expect(screen.getByText(/Events from 0:00 to 5:00/)).toBeTruthy();
     // The late death is at 20 minutes, which is outside the last five.
     press("Last 5 minutes");
-    expect(await screen.findByText(/0 of 3 deaths/)).toBeTruthy();
+    await waitFor(() => expect(layer("deaths")).toBeNull());
     press("Whole match");
-    expect(await screen.findByText(/3 of 3 deaths/)).toBeTruthy();
+    expect(
+      await screen.findByText(/Most is 2 deaths in one spot\./),
+    ).toBeTruthy();
   });
 
-  it("says none happened, and draws nothing, for an empty window", async () => {
+  it("draws nothing for an empty window", async () => {
     analysed();
     EVENTS = DEATHS.slice(0, 2);
     show();
     fireEvent.click(toggle("Deaths"));
-    await screen.findByText(/2 of 2 deaths/);
+    await screen.findByText(/Most is 2 deaths in one spot\./);
     press("Last 5 minutes");
-    expect(await screen.findByText(/0 of 2 deaths/)).toBeTruthy();
-    expect(layer("deaths")).toBeNull();
+    await waitFor(() => expect(layer("deaths")).toBeNull());
     expect(screen.queryByText("Least")).toBeNull();
     expect(screen.queryByText(/No unit died/)).toBeNull();
   });
 
-  it("states orders and events apart and does not add them up", async () => {
+  it("reads orders and events through one window, and says in the help what it is for each", async () => {
     analysed();
     EVENTS = DEATHS;
     ORDERS = {
@@ -689,9 +681,7 @@ describe("the time window with events", () => {
     show();
     fireEvent.click(toggle("Buildings ordered"));
     fireEvent.click(toggle("Deaths"));
-    expect(await screen.findByText(/2 of 2 orders/)).toBeTruthy();
-    expect(screen.getByText(/3 of 3 deaths/)).toBeTruthy();
-    expect(screen.queryByText(/5 of 5/)).toBeNull();
+    expect(await screen.findByText(/Most is 2 deaths/)).toBeTruthy();
     expect(
       help().getByText(
         /For orders the window is when each was given, not when anything was built\. For events it is when each happened in the playback\./,
@@ -699,10 +689,8 @@ describe("the time window with events", () => {
     ).toBeTruthy();
     press("First 5 minutes");
     expect(
-      await screen.findByText(/Orders given and events from 0:00 to 5:00/),
+      await screen.findByText(/Most is 2 deaths in one spot in this window/),
     ).toBeTruthy();
-    expect(screen.getByText(/2 of 2 orders/)).toBeTruthy();
-    expect(screen.getByText(/2 of 3 deaths/)).toBeTruthy();
   });
 
   it("leaves the orders' own readout alone when only an order layer is on", async () => {
@@ -716,7 +704,7 @@ describe("the time window with events", () => {
     };
     show();
     fireEvent.click(toggle("Buildings ordered"));
-    expect(await screen.findByText(/1 of 1 orders/)).toBeTruthy();
+    await waitFor(() => expect(layer("buildings")).toBeTruthy());
     expect(
       screen.queryByText(/The window is when an order was given/),
     ).toBeNull();
@@ -786,9 +774,7 @@ describe("damage dealt", () => {
     show();
     fireEvent.click(toggle("Damage dealt"));
     expect(
-      await screen.findByText(
-        /Most is 400 damage landed within 128 elmos of one spot/,
-      ),
+      await screen.findByText(/Most is 400 damage landed in one spot/),
     ).toBeTruthy();
     expect(layer("damage")).toBeTruthy();
     const said = help();
@@ -809,9 +795,7 @@ describe("damage dealt", () => {
     await screen.findByText("Where damage landed");
     fireEvent.click(screen.getByRole("radio", { name: "Where it came from" }));
     expect(
-      await screen.findByText(
-        /Most is 400 damage was dealt from within 128 elmos of one spot/,
-      ),
+      await screen.findByText(/Most is 400 damage was dealt from one spot/),
     ).toBeTruthy();
     expect(screen.getByText("Where damage came from")).toBeTruthy();
   });
@@ -841,7 +825,7 @@ describe("damage dealt", () => {
     pressWindowPreset("First 5 minutes");
     expect(
       await screen.findByText(
-        /Most is 400 damage landed within 128 elmos of one spot in this window/,
+        /Most is 400 damage landed in one spot in this window/,
       ),
     ).toBeTruthy();
     expect(
@@ -860,12 +844,14 @@ describe("damage dealt", () => {
     expect(layer("damage")).toBeNull();
   });
 
-  it("says so when a match had no damage", async () => {
+  it("draws nothing, and has no note, when a match had no damage", async () => {
     analysed({ loggerVersion: 4 });
     EVENTS = [HEADER];
     show();
     fireEvent.click(toggle("Damage dealt"));
-    expect(await screen.findByText(/No damage was recorded\./)).toBeTruthy();
+    await waitFor(() => expect(layerReads()).not.toEqual([]));
+    expect(screen.queryByText(/No damage was recorded/)).toBeNull();
+    expect(layer("damage")).toBeNull();
   });
 
   it("will not place damage recorded on a grid that is not this map's", async () => {

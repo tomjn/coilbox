@@ -245,8 +245,6 @@ export function ReplayMapHeat({
     info,
     extent: on.startBoxes ? extent : null,
   });
-  const hasBoxes = startAreas.loading || startAreas.areas.length > 0;
-  const noStarts = on.starts && (info.startPositions?.length ?? 0) === 0;
   const [marksW, marksH] = [MARKS_WIDTH, Math.round(MARKS_WIDTH / ratio)];
   const recordedGame = units.recorded;
   const differentBuild = otherBuild(units.source);
@@ -337,17 +335,6 @@ export function ReplayMapHeat({
                 <EventLayerNotes ev={ev} />
                 <StartUnitNotes ev={ev} info={info} />
 
-                {on.startBoxes && !hasBoxes && (
-                  <p className="text-xs text-muted-foreground">
-                    <Trans>This match set no start boxes.</Trans>
-                  </p>
-                )}
-
-                {noStarts && (
-                  <p className="text-xs text-muted-foreground">
-                    <Trans>This replay recorded no start positions.</Trans>
-                  </p>
-                )}
                 <ReadNotes layers={layers} />
 
                 {on.buildings && placed > 0 && (

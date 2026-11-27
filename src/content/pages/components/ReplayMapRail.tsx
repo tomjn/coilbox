@@ -213,19 +213,18 @@ export function LayerSwitches({
 
 /** What the peak of an order heat field holds, in words. */
 function orderPeak(
-  field: { peakWithinRadius?: number; radius: number },
+  field: { peakWithinRadius?: number },
   inWindow: boolean,
 ): string {
   const count = Math.round(field.peakWithinRadius ?? 0);
-  const radius = formatNumber(Math.round(field.radius));
   return inWindow
     ? plural(count, {
-        one: `# order within ${radius} elmos of one spot in this window`,
-        other: `# orders within ${radius} elmos of one spot in this window`,
+        one: `# order in one spot in this window`,
+        other: `# orders in one spot in this window`,
       })
     : plural(count, {
-        one: `# order within ${radius} elmos of one spot`,
-        other: `# orders within ${radius} elmos of one spot`,
+        one: `# order in one spot`,
+        other: `# orders in one spot`,
       });
 }
 
@@ -274,16 +273,8 @@ export function HeatLegends({ layers }: { layers: ReplayMapLayers }) {
 /** What is still being read, what could not be, and what came back empty, for
  *  the layers that read build orders and every order. */
 export function ReadNotes({ layers }: { layers: ReplayMapLayers }) {
-  const {
-    orders,
-    orderPoints,
-    wantOrders,
-    wantPoints,
-    result,
-    built,
-    placedCount,
-    allOrders,
-  } = layers;
+  const { orders, orderPoints, wantOrders, wantPoints, result, allOrders } =
+    layers;
   return (
     <>
       {wantOrders && orders.loading && (
@@ -294,11 +285,6 @@ export function ReadNotes({ layers }: { layers: ReplayMapLayers }) {
       {wantOrders && orders.failed && (
         <p className="text-xs text-destructive">
           <Trans>The build orders could not be read from this replay.</Trans>
-        </p>
-      )}
-      {wantOrders && built && placedCount.total === 0 && (
-        <p className="text-xs text-muted-foreground">
-          <Trans>No buildings were ordered in this replay.</Trans>
         </p>
       )}
       {wantOrders && result?.incomplete && (
@@ -318,13 +304,6 @@ export function ReadNotes({ layers }: { layers: ReplayMapLayers }) {
       {wantPoints && orderPoints.failed && (
         <p className="text-xs text-destructive">
           <Trans>The orders could not be read from this replay.</Trans>
-        </p>
-      )}
-      {wantPoints && allOrders && allOrders.count === 0 && (
-        <p className="text-xs text-muted-foreground">
-          <Trans>
-            No orders with a place on the map were given in this replay.
-          </Trans>
         </p>
       )}
       {wantPoints && allOrders?.incomplete && (
