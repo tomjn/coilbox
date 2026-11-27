@@ -17,10 +17,7 @@ use super::def_sets::{usable_text, MAX_NAME_BYTES, MAX_UNITS};
 use crate::model::StreamEventKind;
 
 /// One `NETMSG_LUAMSG`, borrowed from the stream.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "no decoder reads `mode` yet")
-)]
+#[cfg_attr(not(test), expect(dead_code, reason = "no decoder reads `mode` yet"))]
 pub(super) struct LuaMsg<'a> {
     /// The game the replay was recorded on, as the start script's `gametype`
     /// names it, version included. For a remix it is the game before the remix,
