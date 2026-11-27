@@ -2166,10 +2166,14 @@ describe("the map card's modes", () => {
     expect(screen.queryByRole("button", { name: "Analyse replay" })).toBeNull();
   });
 
-  it("puts the count of marks and the unit's name in the rail in Units, and the flat map's layers in Heat", async () => {
+  it("puts the count of marks in the rail in Units and the unit's name on the map, and the flat map's layers in Heat", async () => {
     await show();
     expect(within(rail()).getByText(/1 unit, 0 projectiles/)).toBeTruthy();
-    expect(within(rail()).getByTestId("recorded-unit-name")).toBeTruthy();
+    // On the map, so naming a unit never moves the switches in the rail.
+    expect(within(rail()).queryByTestId("recorded-unit-name")).toBeNull();
+    expect(
+      screen.getByTestId("recorded-unit-name").closest("[data-map-ground]"),
+    ).toBeTruthy();
     expect(within(rail()).getByText(/Bot \(AI\), Team 2/)).toBeTruthy();
 
     await pick("Heat");

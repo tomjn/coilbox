@@ -20,7 +20,7 @@ import {
   type MapView,
   type MapViewStatus,
 } from "../../replayMapView/loop";
-import type { TeamStyle } from "../../replayMapView/paint";
+import type { PaintCounts, TeamStyle } from "../../replayMapView/paint";
 import { TIMELINE_KEYS } from "../../replayMapView/timelineKeys";
 import { teamLabel } from "../../replaySideLabel";
 import type { ReplayTrackError, ReplayTrackHandle } from "../../replayTrack";
@@ -261,6 +261,41 @@ function TeamKey({
 }
 
 /** Whose a team is, in words, so two teams are told apart without colour. */
+/** The space between the unit's name and its ring or the map's edge, in CSS
+ *  pixels. */
+const NAME_GAP = 4;
+
+/**
+ * Puts the unit's name just above its ring, or below it where the ring is too
+ * near the map's top, and inside the map's sides. Hidden while no unit is
+ * ringed. `ring` is in canvas pixels, which the canvas's size on the page
+ * turns into CSS pixels.
+ */
+export function placeName(
+  label: HTMLElement | null,
+  canvas: HTMLCanvasElement | null,
+  ring: PaintCounts["ring"],
+): void {
+  if (!label || !canvas) return;
+  const box = canvas.getBoundingClientRect();
+  if (!ring || box.width === 0 || canvas.width === 0) {
+    label.style.visibility = "hidden";
+    return;
+  }
+  const k = box.width / canvas.width;
+  const width = label.offsetWidth;
+  const height = label.offsetHeight;
+  const left = Math.min(
+    Math.max(ring.x * k - width / 2, NAME_GAP),
+    box.width - width - NAME_GAP,
+  );
+  const above = (ring.y - ring.radius) * k - NAME_GAP - height;
+  const below = (ring.y + ring.radius) * k + NAME_GAP;
+  label.style.left = `${Math.max(left, 0)}px`;
+  label.style.top = `${above >= NAME_GAP ? above : below}px`;
+  label.style.visibility = "visible";
+}
+
 function ownerWords(header: ReplayTrackHeader, teamId: number): string {
   const team = header.teams.find((candidate) => candidate.id === teamId);
   if (!team) return t`no team`;
@@ -371,6 +406,7 @@ function UnitsView({
   const groundRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const countsRef = useRef<HTMLParagraphElement | null>(null);
+  const nameRef = useRef<HTMLParagraphElement | null>(null);
   const viewRef = useRef<MapView | null>(null);
   const [status, setStatus] = useState<MapViewStatus>({ kind: "ready" });
   const [pointed, setPointed] = useState<Named | null>(null);
@@ -445,6 +481,7 @@ function UnitsView({
       },
       onStatus: setStatus,
       onPainted: (_frame, counts) => {
+        placeName(nameRef.current, canvasRef.current, counts.ring);
         if (!countsRef.current) return;
         countsRef.current.textContent = [
           plural(counts.units, { one: "# unit", other: "# units" }),
@@ -590,6 +627,16 @@ function UnitsView({
               onPointerLeave={() => setPointed(null)}
               onClick={(event) => setChosen(unitAt(event))}
             />
+            {/* Above the ringed unit, placed after each picture so it follows
+                the unit as it moves. Hidden until it has been placed. */}
+            <p
+              ref={nameRef}
+              data-testid="recorded-unit-name"
+              style={{ visibility: "hidden" }}
+              className="pointer-events-none absolute left-0 top-0 max-w-[80%] rounded-md border border-border bg-popover px-2 py-1 text-xs font-medium text-popover-foreground shadow-md empty:hidden"
+            >
+              {named ? `${unitName}, ${ownerWords(header, named.team)}` : ""}
+            </p>
             {status.kind === "loading" && (
               <span
                 role="status"
@@ -634,12 +681,6 @@ function UnitsView({
               drawing={drawing}
             />
           </MapHelp>
-          <p
-            data-testid="recorded-unit-name"
-            className="min-h-4 text-xs font-medium"
-          >
-            {named ? `${unitName}, ${ownerWords(header, named.team)}` : ""}
-          </p>
           <ToggleGroup
             type="single"
             variant="outline"
