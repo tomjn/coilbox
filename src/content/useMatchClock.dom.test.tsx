@@ -9,7 +9,7 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   durationRange,
   MatchClockProvider,
@@ -143,12 +143,25 @@ describe("useMatchFrameValue", () => {
     return { ...hook, renders };
   }
 
-  it("stands still while a drag moves the clock, and takes the settled frame when it ends", () => {
-    const { result } = selectBy(100);
-    act(() => result.current.playback.seek(250, { settle: false }));
-    expect(result.current.value).toBe(0);
-    act(() => result.current.playback.settle());
-    expect(result.current.value).toBe(2);
+  it("follows a drag at most once every 150 ms, and takes the settled frame when it ends", () => {
+    vi.useFakeTimers();
+    try {
+      const { result } = selectBy(100);
+      act(() => result.current.playback.seek(250, { settle: false }));
+      expect(result.current.value).toBe(2);
+      // Inside the window: held back.
+      act(() => result.current.playback.seek(350, { settle: false }));
+      expect(result.current.value).toBe(2);
+      act(() => {
+        vi.advanceTimersByTime(150);
+      });
+      expect(result.current.value).toBe(3);
+      act(() => result.current.playback.seek(450, { settle: false }));
+      act(() => result.current.playback.settle());
+      expect(result.current.value).toBe(4);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("follows the clock while playing, rendering only when the value changes", () => {
