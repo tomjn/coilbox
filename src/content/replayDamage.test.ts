@@ -159,11 +159,11 @@ describe("the legend", () => {
   it("names which end of the damage is drawn and states the peak", () => {
     expect(damageLegend(field, "at", false)).toEqual({
       label: "Where damage landed",
-      peak: "1,234 damage landed within 128 elmos of one spot",
+      peak: "1,234 damage landed in one spot",
     });
     expect(damageLegend(field, "origin", true)).toEqual({
       label: "Where damage came from",
-      peak: "1,234 damage was dealt from within 128 elmos of one spot in this window",
+      peak: "1,234 damage was dealt from one spot in this window",
     });
   });
 });

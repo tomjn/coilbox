@@ -2283,14 +2283,12 @@ msgid "{count, plural, one {# objective} other {# objectives}}"
 msgstr "{count, plural, one {# στόχος} other {# στόχοι}}"
 
 #: src/content/pages/components/ReplayMapRail.tsx
-#, fuzzy
-msgid "{count, plural, one {# order within {radius} elmos of one spot in this window} other {# orders within {radius} elmos of one spot in this window}}"
-msgstr "{count, plural, one {# εντολή σε απόσταση {radius} elmos από ένα σημείο σε αυτό το χρονικό διάστημα} other {# εντολές σε απόσταση {radius} elmos από ένα σημείο σε αυτό το χρονικό διάστημα}}"
+msgid "{count, plural, one {# order in one spot in this window} other {# orders in one spot in this window}}"
+msgstr ""
 
 #: src/content/pages/components/ReplayMapRail.tsx
-#, fuzzy
-msgid "{count, plural, one {# order within {radius} elmos of one spot} other {# orders within {radius} elmos of one spot}}"
-msgstr "{count, plural, one {# εντολή σε απόσταση {radius} elmos από ένα σημείο} other {# εντολές σε απόσταση {radius} elmos από ένα σημείο}}"
+msgid "{count, plural, one {# order in one spot} other {# orders in one spot}}"
+msgstr ""
 
 #: src/lego/unitCheck.ts
 #, fuzzy
@@ -3597,11 +3595,6 @@ msgstr "{infoCount, plural, one {# σημείωση} other {# σημειώσει
 msgid "{inProgress} in progress"
 msgstr "Σε εξέλιξη: {inProgress}"
 
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
-#, fuzzy
-msgid "{inside} of {total} {countNoun}."
-msgstr "{inside} από {total} {countNoun}."
-
 #: src/profile/health.ts
 #, fuzzy
 msgid "{installedCount, plural, one {Filter ({filterDesc}) matched none of the # installed game: {sample}{more}. Adjust it to match one of these.} other {Filter ({filterDesc}) matched none of the # installed games: {sample}{more}. Adjust it to match one of these.}}"
@@ -4678,14 +4671,12 @@ msgid "{metal} metal"
 msgstr "{metal} μέταλλο"
 
 #: src/content/replayEventLayers.ts
-#, fuzzy
-msgid "{metal} metal of units lost within {radius} elmos of one spot"
-msgstr "{metal} μέταλλο σε μονάδες που χάθηκαν σε απόσταση {radius} elmos από ένα σημείο"
+msgid "{metal} metal of units lost in one spot"
+msgstr ""
 
 #: src/content/replayEventLayers.ts
-#, fuzzy
-msgid "{metal} metal of units lost within {radius} elmos of one spot in this window"
-msgstr "{metal} μέταλλο σε μονάδες που χάθηκαν σε απόσταση {radius} elmos από ένα σημείο σε αυτό το χρονικό διάστημα"
+msgid "{metal} metal of units lost in one spot in this window"
+msgstr ""
 
 #: src/direct/ReachablePorts.tsx
 #, fuzzy
@@ -5798,34 +5789,28 @@ msgid "{pathName} · point {pointNumber}"
 msgstr "{pathName} · σημείο {pointNumber}"
 
 #: src/content/replayEventLayers.ts
-#, fuzzy
-msgid "{peak, plural, one {# death within {radius} elmos of one spot in this window} other {# deaths within {radius} elmos of one spot in this window}}"
-msgstr "{peak, plural, one {# απώλεια σε απόσταση {radius} elmos από ένα σημείο σε αυτό το χρονικό διάστημα} other {# απώλειες σε απόσταση {radius} elmos από ένα σημείο σε αυτό το χρονικό διάστημα}}"
+msgid "{peak, plural, one {# death in one spot in this window} other {# deaths in one spot in this window}}"
+msgstr ""
 
 #: src/content/replayEventLayers.ts
-#, fuzzy
-msgid "{peak, plural, one {# death within {radius} elmos of one spot} other {# deaths within {radius} elmos of one spot}}"
-msgstr "{peak, plural, one {# απώλεια σε απόσταση {radius} elmos από ένα σημείο} other {# απώλειες σε απόσταση {radius} elmos από ένα σημείο}}"
+msgid "{peak, plural, one {# death in one spot} other {# deaths in one spot}}"
+msgstr ""
 
 #: src/content/replayDamage.ts
-#, fuzzy
-msgid "{peak} damage landed within {radius} elmos of one spot"
-msgstr "{peak} ζημιά προκλήθηκε σε απόσταση {radius} elmos από ένα σημείο"
+msgid "{peak} damage landed in one spot"
+msgstr ""
 
 #: src/content/replayDamage.ts
-#, fuzzy
-msgid "{peak} damage landed within {radius} elmos of one spot in this window"
-msgstr "{peak} ζημιά προκλήθηκε σε απόσταση {radius} elmos από ένα σημείο σε αυτό το χρονικό διάστημα"
+msgid "{peak} damage landed in one spot in this window"
+msgstr ""
 
 #: src/content/replayDamage.ts
-#, fuzzy
-msgid "{peak} damage was dealt from within {radius} elmos of one spot"
-msgstr "{peak} ζημιά προκλήθηκε από απόσταση {radius} elmos από ένα σημείο"
+msgid "{peak} damage was dealt from one spot"
+msgstr ""
 
 #: src/content/replayDamage.ts
-#, fuzzy
-msgid "{peak} damage was dealt from within {radius} elmos of one spot in this window"
-msgstr "{peak} ζημιά προκλήθηκε από απόσταση {radius} elmos από ένα σημείο σε αυτό το χρονικό διάστημα"
+msgid "{peak} damage was dealt from one spot in this window"
+msgstr ""
 
 #: src/workshop/pages/components/InPlaceWrite.tsx
 #, fuzzy
@@ -6924,11 +6909,6 @@ msgstr "{subject}: προέρχονται από τη λίστα μονάδων 
 #, fuzzy
 msgid "{subject} progress"
 msgstr "Πρόοδος {subject}"
-
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
-#, fuzzy
-msgid "{subjectLabel} from {rangeStart} to {rangeEnd}."
-msgstr "{subjectLabel} από {rangeStart} έως {rangeEnd}."
 
 #: src/challenge/ImportChallengeForm.tsx
 #, fuzzy
@@ -14727,11 +14707,6 @@ msgstr "Πυκνότητα κτιρίων"
 #, fuzzy
 msgid "Building mask"
 msgstr "Μάσκα κτιρίων"
-
-#: src/content/pages/components/ReplayMapRail.tsx
-#, fuzzy
-msgid "building orders"
-msgstr "εντολές κτιρίων"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -22743,11 +22718,6 @@ msgstr "Γεγονός"
 #, fuzzy
 msgid "Event log downloaded."
 msgstr "Το αρχείο καταγραφής γεγονότων λήφθηκε."
-
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
-#, fuzzy
-msgid "Events"
-msgstr "Γεγονότα"
 
 #: src/content/pages/components/ReplayEventList.tsx
 #: src/content/pages/components/ReplayPanel.tsx
@@ -33462,11 +33432,6 @@ msgstr "Εφιάλτης"
 msgid "No"
 msgstr "Όχι"
 
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
-#, fuzzy
-msgid "No {countNoun}."
-msgstr "{countNoun}: κανένα."
-
 #: src/lego/pages/components/MovementSection.tsx
 #, fuzzy
 msgid "no {standsIn} class"
@@ -33644,11 +33609,6 @@ msgstr "Κανένας κατασκευαστής δεν ταιριάζει."
 msgid "No buildings"
 msgstr "Κανένα κτίριο"
 
-#: src/content/pages/components/ReplayMapRail.tsx
-#, fuzzy
-msgid "No buildings were ordered in this replay."
-msgstr "Δεν δόθηκαν εντολές για κτίρια σε αυτή την επανάληψη."
-
 #: src/lego/overlap.ts
 #, fuzzy
 msgid "No buried pieces."
@@ -33757,16 +33717,6 @@ msgstr ""
 #, fuzzy
 msgid "No counted game has a figure for {label}."
 msgstr "Κανένα μετρημένο παιχνίδι δεν έχει αριθμό για {label}."
-
-#: src/content/pages/components/ReplayEventLayers.tsx
-#, fuzzy
-msgid "No damage was recorded in this window."
-msgstr "Δεν καταγράφηκε ζημιά σε αυτό το χρονικό διάστημα."
-
-#: src/content/pages/components/ReplayEventLayers.tsx
-#, fuzzy
-msgid "No damage was recorded."
-msgstr "Δεν καταγράφηκε ζημιά."
 
 #: src/content/pages/PlayerDossierPage.tsx
 #: src/content/pages/StatsPage.tsx
@@ -34571,11 +34521,6 @@ msgstr "Δεν δόθηκαν εντολές σε αυτό το διάστημα
 msgid "No orders were given."
 msgstr "Δεν δόθηκαν εντολές."
 
-#: src/content/pages/components/ReplayMapRail.tsx
-#, fuzzy
-msgid "No orders with a place on the map were given in this replay."
-msgstr "Δεν δόθηκαν εντολές με θέση στον χάρτη σε αυτή την επανάληψη."
-
 #: src/lego/rerollPart.ts
 #, fuzzy
 msgid "No other module is in the {category} category."
@@ -35289,11 +35234,6 @@ msgstr "Κανένα ζεύγος σημείων δεν βρίσκεται πι�
 #, fuzzy
 msgid "No unit data available for this game."
 msgstr "Δεν υπάρχουν διαθέσιμα δεδομένα μονάδων για αυτό το παιχνίδι."
-
-#: src/content/pages/components/ReplayEventLayers.tsx
-#, fuzzy
-msgid "No unit died in this analysis."
-msgstr "Καμία μονάδα δεν πέθανε σε αυτή την ανάλυση."
 
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
@@ -38076,7 +38016,6 @@ msgid "Ordered cost: {metal} metal and {energy} energy."
 msgstr "Κόστος εντολών: {metal} μέταλλο και {energy} ενέργεια."
 
 #: src/content/mapAggregate.ts
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "orders"
 msgstr "εντολές"
@@ -38096,26 +38035,11 @@ msgstr "Εντολές που έστειλε ένα widget στον υπολογ
 msgid "Orders aimed at a unit are not on it, as the replay holds the unit and not its position."
 msgstr "Οι εντολές που στοχεύουν μονάδα δεν εμφανίζονται σε αυτόν, επειδή η επανάληψη κρατά τη μονάδα και όχι τη θέση της."
 
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
-#, fuzzy
-msgid "Orders given"
-msgstr "Εντολές που δόθηκαν"
-
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
-#, fuzzy
-msgid "Orders given and events"
-msgstr "Εντολές που δόθηκαν και συμβάντα"
-
 #. placeholder {0}: rates.periodSec
 #: src/content/pages/components/CommandRateChart.tsx
 #, fuzzy
 msgid "Orders given in each {0} second stretch, shown as a rate per minute."
 msgstr "Εντολές που δόθηκαν σε κάθε διάστημα {0} δευτερολέπτων, ως ρυθμός ανά λεπτό."
-
-#: src/content/pages/components/ReplayMapRail.tsx
-#, fuzzy
-msgid "orders on the map"
-msgstr "εντολές στον χάρτη"
 
 #: src/content/pages/components/CommandRateChart.tsx
 #, fuzzy
@@ -52846,11 +52770,6 @@ msgstr "Διαγράφεται ολόκληρος ο φάκελος, απελε�
 msgid "the whole match"
 msgstr "ολόκληρος ο αγώνας"
 
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
-#, fuzzy
-msgid "The whole match, {matchStart} to {matchEnd}."
-msgstr "Ολόκληρος ο αγώνας, από {matchStart} έως {matchEnd}."
-
 #: src/placement/SurfaceBars.tsx
 #, fuzzy
 msgid "The whole selection swung a quarter turn about its own middle, so it keeps its shape. Press R to turn each thing where it stands instead."
@@ -53114,11 +53033,6 @@ msgstr "Αυτός ο λογαριασμός έχει δημοσιεύσει 20 
 #, fuzzy
 msgid "This analysis is from an older logger, so a path may stop where the unit was upgraded."
 msgstr "Αυτή η ανάλυση είναι από παλαιότερο καταγραφέα, οπότε μια διαδρομή μπορεί να σταματά εκεί που αναβαθμίστηκε η μονάδα."
-
-#: src/content/pages/components/ReplayStartUnitLayer.tsx
-#, fuzzy
-msgid "This analysis recorded no starting unit."
-msgstr "Αυτή η ανάλυση δεν κατέγραψε αρχική μονάδα."
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -53888,12 +53802,6 @@ msgstr ""
 msgid "This match never recorded a game over, usually because it was quit before it ended. There is nothing to check a playback against, so it cannot be analysed."
 msgstr "Αυτός ο αγώνας δεν κατέγραψε ποτέ τέλος παιχνιδιού, συνήθως επειδή έκλεισε πριν τελειώσει. Δεν υπάρχει κάτι για σύγκριση με την αναπαραγωγή, οπότε δεν μπορεί να αναλυθεί."
 
-#: src/content/pages/components/ReplayMapHeat.tsx
-#: src/content/pages/components/ReplayMapUnits.tsx
-#, fuzzy
-msgid "This match set no start boxes."
-msgstr "Αυτός ο αγώνας δεν όρισε περιοχές εκκίνησης."
-
 #: src/scenario/wording.ts
 #, fuzzy
 msgid "This mission comes with {gameName}, which plays it itself."
@@ -54302,12 +54210,6 @@ msgstr "Αυτή η επανάληψη είναι μικρότερη από έν
 #, fuzzy
 msgid "This replay needs engine {version}, which is not installed and cannot be downloaded here."
 msgstr "Αυτή η επανάληψη χρειάζεται τη μηχανή {version}, που δεν είναι εγκατεστημένη και δεν μπορεί να ληφθεί εδώ."
-
-#: src/content/pages/components/ReplayMapHeat.tsx
-#: src/content/pages/components/ReplayMapUnits.tsx
-#, fuzzy
-msgid "This replay recorded no start positions."
-msgstr "Αυτή η επανάληψη δεν κατέγραψε θέσεις εκκίνησης."
 
 #. placeholder {0}: units.recorded
 #: src/content/pages/components/ReplayEventLayers.tsx

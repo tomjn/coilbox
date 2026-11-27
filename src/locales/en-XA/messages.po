@@ -1879,11 +1879,11 @@ msgid "{count, plural, one {# objective} other {# objectives}}"
 msgstr ""
 
 #: src/content/pages/components/ReplayMapRail.tsx
-msgid "{count, plural, one {# order within {radius} elmos of one spot in this window} other {# orders within {radius} elmos of one spot in this window}}"
+msgid "{count, plural, one {# order in one spot in this window} other {# orders in one spot in this window}}"
 msgstr ""
 
 #: src/content/pages/components/ReplayMapRail.tsx
-msgid "{count, plural, one {# order within {radius} elmos of one spot} other {# orders within {radius} elmos of one spot}}"
+msgid "{count, plural, one {# order in one spot} other {# orders in one spot}}"
 msgstr ""
 
 #: src/lego/unitCheck.ts
@@ -2943,10 +2943,6 @@ msgstr ""
 msgid "{inProgress} in progress"
 msgstr ""
 
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
-msgid "{inside} of {total} {countNoun}."
-msgstr ""
-
 #: src/profile/health.ts
 msgid "{installedCount, plural, one {Filter ({filterDesc}) matched none of the # installed game: {sample}{more}. Adjust it to match one of these.} other {Filter ({filterDesc}) matched none of the # installed games: {sample}{more}. Adjust it to match one of these.}}"
 msgstr ""
@@ -3814,11 +3810,11 @@ msgid "{metal} metal"
 msgstr ""
 
 #: src/content/replayEventLayers.ts
-msgid "{metal} metal of units lost within {radius} elmos of one spot"
+msgid "{metal} metal of units lost in one spot"
 msgstr ""
 
 #: src/content/replayEventLayers.ts
-msgid "{metal} metal of units lost within {radius} elmos of one spot in this window"
+msgid "{metal} metal of units lost in one spot in this window"
 msgstr ""
 
 #: src/direct/ReachablePorts.tsx
@@ -4713,27 +4709,27 @@ msgid "{pathName} · point {pointNumber}"
 msgstr ""
 
 #: src/content/replayEventLayers.ts
-msgid "{peak, plural, one {# death within {radius} elmos of one spot in this window} other {# deaths within {radius} elmos of one spot in this window}}"
+msgid "{peak, plural, one {# death in one spot in this window} other {# deaths in one spot in this window}}"
 msgstr ""
 
 #: src/content/replayEventLayers.ts
-msgid "{peak, plural, one {# death within {radius} elmos of one spot} other {# deaths within {radius} elmos of one spot}}"
+msgid "{peak, plural, one {# death in one spot} other {# deaths in one spot}}"
 msgstr ""
 
 #: src/content/replayDamage.ts
-msgid "{peak} damage landed within {radius} elmos of one spot"
+msgid "{peak} damage landed in one spot"
 msgstr ""
 
 #: src/content/replayDamage.ts
-msgid "{peak} damage landed within {radius} elmos of one spot in this window"
+msgid "{peak} damage landed in one spot in this window"
 msgstr ""
 
 #: src/content/replayDamage.ts
-msgid "{peak} damage was dealt from within {radius} elmos of one spot"
+msgid "{peak} damage was dealt from one spot"
 msgstr ""
 
 #: src/content/replayDamage.ts
-msgid "{peak} damage was dealt from within {radius} elmos of one spot in this window"
+msgid "{peak} damage was dealt from one spot in this window"
 msgstr ""
 
 #: src/workshop/pages/components/InPlaceWrite.tsx
@@ -5619,10 +5615,6 @@ msgstr ""
 
 #: src/hub/assets/UploadRunBadge.tsx
 msgid "{subject} progress"
-msgstr ""
-
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
-msgid "{subjectLabel} from {rangeStart} to {rangeEnd}."
 msgstr ""
 
 #: src/challenge/ImportChallengeForm.tsx
@@ -11992,10 +11984,6 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "Building mask"
-msgstr ""
-
-#: src/content/pages/components/ReplayMapRail.tsx
-msgid "building orders"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -18569,10 +18557,6 @@ msgstr ""
 
 #: src/content/pages/components/ReplayEventList.tsx
 msgid "Event log downloaded."
-msgstr ""
-
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
-msgid "Events"
 msgstr ""
 
 #: src/content/pages/components/ReplayEventList.tsx
@@ -27314,10 +27298,6 @@ msgstr ""
 msgid "No"
 msgstr ""
 
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
-msgid "No {countNoun}."
-msgstr ""
-
 #: src/lego/pages/components/MovementSection.tsx
 msgid "no {standsIn} class"
 msgstr ""
@@ -27460,10 +27440,6 @@ msgstr ""
 msgid "No buildings"
 msgstr ""
 
-#: src/content/pages/components/ReplayMapRail.tsx
-msgid "No buildings were ordered in this replay."
-msgstr ""
-
 #: src/lego/overlap.ts
 msgid "No buried pieces."
 msgstr ""
@@ -27550,14 +27526,6 @@ msgstr ""
 
 #: src/content/pages/components/PlayerMatchFigures.tsx
 msgid "No counted game has a figure for {label}."
-msgstr ""
-
-#: src/content/pages/components/ReplayEventLayers.tsx
-msgid "No damage was recorded in this window."
-msgstr ""
-
-#: src/content/pages/components/ReplayEventLayers.tsx
-msgid "No damage was recorded."
 msgstr ""
 
 #: src/content/pages/PlayerDossierPage.tsx
@@ -28210,10 +28178,6 @@ msgstr ""
 msgid "No orders were given."
 msgstr ""
 
-#: src/content/pages/components/ReplayMapRail.tsx
-msgid "No orders with a place on the map were given in this replay."
-msgstr ""
-
 #: src/lego/rerollPart.ts
 msgid "No other module is in the {category} category."
 msgstr ""
@@ -28788,10 +28752,6 @@ msgstr ""
 
 #: src/content/pages/components/UnitPicker.tsx
 msgid "No unit data available for this game."
-msgstr ""
-
-#: src/content/pages/components/ReplayEventLayers.tsx
-msgid "No unit died in this analysis."
 msgstr ""
 
 #: src/workshop/pages/UnitPage.tsx
@@ -31056,7 +31016,6 @@ msgid "Ordered cost: {metal} metal and {energy} energy."
 msgstr ""
 
 #: src/content/mapAggregate.ts
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
 msgid "orders"
 msgstr ""
 
@@ -31072,21 +31031,9 @@ msgstr ""
 msgid "Orders aimed at a unit are not on it, as the replay holds the unit and not its position."
 msgstr ""
 
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
-msgid "Orders given"
-msgstr ""
-
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
-msgid "Orders given and events"
-msgstr ""
-
 #. placeholder {0}: rates.periodSec
 #: src/content/pages/components/CommandRateChart.tsx
 msgid "Orders given in each {0} second stretch, shown as a rate per minute."
-msgstr ""
-
-#: src/content/pages/components/ReplayMapRail.tsx
-msgid "orders on the map"
 msgstr ""
 
 #: src/content/pages/components/CommandRateChart.tsx
@@ -43106,10 +43053,6 @@ msgstr ""
 msgid "the whole match"
 msgstr ""
 
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
-msgid "The whole match, {matchStart} to {matchEnd}."
-msgstr ""
-
 #: src/placement/SurfaceBars.tsx
 msgid "The whole selection swung a quarter turn about its own middle, so it keeps its shape. Press R to turn each thing where it stands instead."
 msgstr ""
@@ -43321,10 +43264,6 @@ msgstr ""
 
 #: src/content/pages/components/ReplayStartUnitLayer.tsx
 msgid "This analysis is from an older logger, so a path may stop where the unit was upgraded."
-msgstr ""
-
-#: src/content/pages/components/ReplayStartUnitLayer.tsx
-msgid "This analysis recorded no starting unit."
 msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
@@ -43945,11 +43884,6 @@ msgstr ""
 msgid "This match never recorded a game over, usually because it was quit before it ended. There is nothing to check a playback against, so it cannot be analysed."
 msgstr ""
 
-#: src/content/pages/components/ReplayMapHeat.tsx
-#: src/content/pages/components/ReplayMapUnits.tsx
-msgid "This match set no start boxes."
-msgstr ""
-
 #: src/scenario/wording.ts
 msgid "This mission comes with {gameName}, which plays it itself."
 msgstr ""
@@ -44276,11 +44210,6 @@ msgstr ""
 
 #: src/content/pages/components/useWatchTarget.ts
 msgid "This replay needs engine {version}, which is not installed and cannot be downloaded here."
-msgstr ""
-
-#: src/content/pages/components/ReplayMapHeat.tsx
-#: src/content/pages/components/ReplayMapUnits.tsx
-msgid "This replay recorded no start positions."
 msgstr ""
 
 #. placeholder {0}: units.recorded

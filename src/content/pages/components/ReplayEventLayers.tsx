@@ -5,7 +5,7 @@ import { ToggleGroup } from "@/components/ui/toggle-group";
 import { formatNumber } from "@/lib/format";
 import { drawHeatField, HEAT_EDGE_CLASS } from "@/lib/heatCanvas";
 import { HEAT_KIND_OF_LAYER } from "@/lib/heatRamp";
-import { ANALYSIS_SECTION_ID } from "../../replayAnalysis";
+import { goToAnalysisSection } from "../../replayAnalysis";
 import { damageLegend } from "../../replayDamage";
 import {
   deathLegend,
@@ -162,9 +162,7 @@ export function EventLayerCanvases({
 }
 
 export function goToAnalysis() {
-  document
-    .getElementById(ANALYSIS_SECTION_ID)
-    ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  goToAnalysisSection();
 }
 
 /** The outline shapes the finished marks use, one for each kind of building. */
@@ -289,11 +287,7 @@ export function EventLayerNotes({ ev }: { ev: EventLayers }) {
 
       {ev.deathsOn && ev.deathRead.status === "done" && (
         <>
-          {ev.deaths.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              <Trans>No unit died in this analysis.</Trans>
-            </p>
-          ) : (
+          {ev.deaths.length > 0 && (
             <p className="text-xs text-muted-foreground">
               <Plural
                 value={diedCount}
@@ -398,14 +392,7 @@ function DamageNotes({ ev }: { ev: EventLayers }) {
         </button>
       </p>
     );
-  if (ev.damageSums.landed === 0)
-    return (
-      <p className="text-xs text-muted-foreground" data-testid="damage">
-        {ev.windowed
-          ? t`No damage was recorded in this window.`
-          : t`No damage was recorded.`}
-      </p>
-    );
+  if (ev.damageSums.landed === 0) return null;
   if (!ev.damageFits)
     return (
       <p

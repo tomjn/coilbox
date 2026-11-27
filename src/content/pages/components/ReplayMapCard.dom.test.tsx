@@ -577,10 +577,27 @@ describe("a current track", () => {
     await show();
     const img = screen.getByAltText("Minimap of Test Map") as HTMLImageElement;
     expect(img.getAttribute("src")).toBe("asset://minimap.png");
+    // At full colour, not dimmed.
+    expect(img.className).not.toMatch(/opacity|saturate/);
     const ground = document.querySelector("[data-map-ground]") as HTMLElement;
     expect(ground.style.aspectRatio).toBe("8192 / 6144");
     expect(canvas()).not.toBeNull();
     expect(headerReads).toEqual([ID]);
+  });
+
+  it("puts the count line under the toggles, so its wrapping does not move them", async () => {
+    await show();
+    const counts = screen.getByText("1 unit, 0 projectiles, 0 wrecks");
+    for (const name of ["Icons", "Footprints", "Explosions", "Start boxes"]) {
+      const toggle = screen.getByRole(
+        name === "Icons" ? "radio" : name === "Footprints" ? "radio" : "button",
+        { name },
+      );
+      expect(
+        toggle.compareDocumentPosition(counts) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
   });
 
   it("draws a mark for each live unit as the time moves, and says how many", async () => {
@@ -2193,6 +2210,15 @@ describe("the map card's modes", () => {
       "calc(max(16rem, 100cqh - var(--replay-dock-reserve, 0px) - 4.5rem) * 8192 / 6144)",
     );
 
+    // The rail takes the width the map's cap leaves, so it is flush with the
+    // card's right edge for a tall map as for a wide one.
+    const railBox = rail();
+    expect(railBox.className).toContain("@xl:grow");
+    expect(railBox.className).toContain("@xl:shrink-0");
+    expect(railBox.className).not.toContain("@xl:w-52");
+    expect(column.className).toContain("@xl:grow-0");
+    expect(column.className).not.toContain("@xl:flex-1");
+
     await pick("Heat");
     const flat = document.querySelector("[data-map-ground]") as HTMLElement;
     expect(flat.style.aspectRatio).toBe("513 / 385");
@@ -2201,6 +2227,24 @@ describe("the map card's modes", () => {
     ).toBe(
       `calc(max(16rem, 100cqh - var(--replay-dock-reserve, 0px) - 4.5rem) * ${513 / 385} / 1)`,
     );
+  });
+});
+
+describe("the 3D view's viewport", () => {
+  it("fills the map column and is limited by height, not held to the map's shape", async () => {
+    await show();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("radio", { name: "3D" }));
+    });
+    await settle();
+    const view = document.querySelector("[data-map-3d]") as HTMLElement;
+    expect(view.style.aspectRatio).toBe("");
+    expect(view.style.getPropertyValue("--map-view-height")).toBe(
+      "max(16rem, 100cqh - var(--replay-dock-reserve, 0px) - 4.5rem)",
+    );
+    expect(view.className).toContain("h-(--map-view-height)");
+    const column = view.closest("[data-map-column]") as HTMLElement;
+    expect(column.style.maxWidth).toBe("");
   });
 });
 
@@ -2276,7 +2320,7 @@ describe("the Heat window lane (#5309)", () => {
     expect(screen.queryByRole("button", { name: "Heat window" })).toBeNull();
   });
 
-  it("sets the window the map's layers read, which says so under the map", async () => {
+  it("sets the window from the lane, with no line about it under the map", async () => {
     ORDERS = {
       orders: [
         {
@@ -2320,13 +2364,13 @@ describe("the Heat window lane (#5309)", () => {
       );
     });
     await settle();
-    screen.getByText(/The whole match, 0:00 to 0:05\. 2 of 2 orders/);
-
     // The order at frame 10 is in the first second.
     const start = screen.getByRole("slider", { name: "Heat window start" });
     fireEvent.keyDown(start, { key: "ArrowRight" });
     await settle();
-    screen.getByText(/Orders given from 0:01 to 0:05\. 1 of 2 orders/);
+    expect(start.getAttribute("aria-valuenow")).toBe("1");
+    // What the window does to the layers is in `ReplayMapHeat.dom.test.tsx`.
+    expect(screen.queryByTestId("time-window")).toBeNull();
   });
 
   it("keeps an arrow on an end from also stepping the match", async () => {
@@ -2754,17 +2798,19 @@ describe("start boxes and start positions in Units (#5312)", () => {
     expect(boxes().map(outline)).toEqual(["#0080ff", "#ff0000", "#94a3b8"]);
   });
 
-  it("shows no box for a match that set none, and says so", async () => {
+  it("shows no box for a match that set none, and has no note", async () => {
     await open(NO_BOXES);
     expect(boxes()).toHaveLength(0);
-    screen.getByText("This match set no start boxes.");
+    expect(screen.queryByText("This match set no start boxes.")).toBeNull();
     expect(dotMarks()).toHaveLength(2);
   });
 
-  it("says a replay recorded no start positions, and draws no dot", async () => {
+  it("draws no dot, and has no note, for a replay that recorded no start positions", async () => {
     await open({ ...SETUP, startPositions: [] } as Partial<DemoInfo>);
     expect(dotMarks()).toHaveLength(0);
-    screen.getByText("This replay recorded no start positions.");
+    expect(
+      screen.queryByText("This replay recorded no start positions."),
+    ).toBeNull();
   });
 
   it("still draws the boxes, with no switches, when the profile hides the layers", async () => {
