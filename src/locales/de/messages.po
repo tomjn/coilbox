@@ -1513,6 +1513,11 @@ msgstr "Einheiten von {0}"
 msgid "{0} uses its own widgets, not the ones for all games."
 msgstr "{0} nutzt eigene Widgets, nicht die für alle Spiele."
 
+#. placeholder {0}: step.label
+#: src/hub/replaySend/runner.ts
+msgid "{0} was not sent"
+msgstr ""
+
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
@@ -12049,10 +12054,22 @@ msgstr "Die Analyse spielt die Partie auf diesem Computer in der Engine des Spie
 msgid "Analysis and recording"
 msgstr "Analyse und Aufzeichnung"
 
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
+msgid "Analysis not sent"
+msgstr ""
+
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
+msgid "Analysis on the hub"
+msgstr ""
+
 #: src/content/AnalysisQueueBadge.tsx
 #, fuzzy
 msgid "Analysis paused"
 msgstr "Analyse pausiert"
+
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
+msgid "Analysis refused"
+msgstr ""
 
 #: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
@@ -17002,6 +17019,10 @@ msgstr "Coilbox konnte die Texturen für das Blatt nicht vermessen."
 #, fuzzy
 msgid "Coilbox could not move the saved password to the new name. Enter the password again."
 msgstr "Coilbox konnte das gespeicherte Passwort nicht auf den neuen Namen übertragen. Geben Sie das Passwort erneut ein."
+
+#: src/hub/replayExtras/messages.ts
+msgid "Coilbox could not reach the hub. Try again later."
+msgstr ""
 
 #: src/multiplayer/battles/WindowsFirewall.tsx
 #, fuzzy
@@ -34386,6 +34407,7 @@ msgstr "Noch keine Nachrichten."
 msgid "No minimap"
 msgstr "Keine Minikarte"
 
+#: src/hub/replayExtras/messages.ts
 #: src/hub/upload/messages.ts
 #, fuzzy
 msgid "No mirror can take an upload right now. Try again later."
@@ -36574,6 +36596,10 @@ msgstr "Für diese Wiederholung wurde nichts aufgezeichnet."
 #, fuzzy
 msgid "Nothing was recorded."
 msgstr "Nichts wurde aufgezeichnet."
+
+#: src/hub/replayExtras/messages.ts
+msgid "Nothing was uploaded."
+msgstr ""
 
 #: src/hub/upload/messages.ts
 msgid "Nothing was uploaded. The hub has you down as having sent it too."
@@ -45113,8 +45139,13 @@ msgstr "{unitName} über den Mutator-Weg senden"
 msgid "Send a raw command…"
 msgstr "Rohen Befehl senden…"
 
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
 #: src/content/pages/components/SendReplayToHub.tsx
 msgid "Send again"
+msgstr ""
+
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
+msgid "Send analysis"
 msgstr ""
 
 #: src/account/pages/SettingsSection.tsx
@@ -45178,6 +45209,10 @@ msgstr "An alle Spieler senden?"
 msgid "Send to hub"
 msgstr "An Hub senden"
 
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
+msgid "Send track"
+msgstr ""
+
 #: src/hub/pages/components/GameFactsControl.tsx
 #, fuzzy
 msgid "Send what your games say"
@@ -45221,6 +45256,10 @@ msgstr "Sende {at} von {total}: {game}"
 msgid "Sending {done} of {total}"
 msgstr "Sende {done} von {total}"
 
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
+msgid "Sending analysis…"
+msgstr ""
+
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
 msgid "Sending or saving this strips {strippedList}. A blueprint is geometry, so there is nowhere for them to go. They stay in this scenario."
@@ -45249,6 +45288,10 @@ msgstr ""
 #, fuzzy
 msgid "Sending to the hub. Open to stop."
 msgstr "Senden an den Hub. Öffnen zum Stoppen."
+
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
+msgid "Sending track…"
+msgstr ""
 
 #: src/hub/pages/components/GameFactsControl.tsx
 #, fuzzy
@@ -47167,6 +47210,10 @@ msgstr "Manche Server senden einen Bestätigungscode per E-Mail, um Ihr Konto zu
 #, fuzzy
 msgid "Someone else calls a vote to kick, ban or move you to spectators, or to make you boss."
 msgstr "Jemand anderes ruft eine Abstimmung auf, um Sie zu kicken, zu bannen oder zu den Zuschauern zu verschieben, oder um Sie zum Boss zu machen."
+
+#: src/hub/replayExtras/messages.ts
+msgid "Someone else is sending a track of this match right now. Try again later."
+msgstr ""
 
 #: src/hub/upload/messages.ts
 msgid "Someone else who was in the match is sending it right now. Try again later, and the hub links you to theirs once it is on the hub."
@@ -49471,6 +49518,10 @@ msgstr "Analyse und Aufzeichnung"
 msgid "The analysis and recording could not be run."
 msgstr "Analyse und Aufzeichnung konnten nicht ausgeführt werden."
 
+#: src/hub/replaySend/runner.ts
+msgid "The analysis of {match}"
+msgstr ""
+
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
 msgid "The analysis will use engine {chosenLabel} instead."
@@ -50707,6 +50758,10 @@ msgstr "Der Hub hat bereits ein Bild jeder Karte auf diesem Computer."
 msgid "The hub already has a picture of every unit in your games."
 msgstr "Der Hub hat bereits ein Bild jeder Einheit in Ihren Spielen."
 
+#: src/hub/replayExtras/messages.ts
+msgid "The hub already has a track of {label}"
+msgstr ""
+
 #: src/hub/upload/messages.ts
 #, fuzzy
 msgid "The hub already has an archive with the same name and version."
@@ -50742,10 +50797,18 @@ msgstr "Der Hub hat Name {index} mit einem anderen Namen beantwortet."
 msgid "The hub could not answer."
 msgstr "Der Hub konnte nicht antworten."
 
+#: src/hub/replayExtras/messages.ts
+msgid "The hub could not finish checking the analysis."
+msgstr ""
+
 #: src/hub/publish.ts
 #, fuzzy
 msgid "The hub could not publish it."
 msgstr "Der Hub konnte es nicht veröffentlichen."
+
+#: src/hub/replayExtras/messages.ts
+msgid "The hub did not accept your sign-in. Sign in again and try once more."
+msgstr ""
 
 #: src/hub/upload/messages.ts
 #, fuzzy
@@ -50765,6 +50828,18 @@ msgstr "Der Hub kennt dieses Spiel noch nicht. Senden Sie es zuerst an den Hub u
 #, fuzzy
 msgid "The hub does not know this map yet. Send it to the hub first, then upload the file."
 msgstr "Der Hub kennt diese Karte noch nicht. Senden Sie sie zuerst an den Hub und laden Sie dann die Datei hoch."
+
+#: src/hub/replayExtras/messages.ts
+msgid "The hub does not list this replay yet. Send the replay first."
+msgstr ""
+
+#: src/hub/replayExtras/messages.ts
+msgid "The hub does not list this replay."
+msgstr ""
+
+#: src/hub/replayExtras/messages.ts
+msgid "The hub does not take tracks in this format."
+msgstr ""
 
 #: src/content/pages/GamesPage.tsx
 #, fuzzy
@@ -50794,6 +50869,10 @@ msgstr "Der Hub hat keinen solchen Eintrag. Er wurde eventuell entfernt."
 msgid "The hub has no test builds for this computer."
 msgstr ""
 
+#: src/hub/replayExtras/messages.ts
+msgid "The hub has not passed an analysis of this match yet. Try again once its check has finished."
+msgstr ""
+
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
 msgid "The hub has nothing for {pinnedGame} yet. This copy of Coilbox lists only that game's things, so there may be other games' things on the hub."
@@ -50811,6 +50890,14 @@ msgstr "Der Hub ist noch leer. Alles, was Sie teilen, erscheint hier."
 
 #: src/content/pages/components/SendReplayToHub.tsx
 msgid "The hub is checking it…"
+msgstr ""
+
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
+msgid "The hub is checking the analysis…"
+msgstr ""
+
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
+msgid "The hub is checking the track…"
 msgstr ""
 
 #: src/hub/upload/UploadToHubButton.tsx
@@ -50909,6 +50996,10 @@ msgstr "Der Hub hat etwas gesendet, das coilbox nicht lesen konnte."
 msgid "The hub stopped answering part way through."
 msgstr "Der Hub hat mittendrin aufgehört zu antworten."
 
+#: src/hub/replayExtras/messages.ts
+msgid "The hub stopped listing the replay before it checked the analysis."
+msgstr ""
+
 #: src/hub/api.ts
 #, fuzzy
 msgid "The hub will not accept it as it stands, so trying again will not help."
@@ -50949,6 +51040,10 @@ msgstr "Der Hub hat die Fakten dieser Karte nicht angenommen."
 #, fuzzy
 msgid "The hub's answer {index} is not a result."
 msgstr "Antwort {index} des Hubs ist kein Ergebnis."
+
+#: src/hub/replayExtras/messages.ts
+msgid "The hub's check found the analysis does not match the replay."
+msgstr ""
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 #, fuzzy
@@ -51244,6 +51339,15 @@ msgstr "Die Partie dauert {duration}, und die Wiedergabe läuft schneller als di
 #, fuzzy
 msgid "The match is already running"
 msgstr "Die Partie läuft bereits"
+
+#. placeholder {0}: info.mapName
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
+msgid "the match on {0}"
+msgstr ""
+
+#: src/hub/replaySend/runner.ts
+msgid "the match on {mapName}"
+msgstr ""
 
 #: src/content/pages/MatchupPage.tsx
 #, fuzzy
@@ -52303,6 +52407,23 @@ msgstr "Die Spur muss neu aufgezeichnet werden, bevor die Partie hier gezeigt we
 #, fuzzy
 msgid "the track in this replay's place is for another game"
 msgstr "die Spur am Platz dieser Wiederholung gehört zu einem anderen Spiel"
+
+#: src/hub/replayExtras/messages.ts
+msgid "The track of {label}"
+msgstr ""
+
+#: src/hub/replayExtras/messages.ts
+msgid "The track of {label} is on the hub"
+msgstr ""
+
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
+#: src/hub/replayExtras/messages.ts
+msgid "The track of {label} was not sent"
+msgstr ""
+
+#: src/hub/replaySend/runner.ts
+msgid "The track of {match}"
+msgstr ""
 
 #: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
@@ -53623,6 +53744,10 @@ msgstr "Die Höhen dieser Karte konnten nicht gelesen werden. Nichts hier wurde 
 #, fuzzy
 msgid "This map's skybox is a DDS, but not a cube map, so the preview draws a sky from the map's colours instead."
 msgstr "Die Skybox dieser Karte ist eine DDS, aber keine Cube Map, daher zeichnet die Vorschau stattdessen einen Himmel aus den Farben der Karte."
+
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
+msgid "This match has no track to send."
+msgstr ""
 
 #: src/content/replayAnalysis.ts
 #, fuzzy
@@ -55035,10 +55160,18 @@ msgstr "Kettenlänge"
 msgid "Track lifetime"
 msgstr "Lebensdauer der Spur"
 
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
+msgid "Track not sent"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Track offset"
 msgstr "Spurversatz"
+
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
+msgid "Track on the hub"
+msgstr ""
 
 #: src/content/pages/components/ReplayTrackBadge.tsx
 #, fuzzy

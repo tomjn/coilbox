@@ -1259,6 +1259,11 @@ msgstr "{0} units"
 msgid "{0} uses its own widgets, not the ones for all games."
 msgstr "{0} uses its own widgets, not the ones for all games."
 
+#. placeholder {0}: step.label
+#: src/hub/replaySend/runner.ts
+msgid "{0} was not sent"
+msgstr "{0} was not sent"
+
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "{0}'s own widgets"
@@ -9810,9 +9815,21 @@ msgstr "Analysing plays the match back in the game's engine on this computer, to
 msgid "Analysis and recording"
 msgstr "Analysis and recording"
 
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
+msgid "Analysis not sent"
+msgstr "Analysis not sent"
+
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
+msgid "Analysis on the hub"
+msgstr "Analysis on the hub"
+
 #: src/content/AnalysisQueueBadge.tsx
 msgid "Analysis paused"
 msgstr "Analysis paused"
+
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
+msgid "Analysis refused"
+msgstr "Analysis refused"
 
 #: src/lego/pages/components/ViewKey.tsx
 msgid "Anchors"
@@ -13871,6 +13888,10 @@ msgstr "Coilbox could not measure the textures for the sheet."
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "Coilbox could not move the saved password to the new name. Enter the password again."
 msgstr "Coilbox could not move the saved password to the new name. Enter the password again."
+
+#: src/hub/replayExtras/messages.ts
+msgid "Coilbox could not reach the hub. Try again later."
+msgstr "Coilbox could not reach the hub. Try again later."
 
 #: src/multiplayer/battles/WindowsFirewall.tsx
 msgid "Coilbox could not reach Windows Firewall"
@@ -28061,6 +28082,7 @@ msgstr "No messages yet."
 msgid "No minimap"
 msgstr "No minimap"
 
+#: src/hub/replayExtras/messages.ts
 #: src/hub/upload/messages.ts
 msgid "No mirror can take an upload right now. Try again later."
 msgstr "No mirror can take an upload right now. Try again later."
@@ -29833,6 +29855,10 @@ msgstr "Nothing was recorded for this replay."
 #: src/downloads/pages/ActivityPage.tsx
 msgid "Nothing was recorded."
 msgstr "Nothing was recorded."
+
+#: src/hub/replayExtras/messages.ts
+msgid "Nothing was uploaded."
+msgstr "Nothing was uploaded."
 
 #: src/hub/upload/messages.ts
 msgid "Nothing was uploaded. The hub has you down as having sent it too."
@@ -36809,9 +36835,14 @@ msgstr "Send {unitName} through the mutator route"
 msgid "Send a raw command…"
 msgstr "Send a raw command…"
 
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
 #: src/content/pages/components/SendReplayToHub.tsx
 msgid "Send again"
 msgstr "Send again"
+
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
+msgid "Send analysis"
+msgstr "Send analysis"
 
 #: src/account/pages/SettingsSection.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
@@ -36864,6 +36895,10 @@ msgstr "Send to every player?"
 msgid "Send to hub"
 msgstr "Send to hub"
 
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
+msgid "Send track"
+msgstr "Send track"
+
 #: src/hub/pages/components/GameFactsControl.tsx
 msgid "Send what your games say"
 msgstr "Send what your games say"
@@ -36899,6 +36934,10 @@ msgstr "Sending {at} of {total}: {game}"
 msgid "Sending {done} of {total}"
 msgstr "Sending {done} of {total}"
 
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
+msgid "Sending analysis…"
+msgstr "Sending analysis…"
+
 #: src/scenario/pages/components/BlueprintPanel.tsx
 msgid "Sending or saving this strips {strippedList}. A blueprint is geometry, so there is nowhere for them to go. They stay in this scenario."
 msgstr "Sending or saving this strips {strippedList}. A blueprint is geometry, so there is nowhere for them to go. They stay in this scenario."
@@ -36922,6 +36961,10 @@ msgstr "Sending to hub…"
 #: src/hub/assets/UploadRunBadge.tsx
 msgid "Sending to the hub. Open to stop."
 msgstr "Sending to the hub. Open to stop."
+
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
+msgid "Sending track…"
+msgstr "Sending track…"
 
 #: src/hub/pages/components/GameFactsControl.tsx
 msgid "Sending: {game}"
@@ -38486,6 +38529,10 @@ msgstr "Some servers email a verification code to confirm your account."
 #: src/sound/events.ts
 msgid "Someone else calls a vote to kick, ban or move you to spectators, or to make you boss."
 msgstr "Someone else calls a vote to kick, ban or move you to spectators, or to make you boss."
+
+#: src/hub/replayExtras/messages.ts
+msgid "Someone else is sending a track of this match right now. Try again later."
+msgstr "Someone else is sending a track of this match right now. Try again later."
 
 #: src/hub/upload/messages.ts
 msgid "Someone else who was in the match is sending it right now. Try again later, and the hub links you to theirs once it is on the hub."
@@ -40359,6 +40406,10 @@ msgstr "the analysis and recording"
 msgid "The analysis and recording could not be run."
 msgstr "The analysis and recording could not be run."
 
+#: src/hub/replaySend/runner.ts
+msgid "The analysis of {match}"
+msgstr "The analysis of {match}"
+
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 msgid "The analysis will use engine {chosenLabel} instead."
 msgstr "The analysis will use engine {chosenLabel} instead."
@@ -41357,6 +41408,10 @@ msgstr "The hub already has a picture of every map on this computer."
 msgid "The hub already has a picture of every unit in your games."
 msgstr "The hub already has a picture of every unit in your games."
 
+#: src/hub/replayExtras/messages.ts
+msgid "The hub already has a track of {label}"
+msgstr "The hub already has a track of {label}"
+
 #: src/hub/upload/messages.ts
 msgid "The hub already has an archive with the same name and version."
 msgstr "The hub already has an archive with the same name and version."
@@ -41385,9 +41440,17 @@ msgstr "The hub answered name {index} with a different name."
 msgid "The hub could not answer."
 msgstr "The hub could not answer."
 
+#: src/hub/replayExtras/messages.ts
+msgid "The hub could not finish checking the analysis."
+msgstr "The hub could not finish checking the analysis."
+
 #: src/hub/publish.ts
 msgid "The hub could not publish it."
 msgstr "The hub could not publish it."
+
+#: src/hub/replayExtras/messages.ts
+msgid "The hub did not accept your sign-in. Sign in again and try once more."
+msgstr "The hub did not accept your sign-in. Sign in again and try once more."
 
 #: src/hub/upload/messages.ts
 msgid "The hub did not accept your sign-in. Sign in again, then upload it again."
@@ -41404,6 +41467,18 @@ msgstr "The hub does not know this game yet. Send it to the hub first, then uplo
 #: src/hub/upload/messages.ts
 msgid "The hub does not know this map yet. Send it to the hub first, then upload the file."
 msgstr "The hub does not know this map yet. Send it to the hub first, then upload the file."
+
+#: src/hub/replayExtras/messages.ts
+msgid "The hub does not list this replay yet. Send the replay first."
+msgstr "The hub does not list this replay yet. Send the replay first."
+
+#: src/hub/replayExtras/messages.ts
+msgid "The hub does not list this replay."
+msgstr "The hub does not list this replay."
+
+#: src/hub/replayExtras/messages.ts
+msgid "The hub does not take tracks in this format."
+msgstr "The hub does not take tracks in this format."
 
 #: src/content/pages/GamesPage.tsx
 msgid "The hub features no games."
@@ -41429,6 +41504,10 @@ msgstr "The hub has no such item. It may have been taken down."
 msgid "The hub has no test builds for this computer."
 msgstr "The hub has no test builds for this computer."
 
+#: src/hub/replayExtras/messages.ts
+msgid "The hub has not passed an analysis of this match yet. Try again once its check has finished."
+msgstr "The hub has not passed an analysis of this match yet. Try again once its check has finished."
+
 #: src/hub/pages/BrowsePage.tsx
 msgid "The hub has nothing for {pinnedGame} yet. This copy of Coilbox lists only that game's things, so there may be other games' things on the hub."
 msgstr "The hub has nothing for {pinnedGame} yet. This copy of Coilbox lists only that game's things, so there may be other games' things on the hub."
@@ -41444,6 +41523,14 @@ msgstr "The hub has nothing on it yet. Anything you share will show up here."
 #: src/content/pages/components/SendReplayToHub.tsx
 msgid "The hub is checking it…"
 msgstr "The hub is checking it…"
+
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
+msgid "The hub is checking the analysis…"
+msgstr "The hub is checking the analysis…"
+
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
+msgid "The hub is checking the track…"
+msgstr "The hub is checking the track…"
 
 #: src/hub/upload/UploadToHubButton.tsx
 msgid "The hub keeps the name of your account, privately."
@@ -41525,6 +41612,10 @@ msgstr "The hub sent something coilbox could not read."
 msgid "The hub stopped answering part way through."
 msgstr "The hub stopped answering part way through."
 
+#: src/hub/replayExtras/messages.ts
+msgid "The hub stopped listing the replay before it checked the analysis."
+msgstr "The hub stopped listing the replay before it checked the analysis."
+
 #: src/hub/api.ts
 msgid "The hub will not accept it as it stands, so trying again will not help."
 msgstr "The hub will not accept it as it stands, so trying again will not help."
@@ -41557,6 +41648,10 @@ msgstr "The hub would not take this map's facts."
 #: src/hub/maps/lookup.ts
 msgid "The hub's answer {index} is not a result."
 msgstr "The hub's answer {index} is not a result."
+
+#: src/hub/replayExtras/messages.ts
+msgid "The hub's check found the analysis does not match the replay."
+msgstr "The hub's check found the analysis does not match the replay."
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 msgid "The in-world height (in map units) that pure black in the heightmap maps to — the map's lowest point. Below 0 is underwater."
@@ -41795,6 +41890,15 @@ msgstr "The match is {duration} long, and playback runs faster than the match di
 #: src/multiplayer/battle/BattleRoomHeader.tsx
 msgid "The match is already running"
 msgstr "The match is already running"
+
+#. placeholder {0}: info.mapName
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
+msgid "the match on {0}"
+msgstr "the match on {0}"
+
+#: src/hub/replaySend/runner.ts
+msgid "the match on {mapName}"
+msgstr "the match on {mapName}"
 
 #: src/content/pages/MatchupPage.tsx
 msgid "the matchup"
@@ -42649,6 +42753,23 @@ msgstr "The track has to be recorded again before the match can be shown here."
 #: src/content/replayTrack/fault.ts
 msgid "the track in this replay's place is for another game"
 msgstr "the track in this replay's place is for another game"
+
+#: src/hub/replayExtras/messages.ts
+msgid "The track of {label}"
+msgstr "The track of {label}"
+
+#: src/hub/replayExtras/messages.ts
+msgid "The track of {label} is on the hub"
+msgstr "The track of {label} is on the hub"
+
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
+#: src/hub/replayExtras/messages.ts
+msgid "The track of {label} was not sent"
+msgstr "The track of {label} was not sent"
+
+#: src/hub/replaySend/runner.ts
+msgid "The track of {match}"
+msgstr "The track of {match}"
 
 #: src/content/pages/components/ReplayMapUnits.tsx
 msgid "The track stored for this replay belongs to another match, so it is not shown."
@@ -43712,6 +43833,10 @@ msgstr "This map's heights could not be read. Nothing here has been checked agai
 #: src/mapconv/skyboxNote.ts
 msgid "This map's skybox is a DDS, but not a cube map, so the preview draws a sky from the map's colours instead."
 msgstr "This map's skybox is a DDS, but not a cube map, so the preview draws a sky from the map's colours instead."
+
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
+msgid "This match has no track to send."
+msgstr "This match has no track to send."
 
 #: src/content/replayAnalysis.ts
 msgid "This match never recorded a game over, usually because it was quit before it ended. There is nothing to check a playback against, so it cannot be analysed."
@@ -44850,9 +44975,17 @@ msgstr "Track length"
 msgid "Track lifetime"
 msgstr "Track lifetime"
 
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
+msgid "Track not sent"
+msgstr "Track not sent"
+
 #: src/content/unitFieldNotes.ts
 msgid "Track offset"
 msgstr "Track offset"
+
+#: src/content/pages/components/SendReplayExtrasToHub.tsx
+msgid "Track on the hub"
+msgstr "Track on the hub"
 
 #: src/content/pages/components/ReplayTrackBadge.tsx
 msgid "Track out of date"

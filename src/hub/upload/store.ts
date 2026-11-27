@@ -11,6 +11,8 @@ import {
 import { noteHubChanged } from "../manualSend/run";
 import { gamePageUrl, mapPageUrl } from "../manualSend/status";
 import { fetchMapFacts } from "../maps/lookup";
+import { describeTrackEnd } from "../replayExtras/messages";
+import { rememberTrackOnHub } from "../replayExtras/onHub";
 import { rememberReplayOnHub } from "../replaysOnHub";
 import { describeUploadEnd, type UploadEnding } from "./messages";
 
@@ -26,14 +28,15 @@ import { describeUploadEnd, type UploadEnding } from "./messages";
 
 /** What the page that started an upload called it, for the messages. */
 export interface UploadSubject {
-  kind: "map" | "game" | "replay";
+  kind: "map" | "game" | "replay" | "track";
   /** What a person calls it. */
   label: string;
   /** A map's name, which the hub's map page is found by. */
   mapName?: string;
   /** A game's modinfo shortname, which the hub's game page is found by. */
   shortname?: string;
-  /** A replay's game id, which the replay browser's mark is kept by. */
+  /** A replay's or a track's game id, which the replay browser's mark and the
+   *  replay page's track mark are kept by. */
   gameId?: string;
 }
 
@@ -51,7 +54,7 @@ const subjects = new Map<string, UploadSubject>();
 const announced = new Set<string>();
 /** Hashes of uploads a bulk run started, which it reports on itself. */
 const quiet = new Set<string>();
-/** Replays being sent in the background, by file name. */
+/** Replays and tracks being sent in the background, by file name. */
 const muted = new Set<string>();
 let following: Promise<void> | null = null;
 
@@ -91,8 +94,8 @@ export function rememberUpload(
 }
 
 /**
- * Say nothing when this replay's upload ends, because whoever is sending it in
- * the background reports on it. By file name, so it can be asked for before the
+ * Say nothing when this replay's or track's upload ends, because whoever is
+ * sending it in the background reports on it. By file name, so it can be asked for before the
  * upload has a hash. Call the returned function to stop.
  */
 export function muteReplayUpload(filename: string): () => void {
@@ -212,12 +215,28 @@ async function announceEnd(state: ArchiveUploadState): Promise<void> {
   if (!outcome) return;
   if (
     quiet.has(state.sha256) ||
-    (state.kind === "replay" && muted.has(state.filename))
+    ((state.kind === "replay" || state.kind === "track") &&
+      muted.has(state.filename))
   ) {
     noteHubChanged();
     return;
   }
   const subject = subjects.get(state.sha256);
+  if (state.kind === "track") {
+    if (outcome.kind === "listed" && subject?.gameId) {
+      rememberTrackOnHub(subject.gameId, state.hubUrl);
+    }
+    void notify(
+      endingToNotification(
+        describeTrackEnd(
+          outcome,
+          subject?.label ?? state.filename,
+          state.heldAlready,
+        ),
+      ),
+    );
+    return;
+  }
   if (state.kind === "replay" && outcome.kind === "listed" && subject?.gameId) {
     rememberReplayOnHub(subject.gameId, {
       hubUrl: state.hubUrl,

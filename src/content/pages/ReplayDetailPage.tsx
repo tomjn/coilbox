@@ -61,6 +61,7 @@ import {
   ReplayTimelineDock,
   TimelineKeysProvider,
 } from "./components/ReplayTimelineDock";
+import { SendReplayExtrasToHub } from "./components/SendReplayExtrasToHub";
 import { SendReplayToHub } from "./components/SendReplayToHub";
 import { StaleRemixNotice } from "./components/StaleRemixNotice";
 import {
@@ -364,6 +365,7 @@ export default function ReplayDetailPage() {
             {decoded.info && (
               <SendReplayToHub info={decoded.info} replayPath={replay.path} />
             )}
+            {decoded.info && <SendReplayExtrasToHub info={decoded.info} />}
             {info && (
               <WatchWithRewindButton
                 replayPath={replay.path}

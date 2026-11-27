@@ -35,6 +35,11 @@ export function rememberReplayOnHub(gameId: string, record: ReplayOnHub) {
   writeStoredSetting(REPLAYS_ON_HUB_KEY, { ...held, [gameId]: record });
 }
 
+/** Every replay this machine has seen on a hub, outside React. */
+export function readReplaysOnHub(): ReplaysOnHub {
+  return readStoredSettingIfInstalled<ReplaysOnHub>(REPLAYS_ON_HUB_KEY, NONE);
+}
+
 /** Every replay this machine has seen on a hub. */
 export function useReplaysOnHub(): ReplaysOnHub {
   const [held] = useSetting<ReplaysOnHub>(REPLAYS_ON_HUB_KEY, NONE);
