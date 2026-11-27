@@ -153,7 +153,7 @@ export function SendReplayToHub({
   }
   if (!name) {
     return unavailable(
-      t`None of the names you are signed in with played in or watched this match.`,
+      t`Only someone who played in or watched this match can send it.`,
     );
   }
   const gameId = info.gameId;

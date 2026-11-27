@@ -35500,10 +35500,6 @@ msgstr "Ingen av de {twoSides} kampene med to lag har et registrert resultat, s�
 msgid "None of the lines on the chart above gave orders of this kind."
 msgstr "Ingen av linjene i diagrammet over ga ordrer av denne typen."
 
-#: src/content/pages/components/SendReplayToHub.tsx
-msgid "None of the names you are signed in with played in or watched this match."
-msgstr ""
-
 #: src/content/pages/StatsPage.tsx
 #, fuzzy
 msgid "None of the replays in this set are in your library."
@@ -37264,6 +37260,10 @@ msgstr "Leses bare for en enhet uten bevegelsesklasse, altså alt som står stil
 #, fuzzy
 msgid "Only shoots at"
 msgstr "Skyter bare på"
+
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Only someone who played in or watched this match can send it."
+msgstr ""
 
 #: src/blueprint/pages/components/LeavingPack.tsx
 #, fuzzy

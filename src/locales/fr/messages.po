@@ -35488,10 +35488,6 @@ msgstr "Aucune des {twoSides} parties à deux équipes n’a de résultat enregi
 msgid "None of the lines on the chart above gave orders of this kind."
 msgstr "Aucune des courbes du graphique ci-dessus n’a donné d’ordres de ce type."
 
-#: src/content/pages/components/SendReplayToHub.tsx
-msgid "None of the names you are signed in with played in or watched this match."
-msgstr ""
-
 #: src/content/pages/StatsPage.tsx
 #, fuzzy
 msgid "None of the replays in this set are in your library."
@@ -37250,6 +37246,10 @@ msgstr "Lu uniquement pour une unité sans classe de déplacement, c’est-à-di
 #, fuzzy
 msgid "Only shoots at"
 msgstr "Ne tire que sur"
+
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Only someone who played in or watched this match can send it."
+msgstr ""
 
 #: src/blueprint/pages/components/LeavingPack.tsx
 #, fuzzy
