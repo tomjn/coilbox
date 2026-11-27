@@ -21,6 +21,7 @@ import {
   pickUnitSource,
   pictureGame,
   recordedGame,
+  sourceUnits,
   type UnitSource,
 } from "./replayBuildOrders";
 import {
@@ -191,8 +192,7 @@ export function useReplayUnits(
     () => (names && !reading ? namedUnits(names, read ?? []) : null),
     [names, reading, read],
   );
-  const units: UnitDatasetEntry[] | null =
-    source?.kind === "stored" ? source.list.units : names ? named : read;
+  const { units, described } = sourceUnits(source, read, named);
   return {
     selected,
     recorded,
@@ -210,7 +210,7 @@ export function useReplayUnits(
     units,
     /** `units` when they say what each unit is and costs, and null when there
      *  is nothing but names to go on. */
-    described: names && !read?.length ? null : units,
+    described,
     /** Every list the store holds for this replay. */
     links: lists.sets?.links ?? NO_LINKS,
     /** The version of the read of a match that this build makes. */

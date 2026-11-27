@@ -169,6 +169,32 @@ export function pictureGame(source: UnitSource | null): GameItem | null {
 }
 
 /**
+ * A source's units, from what was read for it: `read` is the installed game's
+ * dataset, or null when there is none, and `named` the replay's own names made
+ * into units. `described` is `units` when they say what each unit is and
+ * costs, and null when there is nothing but names to go on.
+ */
+export function sourceUnits(
+  source: UnitSource | null,
+  read: UnitDatasetEntry[] | null,
+  named: UnitDatasetEntry[] | null,
+): {
+  units: UnitDatasetEntry[] | null;
+  described: UnitDatasetEntry[] | null;
+} {
+  const units =
+    source?.kind === "stored"
+      ? source.list.units
+      : source?.kind === "replay"
+        ? named
+        : read;
+  return {
+    units,
+    described: source?.kind === "replay" && !read?.length ? null : units,
+  };
+}
+
+/**
  * The unit a definition id names in `units`, a dataset sorted by internal
  * name, or undefined for an id the dataset does not reach.
  */

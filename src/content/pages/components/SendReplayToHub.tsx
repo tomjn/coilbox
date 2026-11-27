@@ -13,6 +13,7 @@ import { useHubAccount } from "@/hub/account";
 import { startReplayUpload } from "@/hub/archiveUploads";
 import { useHubUrl } from "@/hub/config";
 import { beginReplaySend, endManualSend } from "@/hub/manualSend/grant";
+import { describeSummaryProblem } from "@/hub/replaySend/messages";
 import { replayOnHub, useReplaysOnHub } from "@/hub/replaysOnHub";
 import { describeUploadEnd } from "@/hub/upload/messages";
 import {
@@ -25,7 +26,7 @@ import { notify } from "@/notify/notify";
 import { useLastLogin, useLobbyAccounts } from "../../../lobby-servers/config";
 import type { DemoInfo } from "../../bindings";
 import { signedInLobbyNames, userNameInReplay } from "../../replayHubName";
-import { buildReplaySummary, type SummaryProblem } from "../../replaySummary";
+import { buildReplaySummary } from "../../replaySummary";
 import { useMatchStats } from "../../useMatchStats";
 import { useReplayBuildOrders } from "../../useReplayBuildOrders";
 import { useReplayUnits } from "../../useReplayUnits";
@@ -137,19 +138,6 @@ export function SendReplayToHub({
   // Only a signed in player can send, so nobody else is offered the button.
   if (!ending && !account.signedIn) return null;
 
-  const problemText = (problem: SummaryProblem): string => {
-    switch (problem.kind) {
-      case "unfinished":
-        return t`The recording stops before the end of the match, and the hub only takes a whole match.`;
-      case "incompleteOrders":
-        return t`Coilbox could not read every build order in this replay, and the hub checks all of them.`;
-      case "noTeam":
-        return t`The replay does not say which team ${problem.name} was on.`;
-      case "unknownUnit":
-        return t`Coilbox cannot say what every unit built in this match is or costs. Install the game it was played on, then try again.`;
-    }
-  };
-
   const failed = stats.error !== null || builds.failed;
   // A match with no build orders names no units, so it waits for nothing more.
   const unitsReady =
@@ -223,11 +211,7 @@ export function SendReplayToHub({
       </>
     );
   } else if (otherBuild && orders && orders.orders.length > 0) {
-    body = (
-      <p>
-        {t`Another version of the game is installed, so Coilbox cannot say which unit each build order was for. Install the version it was played on, then try again.`}
-      </p>
-    );
+    body = <p>{describeSummaryProblem({ kind: "otherBuild" })}</p>;
   } else if (failed) {
     body = (
       <p>
@@ -238,7 +222,7 @@ export function SendReplayToHub({
   } else if (!made) {
     body = <p aria-busy>{t`Reading the replay…`}</p>;
   } else if ("problem" in made) {
-    body = <p>{problemText(made.problem)}</p>;
+    body = <p>{describeSummaryProblem(made.problem)}</p>;
   } else {
     body = (
       <>
