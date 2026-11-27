@@ -1768,12 +1768,18 @@ export const contentReplayAnalysisLog = defineCommand<
 
 /**
  * What sending a match's track to the hub needs (issue #5495): the stored
- * file and the format version in its header. Null unless the match has a
- * current track.
+ * file, and the format version and recorder version in its header. Null unless
+ * the match has a current track.
  */
 export const contentReplayTrackUploadFacts = defineCommand<
   { gameId: string },
-  { track: { path: string; formatVersion: number } | null }
+  {
+    track: {
+      path: string;
+      formatVersion: number;
+      recorderVersion: number;
+    } | null;
+  }
 >("coilbox-content", "content_replay_track_upload_facts");
 
 /**
@@ -1807,6 +1813,8 @@ export interface StoredReplayTrack {
   sizeBytes: number;
   /** When it was stored or last watched, in epoch milliseconds. */
   lastWatchedMs: number;
+  /** The recorder version of a `current` track. Null for a `stale` one. */
+  recorderVersion?: number | null;
 }
 
 /**

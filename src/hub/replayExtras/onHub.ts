@@ -25,8 +25,9 @@ export interface ReplayExtrasOnHub {
   /** The hub it was sent to, as the hub address setting had it. */
   hubUrl: string;
   analysis?: AnalysisOnHub;
-  /** The hub has a track of this match, from this machine or another. */
-  track?: boolean;
+  /** The hub has a track of this match, from this machine or another, made
+   *  by this recorder version. */
+  trackRecorderVersion?: number;
 }
 
 export type ReplayExtras = Record<string, ReplayExtrasOnHub>;
@@ -84,9 +85,28 @@ export function rememberAnalysisOnHub(
   change(gameId, hubUrl, { analysis });
 }
 
-/** Note that this hub has a track of this match. */
-export function rememberTrackOnHub(gameId: string, hubUrl: string): void {
-  change(gameId, hubUrl, { track: true });
+/** Note that this hub has a track of this match from this recorder version. */
+export function rememberTrackOnHub(
+  gameId: string,
+  hubUrl: string,
+  recorderVersion: number,
+): void {
+  change(gameId, hubUrl, { trackRecorderVersion: recorderVersion });
+}
+
+/**
+ * Whether a recorded track has nothing the hub lacks: the hub is known to have
+ * one of this match from the same recorder version or a newer one. The hub takes
+ * a newer one in place of the track it has (issue #5525). A stale track is never
+ * sent, so any track the hub has covers it.
+ */
+export function hubHasTrack(
+  record: ReplayExtrasOnHub | undefined,
+  track: { recorderVersion?: number | null } | null | undefined,
+): boolean {
+  const theirs = record?.trackRecorderVersion;
+  if (theirs === undefined) return false;
+  return (track?.recorderVersion ?? 0) <= theirs;
 }
 
 /** Everything this machine has sent besides replays, kept current. */

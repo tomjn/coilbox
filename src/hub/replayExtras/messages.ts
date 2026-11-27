@@ -83,6 +83,13 @@ export function describeTrackEnd(
           body: t`Someone else is sending a track of this match right now. Try again later.`,
           retry: true,
         };
+      case "older_kept":
+        return {
+          level: "warning",
+          title: notSent,
+          body: t`The hub is keeping its older track of this match, because it cannot replace it right now. Try again later.`,
+          retry: true,
+        };
       case "unknown_format":
         return {
           level: "error",

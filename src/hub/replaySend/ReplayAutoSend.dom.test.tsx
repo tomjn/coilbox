@@ -138,6 +138,13 @@ describe("the background sender", () => {
     map: "Persepolis",
   });
 
+  const recorded = (recorderVersion: number) => ({
+    gameId: "m",
+    state: "current",
+    recorderVersion,
+    lastWatchedMs: Date.now(),
+  });
+
   it("queues a match's analysis and track when an analysis run of it finishes (#5495)", () => {
     turn(true);
     analyses = new Map([["old", analysis("old", 1)]]);
@@ -169,12 +176,20 @@ describe("the background sender", () => {
     turn(true);
     analyses = new Map([["m", analysis("m", 1)]]);
     const { rerender } = render(<ReplayAutoSend />);
-    rememberTrackOnHub("m", "https://hub.test");
-    tracks = new Map([
-      ["m", { gameId: "m", state: "current", lastWatchedMs: Date.now() }],
-    ]);
+    rememberTrackOnHub("m", "https://hub.test", 5);
+    tracks = new Map([["m", recorded(5)]]);
     rerender(<ReplayAutoSend />);
     expect(readReplayExtrasQueue()).toEqual([]);
+  });
+
+  it("queues a track from a newer recorder than the hub's (#5525)", () => {
+    turn(true);
+    analyses = new Map([["m", analysis("m", 1)]]);
+    const { rerender } = render(<ReplayAutoSend />);
+    rememberTrackOnHub("m", "https://hub.test", 4);
+    tracks = new Map([["m", recorded(5)]]);
+    rerender(<ReplayAutoSend />);
+    expect(readReplayExtrasQueue().map((one) => one.gameId)).toEqual(["m"]);
   });
 
   it("stops everything while the setting is off", () => {

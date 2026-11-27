@@ -120,6 +120,40 @@ fn read_request(stream: &mut TcpStream) -> Option<Request> {
 
 // ------------------------------------------------------------------- the hub
 
+/// A track the hub lists, and what it does with one from a newer recorder.
+struct ListedTrack {
+    recorder_version: u16,
+    /// A mirror reports the `replace_track` feature.
+    replaceable: bool,
+    /// How many times a newer one has been asked about.
+    newer_asks: usize,
+}
+
+impl ListedTrack {
+    /// What `TrackUploads::begin` in coilbox-hub answers a send of this
+    /// recorder version with, as `Some`, or `None` for an upload slot. A newer
+    /// one gets a slot, is then being checked, and is then the listed track.
+    fn answer(&mut self, game_id: &str, recorder_version: u16) -> Option<(u16, Value)> {
+        let mut state = "listed";
+        if recorder_version > self.recorder_version && self.replaceable {
+            self.newer_asks += 1;
+            match self.newer_asks {
+                1 => return None,
+                2 => state = "checking",
+                _ => self.recorder_version = recorder_version,
+            }
+        }
+        Some((
+            200,
+            json!({ "track": {
+                "game_id": game_id, "format_version": 1, "state": state,
+                "recorder_version": (state == "listed").then_some(self.recorder_version),
+                "size": 10, "sha256": "d".repeat(64), "url": null,
+            }}),
+        ))
+    }
+}
+
 #[derive(Default)]
 struct HubState {
     /// Answers to `POST /api/v1/uploads`. Empty means the hub's own: 201 the
@@ -147,6 +181,8 @@ struct HubState {
     track_answers: VecDeque<Option<(u16, Value)>>,
     last_track_answer: Option<(u16, Value)>,
     track_requests: Vec<(String, Option<String>, String)>,
+    /// The track the hub lists, when the track route answers for itself.
+    listed_track: Option<ListedTrack>,
     /// Analyses sent, by who sent them and the body, with their id. The same
     /// pair again is answered with the first send, as the hub does.
     analyses: Vec<((Option<String>, String), u64)>,
@@ -229,6 +265,23 @@ impl FakeHub {
     pub fn tracking(self, answers: Vec<Option<(u16, Value)>>) -> Self {
         self.state.lock().unwrap().track_answers = answers.into();
         self
+    }
+
+    /// List a track from this recorder version, and answer the track route as
+    /// the hub does for it. `replaceable` is whether a mirror can replace it.
+    pub fn listing_track(self, recorder_version: u16, replaceable: bool) -> Self {
+        self.state.lock().unwrap().listed_track = Some(ListedTrack {
+            recorder_version,
+            replaceable,
+            newer_asks: 0,
+        });
+        self
+    }
+
+    /// The recorder version of the track the hub lists.
+    pub fn listed_recorder_version(&self) -> Option<u16> {
+        let state = self.state.lock().unwrap();
+        state.listed_track.as_ref().map(|t| t.recorder_version)
     }
 
     /// The path, the authorization header and the body of each track request.
@@ -341,9 +394,18 @@ fn hub_answer(state: &Mutex<HubState>, request: &Request) -> Reply {
         let auth = request.headers.get("authorization").cloned();
         let body = String::from_utf8_lossy(&request.body).into_owned();
         if let Some(game_id) = rest.strip_suffix("/tracks/uploads") {
+            let recorder_version = serde_json::from_str::<Value>(&body)
+                .ok()
+                .and_then(|b| b.get("recorder_version")?.as_u64())
+                .and_then(|v| u16::try_from(v).ok());
             state
                 .track_requests
                 .push((request.path.clone(), auth, body));
+            if let (Some(track), Some(sent)) = (state.listed_track.as_mut(), recorder_version) {
+                if let Some((status, body)) = track.answer(game_id, sent) {
+                    return Reply::Json(status, body);
+                }
+            }
             if let Some(next) = state.track_answers.pop_front() {
                 state.last_track_answer = next;
             }

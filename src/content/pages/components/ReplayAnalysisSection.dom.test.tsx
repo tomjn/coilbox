@@ -1459,6 +1459,8 @@ describe("the hub's track of a replay with none here (#5520)", () => {
 
     await waitFor(() => expect(commands()).toContain("content_replay_tracks"));
     expect(commands()[0]).toBe("content_replay_hub_track_download");
+    // The hub's recorder version is noted before the tracks are read.
+    expect(commands()[1]).toBe("content_replay_track_upload_facts");
     expect(commands()).not.toContain("content_analysis_enqueue");
   });
 

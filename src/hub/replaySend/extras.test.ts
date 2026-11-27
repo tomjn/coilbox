@@ -14,7 +14,11 @@ vi.mock("@/profile/profile", () => ({
 
 const GAME_ID = "9f2c4b1ad07e5386c1f4a92b6e8d0375";
 let stored: { outcome: string; loggerVersion: number } | null = null;
-let track: { path: string; formatVersion: number } | null = null;
+let track: {
+  path: string;
+  formatVersion: number;
+  recorderVersion: number;
+} | null = null;
 vi.mock("@/content/bindings", async (actual) => ({
   ...(await actual<typeof import("@/content/bindings")>()),
   contentReplayAnalysis: async () => ({ analysis: stored }),
@@ -57,7 +61,7 @@ vi.mock("@/notify/notify", () => ({
 }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: async () => {} }));
 
-import { readReplayExtras } from "@/hub/replayExtras/onHub";
+import { readReplayExtras, rememberTrackOnHub } from "@/hub/replayExtras/onHub";
 import { rememberReplayOnHub } from "@/hub/replaysOnHub";
 import { forgetArchiveUploads } from "@/hub/upload/store";
 import {
@@ -110,9 +114,12 @@ function upload(patch: Partial<ArchiveUploadState> = {}): ArchiveUploadState {
 }
 
 /** Make the next track start answer, then end as `outcome` says. */
-function trackEnds(outcome: ArchiveUploadState["outcome"]) {
+function trackEnds(
+  outcome: ArchiveUploadState["outcome"],
+  recorderVersion = 5,
+) {
   trackStarted.mockImplementationOnce(async () => {
-    const first = upload();
+    const first = upload({ recorderVersion });
     setTimeout(() => announce({ ...first, phase: "done", outcome }), 0);
     return first;
   });
@@ -131,6 +138,7 @@ beforeEach(() => {
   track = {
     path: `/data/content/replay-tracks/${GAME_ID}.cbtrack`,
     formatVersion: 1,
+    recorderVersion: 5,
   };
   analysed.mockReset();
   trackStarted.mockReset();
@@ -179,12 +187,13 @@ describe("sending a match's analysis and track", () => {
       GAME_ID,
       track?.path,
       1,
+      5,
       undefined,
     );
     expect(readReplayExtras()[GAME_ID]).toEqual({
       hubUrl: HUB,
       analysis: { loggerVersion: 8, state: "kept", reason: null },
-      track: true,
+      trackRecorderVersion: 5,
     });
     expect(readReplayExtrasQueue()).toEqual([]);
     expect(notified).not.toHaveBeenCalled();
@@ -198,12 +207,44 @@ describe("sending a match's analysis and track", () => {
     await runDueReplaySends(context());
     expect(readReplayExtrasQueue()).toEqual([]);
 
-    track = { path: "/t", formatVersion: 1 };
+    track = { path: "/t", formatVersion: 1, recorderVersion: 5 };
     trackEnds({ kind: "listed" });
     queued();
     await runDueReplaySends(context());
     expect(analysed).toHaveBeenCalledTimes(1);
     expect(trackStarted).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends a newer recorder's track in place of the one the hub has (#5525)", async () => {
+    onHub();
+    rememberTrackOnHub(GAME_ID, HUB, 4);
+    analysed.mockResolvedValueOnce(sent("kept"));
+    trackEnds({ kind: "listed" });
+    queued();
+    await runDueReplaySends(context());
+    expect(trackStarted).toHaveBeenCalledTimes(1);
+    expect(readReplayExtras()[GAME_ID]?.trackRecorderVersion).toBe(5);
+
+    queued();
+    await runDueReplaySends(context());
+    expect(trackStarted).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops quietly when the hub cannot replace its older track yet (#5525)", async () => {
+    onHub();
+    queued();
+    analysed.mockResolvedValueOnce(sent("kept"));
+    trackEnds({
+      kind: "stopped",
+      source: "hub",
+      code: "older_kept",
+      status: 200,
+      said: "said",
+    });
+    await runDueReplaySends(context());
+    expect(readReplayExtrasQueue()).toEqual([]);
+    expect(readReplayExtras()[GAME_ID]?.trackRecorderVersion).toBeUndefined();
+    expect(notified).not.toHaveBeenCalled();
   });
 
   it("never sends a run that diverged", async () => {
@@ -268,7 +309,7 @@ describe("sending a match's analysis and track", () => {
       attempts: 1,
       notBefore: now + RETRY_DELAYS_MS[0],
     });
-    expect(readReplayExtras()[GAME_ID]?.track).toBeUndefined();
+    expect(readReplayExtras()[GAME_ID]?.trackRecorderVersion).toBeUndefined();
     expect(notified).not.toHaveBeenCalled();
   });
 

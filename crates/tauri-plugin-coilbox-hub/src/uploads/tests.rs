@@ -127,6 +127,7 @@ fn state_for(facts: &ArchiveFacts, hub_url: &str) -> UploadState {
         upload_id: None,
         page_url: None,
         held_already: false,
+        recorder_version: None,
         outcome: None,
     }
 }
@@ -1151,17 +1152,22 @@ fn track_request(size: u64) -> TrackRequest {
     TrackRequest {
         game_id: GAME_ID.into(),
         format_version: 1,
+        recorder_version: 5,
         sha256: "d".repeat(64),
         size,
     }
 }
 
 fn track_held(state: &str) -> Option<(u16, Value)> {
+    track_held_from(state, 5)
+}
+
+fn track_held_from(state: &str, recorder_version: u16) -> Option<(u16, Value)> {
     Some((
         200,
         json!({ "track": {
             "game_id": GAME_ID, "format_version": 1, "state": state,
-            "recorder_version": 5, "size": 10, "sha256": "d".repeat(64),
+            "recorder_version": recorder_version, "size": 10, "sha256": "d".repeat(64),
             "url": "https://mirror.example/tracks/x.cbtrack",
         }}),
     ))
@@ -1218,7 +1224,10 @@ async fn a_track_goes_to_its_replay_s_route_then_waits_for_the_check_to_list_it(
     let sent: Value = serde_json::from_str(&requests[0].2).unwrap();
     assert_eq!(
         sent,
-        json!({ "format_version": 1, "sha256": "d".repeat(64), "size": ARCHIVE.len() })
+        json!({
+            "format_version": 1, "recorder_version": 5,
+            "sha256": "d".repeat(64), "size": ARCHIVE.len(),
+        })
     );
     assert!(rig.hub.replay_requests().is_empty());
     assert!(
@@ -1238,6 +1247,56 @@ async fn a_track_the_hub_has_already_uploads_nothing() {
     assert!(state.held_already);
     assert!(rig.mirror.posts().is_empty());
     assert_eq!(rig.hub.track_requests().len(), 1);
+}
+
+#[tokio::test]
+async fn a_newer_recorder_s_track_replaces_the_one_the_hub_lists() {
+    let rig = Rig::new("track-replace", 1 << 20).with_hub(|hub| hub.listing_track(4, true));
+
+    let (state, _) = rig.run_track().await;
+
+    assert_eq!(state.outcome, Some(Outcome::Listed));
+    assert!(!state.held_already);
+    assert_eq!(rig.mirror.held(), ARCHIVE);
+    assert_eq!(rig.hub.listed_recorder_version(), Some(5));
+    assert_eq!(state.recorder_version, Some(5));
+    assert_eq!(rig.hub.track_requests().len(), 3);
+}
+
+#[tokio::test]
+async fn an_older_track_the_hub_cannot_replace_yet_uploads_nothing() {
+    let rig = Rig::new("track-older", 1 << 20).with_hub(|hub| hub.listing_track(4, false));
+
+    let (state, _) = rig.run_track().await;
+
+    assert_eq!(stopped(&state), (Source::Hub, "older_kept".to_owned()));
+    assert!(rig.mirror.posts().is_empty());
+    assert_eq!(rig.hub.track_requests().len(), 1);
+    assert_eq!(rig.hub.listed_recorder_version(), Some(4));
+}
+
+#[tokio::test]
+async fn an_older_track_still_listed_after_the_upload_is_not_a_send_that_worked() {
+    let rig = Rig::new("track-not-replaced", 1 << 20)
+        .with_hub(|hub| hub.tracking(vec![None, track_held_from("listed", 4)]));
+
+    let (state, _) = rig.run_track().await;
+
+    assert_eq!(stopped(&state), (Source::Hub, "older_kept".to_owned()));
+    assert_eq!(rig.mirror.held(), ARCHIVE);
+}
+
+#[tokio::test]
+async fn a_track_from_a_newer_recorder_than_the_one_sent_counts_as_held() {
+    let rig = Rig::new("track-newer-held", 1 << 20)
+        .with_hub(|hub| hub.tracking(vec![track_held_from("listed", 6)]));
+
+    let (state, _) = rig.run_track().await;
+
+    assert_eq!(state.outcome, Some(Outcome::Listed));
+    assert!(state.held_already);
+    assert_eq!(state.recorder_version, Some(6));
+    assert!(rig.mirror.posts().is_empty());
 }
 
 #[tokio::test]

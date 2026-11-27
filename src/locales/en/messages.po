@@ -41596,6 +41596,10 @@ msgstr "The hub is checking the analysis…"
 msgid "The hub is checking the track…"
 msgstr "The hub is checking the track…"
 
+#: src/hub/replayExtras/messages.ts
+msgid "The hub is keeping its older track of this match, because it cannot replace it right now. Try again later."
+msgstr "The hub is keeping its older track of this match, because it cannot replace it right now. Try again later."
+
 #: src/hub/upload/UploadToHubButton.tsx
 msgid "The hub keeps the name of your account, privately."
 msgstr "The hub keeps the name of your account, privately."

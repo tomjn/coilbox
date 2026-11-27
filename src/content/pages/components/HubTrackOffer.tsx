@@ -11,6 +11,7 @@ import { isHubEnabled } from "@/profile/profile";
 import {
   contentReplayHubTrack,
   contentReplayHubTrackDownload,
+  contentReplayTrackUploadFacts,
 } from "../../bindings";
 import { ANALYSIS_ACTION_ATTRIBUTE } from "../../replayAnalysis";
 import { refreshStoredTracks } from "../../replayTracks";
@@ -76,7 +77,8 @@ export function useHubTrack(gameId: string | undefined): HubTrack {
       }
       // Before the tracks are read again, so the automatic sender sees that
       // this one is the hub's own.
-      rememberTrackOnHub(gameId, hubUrl);
+      const { track } = await contentReplayTrackUploadFacts({ gameId });
+      if (track) rememberTrackOnHub(gameId, hubUrl, track.recorderVersion);
       await refreshStoredTracks();
       set(IDLE);
     } catch (e) {

@@ -186,6 +186,9 @@ pub struct TrackRequest {
     pub game_id: String,
     /// The format version in the track's header.
     pub format_version: u16,
+    /// The recorder version in the track's header. The hub replaces a track it
+    /// holds with one from a newer recorder (coilbox-hub #687).
+    pub recorder_version: u16,
     pub sha256: String,
     pub size: u64,
 }
@@ -349,6 +352,10 @@ pub struct UploadState {
     /// The hub held this replay before this send, from this sender or another,
     /// so nothing was uploaded.
     pub held_already: bool,
+    /// A track's alone: the recorder version of the track being sent, or once
+    /// the hub says it holds one, of the hub's.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub recorder_version: Option<u16>,
     /// Set when `phase` is `done`.
     pub outcome: Option<Outcome>,
 }
@@ -641,6 +648,8 @@ struct HeldReplay {
     /// A replay's page on the hub. A track's `url` is where to download the
     /// file, not a page, so it is not kept.
     url: Option<String>,
+    /// A listed track's recorder version.
+    recorder_version: Option<u16>,
 }
 
 fn parse_held(sending: &Sending<'_>, body: &Value) -> Option<HeldReplay> {
@@ -656,7 +665,33 @@ fn parse_held(sending: &Sending<'_>, body: &Value) -> Option<HeldReplay> {
         url: matches!(sending, Sending::Replay(_))
             .then(|| replay.get("url").and_then(Value::as_str).map(str::to_owned))
             .flatten(),
+        recorder_version: replay
+            .get("recorder_version")
+            .and_then(Value::as_u64)
+            .and_then(|version| u16::try_from(version).ok()),
     })
+}
+
+/// What a listed answer ends a run as.
+///
+/// The hub can answer with a listed track from an older recorder than the one
+/// being sent. It does while no mirror can replace it, which includes after its
+/// check refused the new one (coilbox-hub #687). The track sent is then not on
+/// the hub, so that is not the end of a send that worked.
+fn listed(state: &mut UploadState, sending: &Sending<'_>, held: HeldReplay) -> Result<(), End> {
+    if let (Sending::Track(track), Some(theirs)) = (sending, held.recorder_version) {
+        if theirs < track.recorder_version {
+            return Err(replay_stop(
+                200,
+                "older_kept",
+                "The hub is keeping an older track of this match. It cannot replace it just now.",
+            )
+            .into());
+        }
+        state.recorder_version = Some(theirs);
+    }
+    state.page_url = held.url;
+    Ok(())
 }
 
 /// Ask the hub for a slot, or for a fresh token for the one it already gave.
@@ -714,10 +749,10 @@ async fn replay_held(
     sending: &Sending<'_>,
     held: HeldReplay,
 ) -> Result<(), End> {
-    state.page_url = held.url;
     if held.listed {
-        return Ok(());
+        return listed(state, sending, held);
     }
+    state.page_url = held.url;
     state.phase = Phase::Waiting;
     (env.report)(state);
     replay_checked(env, client, state, sending).await
@@ -762,8 +797,7 @@ async fn replay_checked(
             200 => {
                 if let Some(held) = parse_held(sending, &raw.body) {
                     if held.listed {
-                        state.page_url = held.url;
-                        return Ok(());
+                        return listed(state, sending, held);
                     }
                 }
             }
@@ -1326,13 +1360,14 @@ pub fn begin_track<R: Runtime>(
     )?;
     consent.admits_track(&request.game_id)?;
     check_size(&path, request.size, "track")?;
-    let state = fresh_state(
+    let mut state = fresh_state(
         &hub_url,
         format!("{}.cbtrack", request.game_id),
         ArchiveKind::Track,
         &request.sha256,
         request.size,
     )?;
+    state.recorder_version = Some(request.recorder_version);
     start(app, path, Owned::Track(request), state)
 }
 
@@ -1400,6 +1435,7 @@ fn fresh_state(
         upload_id: None,
         page_url: None,
         held_already: false,
+        recorder_version: None,
         outcome: None,
     })
 }

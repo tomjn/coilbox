@@ -570,8 +570,8 @@ async fn hub_replay_analysis_send<R: Runtime>(
 /// `hub_replay_track_upload_start`: send a match's recorded track to the hub,
 /// as whoever is signed in (issue #5495).
 ///
-/// `path` is the stored track and `format_version` the one in its header, as
-/// `content_replay_track_upload_facts` answers. The file's hash and size are
+/// `path` is the stored track, and `format_version` and `recorder_version` the
+/// ones in its header, as `content_replay_track_upload_facts` answers. The file's hash and size are
 /// worked out here. The upload is followed as an archive's is, with `kind`
 /// `track`. `grant` is the one a press of the track's send button opened.
 /// Without one the switch that sends finished matches has to be on.
@@ -582,6 +582,7 @@ async fn hub_replay_track_upload_start<R: Runtime>(
     game_id: String,
     path: String,
     format_version: u16,
+    recorder_version: u16,
     grant: Option<String>,
 ) -> CliResult {
     let consent = match consent::AssetUploadConsent::check_replay(&app, grant.as_deref()) {
@@ -602,6 +603,7 @@ async fn hub_replay_track_upload_start<R: Runtime>(
     let request = uploads::TrackRequest {
         game_id,
         format_version,
+        recorder_version,
         sha256,
         size,
     };

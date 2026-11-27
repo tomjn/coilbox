@@ -194,6 +194,7 @@ mod tests {
             state,
             size_bytes: size,
             last_watched_ms: watched,
+            recorder_version: None,
         }
     }
 

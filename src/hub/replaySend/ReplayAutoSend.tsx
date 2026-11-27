@@ -7,7 +7,11 @@ import { useLastLogin, useLobbyAccounts } from "@/lobby-servers/config";
 import { isHubAssetUploadOffered } from "@/profile/profile";
 import { useHubAccount } from "../account";
 import { useHubUrl } from "../config";
-import { readReplayExtras, replayExtrasOn } from "../replayExtras/onHub";
+import {
+  hubHasTrack,
+  readReplayExtras,
+  replayExtrasOn,
+} from "../replayExtras/onHub";
 import {
   AUTO_SEND_REPLAYS_KEY,
   queueReplayExtras,
@@ -64,7 +68,8 @@ function FinishedRuns() {
     // track downloaded from it (issue #5520).
     const held = readReplayExtras();
     for (const track of tracks.values()) {
-      if (replayExtrasOn(held, hubUrl, track.gameId)?.track) continue;
+      const record = replayExtrasOn(held, hubUrl, track.gameId);
+      if (hubHasTrack(record, track)) continue;
       if (track.state === "current") queue(track.gameId, track.lastWatchedMs);
     }
   }, [analyses, tracks, since, hubUrl]);
