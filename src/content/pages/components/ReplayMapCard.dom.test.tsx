@@ -1615,6 +1615,35 @@ describe("the dock's place", () => {
     dock.getByRole("slider", { name: "Time in the match" });
     expect(dock.getByTestId("timeline-axis").textContent).toBe("0:00");
   });
+
+  it("has go to start, rewind, play and the speed, in that order, in one group", async () => {
+    await show("current", "/replay?frame=60");
+    const dock = within(screen.getByRole("group", { name: "Timeline" }));
+    const names = ["Go to start", "Play in reverse", "Play"];
+    const controls = [
+      ...names.map((name) => dock.getByRole("button", { name })),
+      dock.getByRole("combobox", { name: "Playback speed" }),
+    ];
+    const group = controls[0].parentElement as HTMLElement;
+    const inGroup = Array.from(
+      group.querySelectorAll("button, [role=combobox]"),
+    );
+    expect(inGroup).toEqual(controls);
+    // Play is the filled, primary one.
+    expect(controls[2].className).toContain("bg-primary");
+    expect(controls[1].className).not.toContain("bg-primary");
+    // The clock's readout follows the group.
+    expect(
+      group.compareDocumentPosition(dock.getByTestId("match-clock")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("goes to the start of the match from its button", async () => {
+    await show("current", "/replay?frame=60");
+    await click("Go to start");
+    expect(clockFrame()).toBe(0);
+  });
 });
 
 describe("the dock's height (#5356)", () => {

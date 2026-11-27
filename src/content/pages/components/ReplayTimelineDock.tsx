@@ -2,7 +2,14 @@ import type { MessageDescriptor } from "@lingui/core";
 import { msg, plural, t } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
-import { ChevronsDown, ChevronsUp, Pause, Play } from "lucide-react";
+import {
+  ChevronsDown,
+  ChevronsUp,
+  Pause,
+  Play,
+  Rewind,
+  SkipBack,
+} from "lucide-react";
 import { Slider as SliderPrimitive } from "radix-ui";
 import {
   createContext,
@@ -435,47 +442,60 @@ function Knob({
   );
 }
 
-/** Play, reverse, and the speed. Only a match with a recording has them. */
+/** Go to start, rewind, play and the speed. Only a match with a recording has
+ *  them. Play is the primary control and the rest are quieter. */
 function Transport() {
   const { t: tr } = useLingui();
-  const { playback } = useMatchClock();
+  const { playback, range } = useMatchClock();
   const state = usePlaybackState();
   const playingForward = state.playing && state.direction === 1;
   const playingBack = state.playing && state.direction === -1;
   return (
     <div className="flex items-center gap-1">
+      <Tip label={tr`Go to start`}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-7 text-muted-foreground"
+          aria-label={tr`Go to start`}
+          onClick={() => playback.seek(range.firstFrame)}
+        >
+          <SkipBack className="size-4" />
+        </Button>
+      </Tip>
       <Tip label={playingBack ? tr`Pause` : tr`Play in reverse`}>
         <Button
           type="button"
           variant="ghost"
           size="icon"
-          className="size-7"
+          className="size-7 text-muted-foreground"
           aria-label={playingBack ? tr`Pause` : tr`Play in reverse`}
           onClick={() => (playingBack ? playback.pause() : playback.play(-1))}
         >
           {playingBack ? (
             <Pause className="size-4" />
           ) : (
-            <Play className="size-4 -scale-x-100" />
+            <Rewind className="size-4" />
           )}
         </Button>
       </Tip>
       <Tip label={playingForward ? tr`Pause` : tr`Play`}>
         <Button
           type="button"
-          variant="ghost"
           size="icon"
-          className="size-7"
+          className="size-8 rounded-full"
           aria-label={playingForward ? tr`Pause` : tr`Play`}
           onClick={() => (playingForward ? playback.pause() : playback.play(1))}
         >
           {playingForward ? (
-            <Pause className="size-4" />
+            <Pause className="size-4 fill-current" />
           ) : (
-            <Play className="size-4" />
+            <Play className="size-4 fill-current" />
           )}
         </Button>
       </Tip>
+      <SpeedSelect />
     </div>
   );
 }
@@ -688,7 +708,6 @@ export function ReplayTimelineDock({
           >
             {reading ? groupWords(range, reading) : ""}
           </p>
-          {animates && <SpeedSelect />}
           {folded && (
             <Tip
               label={opened ? tr`Fold the extra lanes` : tr`Show every lane`}
