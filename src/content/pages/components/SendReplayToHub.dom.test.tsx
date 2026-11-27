@@ -222,20 +222,49 @@ describe("send to hub on a replay's page", () => {
     expect(screen.getByRole("button", { name: /Send to hub/ })).toBeTruthy();
   });
 
-  it("is not offered for a battle the user was not in", () => {
+  // Radix opens a tooltip on focus, and the wrapper around a disabled button
+  // takes focus.
+  const reasonFor = async (container: HTMLElement) => {
+    const button = screen.getByRole("button", { name: /Send to hub/ });
+    expect(button.hasAttribute("disabled")).toBe(true);
+    const wrapper = container.querySelector("span[tabindex]") as HTMLElement;
+    await act(async () => wrapper.focus());
+    return (
+      await screen.findAllByText(/./, { selector: '[role="tooltip"]' })
+    )[0]?.textContent;
+  };
+
+  it("shows it off, with the reason, for a battle the user was not in", async () => {
     logins = [{ serverId: "s", username: "Dave", lastUsedAt: 1 }];
     const { container } = render(
       <SendReplayToHub info={INFO} replayPath={PATH} />,
     );
-    expect(container.innerHTML).toBe("");
+    expect(await reasonFor(container)).toMatch(/played in or watched/);
   });
 
-  it("is not offered to somebody signed out of the hub", () => {
+  it("shows it off, with the reason, to somebody signed out of the hub", async () => {
     account = signedIn(false);
     const { container } = render(
       <SendReplayToHub info={INFO} replayPath={PATH} />,
     );
-    expect(container.innerHTML).toBe("");
+    expect(await reasonFor(container)).toMatch(/Sign in to the hub/);
+  });
+
+  it("shows it off, with the reason, for a replay with no game id", async () => {
+    const { container } = render(
+      <SendReplayToHub
+        info={{ ...INFO, gameId: undefined }}
+        replayPath={PATH}
+      />,
+    );
+    expect(await reasonFor(container)).toMatch(/no game ID/);
+  });
+
+  it("shows it off, with the reason, for a remix", async () => {
+    const { container } = render(
+      <SendReplayToHub info={{ ...INFO, remixed: true }} replayPath={PATH} />,
+    );
+    expect(await reasonFor(container)).toMatch(/remixed/);
   });
 
   it("asks first, then sends the summary under the user's name in the replay", async () => {
