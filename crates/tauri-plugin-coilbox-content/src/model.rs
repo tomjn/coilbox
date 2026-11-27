@@ -289,6 +289,11 @@ pub struct PlayerInfo {
     /// Faction (the team's `side`, e.g. `Armada`/`Cortex`/`Legion`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub side: Option<String>,
+    /// The faction the player picked in the match, which stands in place of
+    /// `side`. Absent for a player with no pick that counts, and from the cheap
+    /// decode the replay list uses.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pick: Option<RecordedPick>,
     /// Normalized team colour `[r, g, b]` (0..1), when present.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rgb_color: Option<[f32; 3]>,
@@ -704,6 +709,31 @@ pub enum StreamEventKind {
     /// player's client sends its own copy.
     #[serde(rename_all = "camelCase")]
     MatchAwards { awards: Vec<RecordedAward> },
+    /// `player` picked a faction, from a `NETMSG_LUAMSG`. Whether the game took
+    /// the pick depends on when it was sent.
+    #[serde(rename_all = "camelCase")]
+    FactionPick { player: u8, picked: PickedFaction },
+}
+
+/// How a game's Lua message names the faction picked.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum PickedFaction {
+    /// The unit definition id of the start unit, in the recorded game's
+    /// numbering.
+    UnitDefId(u32),
+    /// The faction's name, exactly as sent.
+    Name(String),
+}
+
+/// A pick the game took: `frame` and either `unitDefId` or `name`.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RecordedPick {
+    /// The frame it was sent in, [`PREGAME_FRAME`] before the match started.
+    pub frame: i32,
+    #[serde(flatten)]
+    pub picked: PickedFaction,
 }
 
 /// One award a game recorded in its replay.

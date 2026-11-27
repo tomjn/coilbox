@@ -9,10 +9,11 @@
 //! To read a new message, add a [`StreamEventKind`] variant for it and a
 //! [`LuaDecoder`] to [`DECODERS`].
 
+use super::faction_picks;
 use crate::model::{RecordedAward, RecordedAwardId, RecordedPlace, StreamEventKind};
 
 /// One `NETMSG_LUAMSG`, borrowed from the stream.
-#[cfg_attr(not(test), expect(dead_code, reason = "no decoder reads these yet"))]
+#[cfg_attr(not(test), expect(dead_code, reason = "no decoder reads the mode yet"))]
 pub(super) struct LuaMsg<'a> {
     /// The game the replay was recorded on, as the start script's `gametype`
     /// names it, version included. For a remix it is the game before the remix,
@@ -42,13 +43,27 @@ pub(super) struct LuaDecoder {
 }
 
 /// Every decoder the walk tries, in order. The first to claim a message has it.
-pub(super) const DECODERS: &[LuaDecoder] = &[LuaDecoder {
-    name: "barAwards",
-    decode: bar_awards,
-}];
+pub(super) const DECODERS: &[LuaDecoder] = &[
+    LuaDecoder {
+        name: "barAwards",
+        decode: bar_awards,
+    },
+    LuaDecoder {
+        name: "barFactionPick",
+        decode: faction_picks::bar_pick,
+    },
+    LuaDecoder {
+        name: "byteFactionPick",
+        decode: faction_picks::byte_pick,
+    },
+    LuaDecoder {
+        name: "metalFactionsPick",
+        decode: faction_picks::metal_factions_pick,
+    },
+];
 
 /// LuaRules, as [`LuaMsg::handle`] numbers it.
-const LUA_RULES: u16 = 100;
+pub(super) const LUA_RULES: u16 = 100;
 
 /// Beyond All Reason's awards, sent once at game over. The message is a run of
 /// fields, each a marker byte and then ASCII `team:score`, or the team alone for
