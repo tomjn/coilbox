@@ -209,7 +209,7 @@ Once the hub has a replay, you can also send it what coilbox found when it playe
 A Send analysis button appears beside On the hub when the replay has an analysis that played out exactly as the match did. A run that did not is never sent.
 
 1. Select Send analysis.
-2. The button says The hub is checking the analysis… while the hub compares it with the replay. Coilbox asks the hub how it went every few seconds while the page is open.
+2. The button says The hub is checking the analysis… while the hub compares it with the replay. Coilbox asks the hub how it went every 10 seconds while the page is open.
 3. Once the hub has passed the analysis, the button says Send track if the replay has an up to date recording. Select it.
 4. The button says Sending track…, then The hub is checking the track…, then Track on the hub.
 
