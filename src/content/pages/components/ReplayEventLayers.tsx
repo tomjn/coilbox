@@ -5,7 +5,7 @@ import { ToggleGroup } from "@/components/ui/toggle-group";
 import { formatNumber } from "@/lib/format";
 import { drawHeatField, HEAT_EDGE_CLASS } from "@/lib/heatCanvas";
 import { HEAT_KIND_OF_LAYER } from "@/lib/heatRamp";
-import { ANALYSIS_SECTION_ID } from "../../replayAnalysis";
+import { goToAnalysisSection } from "../../replayAnalysis";
 import { damageLegend } from "../../replayDamage";
 import {
   deathLegend,
@@ -162,9 +162,7 @@ export function EventLayerCanvases({
 }
 
 export function goToAnalysis() {
-  document
-    .getElementById(ANALYSIS_SECTION_ID)
-    ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  goToAnalysisSection();
 }
 
 /** The outline shapes the finished marks use, one for each kind of building. */

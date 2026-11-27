@@ -22,7 +22,9 @@ import {
 } from "../config";
 import {
   analysisRunHidden,
+  goToAnalysisSection,
   openAnalysisRun,
+  SHOW_ANALYSIS_EVENT,
   useStoredAnalyses,
 } from "../replayAnalysis";
 import { otherGameVersion } from "../replayAnalysisOffer";
@@ -131,10 +133,16 @@ export default function ReplayDetailPage() {
   // The map card's Analyse replay button presses the one in the Summary tab,
   // which is only there to press once the tab is open.
   const analyseWhenSummary = useRef(false);
+  const showWhenSummary = useRef(false);
   useEffect(() => {
-    if (tab !== "summary" || !analyseWhenSummary.current) return;
-    analyseWhenSummary.current = false;
-    openAnalysisRun();
+    if (tab !== "summary") return;
+    if (analyseWhenSummary.current) {
+      analyseWhenSummary.current = false;
+      openAnalysisRun();
+    } else if (showWhenSummary.current) {
+      showWhenSummary.current = false;
+      goToAnalysisSection();
+    }
   }, [tab]);
   const onAnalyse = useCallback(() => {
     if (tab === "summary") {
@@ -143,6 +151,17 @@ export default function ReplayDetailPage() {
     }
     analyseWhenSummary.current = true;
     setTab("summary");
+  }, [tab, setTab]);
+  // The links in the map card's rail go to the analysis section, which is in
+  // the Summary tab and cannot be scrolled to while another tab is open.
+  useEffect(() => {
+    const show = () => {
+      if (tab === "summary") return;
+      showWhenSummary.current = true;
+      setTab("summary");
+    };
+    window.addEventListener(SHOW_ANALYSIS_EVENT, show);
+    return () => window.removeEventListener(SHOW_ANALYSIS_EVENT, show);
   }, [tab, setTab]);
 
   // Remount the preview after a successful map download so it refetches.

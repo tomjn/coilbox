@@ -16,6 +16,7 @@ import {
 import type { ReactNode } from "react";
 import { HashRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { goToAnalysisSection } from "../replayAnalysis";
 
 /** The one replay file the list holds. Set by each test before it renders. */
 let FILE = "";
@@ -291,6 +292,15 @@ describe("ReplayDetailPage", () => {
       renderAt("a.sdfz", "?tab=events");
       expect(selected()).toEqual(["Events and chat"]);
       fireEvent.click(screen.getByRole("button", { name: "Analyse replay" }));
+      await waitFor(() => expect(selected()).toEqual(["Summary"]));
+    });
+
+    it("opens the Summary when a link in the map card's rail goes to the analysis section from another tab", async () => {
+      FILE = "a.sdfz";
+      INFO = LOADED_INFO;
+      renderAt("a.sdfz", "?tab=events");
+      expect(selected()).toEqual(["Events and chat"]);
+      goToAnalysisSection();
       await waitFor(() => expect(selected()).toEqual(["Summary"]));
     });
 
