@@ -3,6 +3,7 @@ import {
   type ComponentProps,
   type CSSProperties,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { HEAT_KIND_OF_LAYER } from "@/lib/heatRamp";
@@ -11,6 +12,7 @@ import { useHeatmapLayer } from "@/lib/useHeatmapLayer";
 import { fieldFromGrid } from "@/placement/terrain";
 import { useHeightGrid } from "@/placement/useHeightGrid";
 import { MapPreview3D } from "../../../mapconv/pages/components/MapPreview3D";
+import type { ExpandBounds } from "../../../mapconv/pages/components/useExpandedFrame";
 import type { DemoInfo } from "../../bindings";
 import { useUnitsyncHeightField, useUnitsyncMapSkybox } from "../../config";
 import type { ReplayTrackHandle } from "../../replayTrack";
@@ -34,6 +36,11 @@ export type Preview3D = Omit<
   ComponentProps<typeof MapPreview3D>,
   "onScene" | "worldWidth" | "worldHeight" | "className" | "skyboxSrc"
 >;
+
+/** Set by `ReplayDetailPage` on its content area and by `ReplayTimelineDock`
+ *  on the dock. */
+const REPLAY_CONTENT_ATTRIBUTE = "data-replay-content";
+const REPLAY_DOCK_ATTRIBUTE = "data-replay-dock";
 
 const NO_TEAMS: ReplayTrackHandle["header"]["teams"] = [];
 
@@ -79,6 +86,19 @@ export function ReplayMap3D({
   const skybox = useUnitsyncMapSkybox(enginePath, dataDir, mapName);
 
   const [handle, setHandle] = useState<MapScene3D | null>(null);
+
+  // Maximised, the view fills the page's content area above the timeline dock,
+  // so the app's bars stay and the clock can still be played and scrubbed.
+  const frameRef = useRef<HTMLDivElement | null>(null);
+  const expandBounds = useMemo<ExpandBounds>(() => {
+    const content = () =>
+      frameRef.current?.closest(`[${REPLAY_CONTENT_ATTRIBUTE}]`) ?? null;
+    return {
+      content,
+      below: () =>
+        content()?.querySelector(`[${REPLAY_DOCK_ATTRIBUTE}]`) ?? null,
+    };
+  }, []);
   // One 3D layer for each density, so two on at once are both on the terrain,
   // each in its own ramp. Layers at one depth are drawn in the order they were
   // made, so orders go first and the sparser buildings sit on top of them.
@@ -127,6 +147,7 @@ export function ReplayMap3D({
       shape={null}
       map={
         <div
+          ref={frameRef}
           data-map-3d
           style={{ "--map-view-height": MAP_VIEW_HEIGHT } as CSSProperties}
           className="relative h-(--map-view-height) w-full overflow-hidden rounded-md border border-border bg-gradient-to-b from-muted/20 to-muted/40"
@@ -137,6 +158,7 @@ export function ReplayMap3D({
             skyboxSrc={skybox.dataUrl}
             worldWidth={world.worldWidth || 1}
             worldHeight={world.worldHeight || 1}
+            expandBounds={expandBounds}
             onScene={setHandle}
           />
         </div>

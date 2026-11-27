@@ -22,6 +22,7 @@ import { useEffect } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import * as THREE from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ExpandBounds } from "../../../mapconv/pages/components/useExpandedFrame";
 import type {
   ChatLine,
   DemoInfo,
@@ -145,6 +146,8 @@ vi.mock("../../useMatchStats", () => ({
     error: null,
   }),
 }));
+/** Where the 3D view was told to go when maximised. */
+let EXPAND_BOUNDS: ExpandBounds | undefined;
 /** The scene the 3D view hands over, which a test reads the dots from. */
 let VIEW_3D: {
   scene: THREE.Scene;
@@ -152,7 +155,14 @@ let VIEW_3D: {
   render: () => void;
 } | null = null;
 vi.mock("../../../mapconv/pages/components/MapPreview3D", () => ({
-  MapPreview3D: ({ onScene }: { onScene?: (scene: unknown) => void }) => {
+  MapPreview3D: ({
+    onScene,
+    expandBounds,
+  }: {
+    onScene?: (scene: unknown) => void;
+    expandBounds?: ExpandBounds;
+  }) => {
+    EXPAND_BOUNDS = expandBounds;
     useEffect(() => {
       onScene?.(VIEW_3D);
     }, [onScene]);
@@ -2184,6 +2194,19 @@ describe("the map card's modes", () => {
         .getAllByRole("button")
         .map((b) => b.textContent),
     ).toEqual(["Building density", "Order density", "Deaths", "Damage dealt"]);
+  });
+
+  it("tells the 3D view to fill the page's content above the timeline dock when maximised", async () => {
+    const { container } = await show();
+    await pick("3D");
+    // Without a content area on the page, the view has nowhere to be told.
+    expect(EXPAND_BOUNDS?.content()).toBeNull();
+
+    container.setAttribute("data-replay-content", "");
+    expect(EXPAND_BOUNDS?.content()).toBe(container);
+    const dock = screen.getByRole("group", { name: "Timeline" });
+    expect(dock.hasAttribute("data-replay-dock")).toBe(true);
+    expect(EXPAND_BOUNDS?.below?.()).toBe(dock);
   });
 
   describe("the units in 3D", () => {
