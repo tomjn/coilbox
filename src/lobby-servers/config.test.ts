@@ -92,9 +92,9 @@ describe("tlsModeFor", () => {
     expect(tlsModeFor(custom)).toBe("none");
   });
 
-  it("upgrades BAR in-band, since its 8201 port never sends the greeting", () => {
+  it("connects to BAR in plaintext, since BAR turned TLS off", () => {
     const bar = BUILTIN_SERVERS.find((s) => s.id === "bar-ssl");
-    expect(tlsModeFor(bar as LobbyServer)).toBe("stls");
+    expect(tlsModeFor(bar as LobbyServer)).toBe("none");
   });
 });
 
@@ -297,7 +297,7 @@ describe("a profile naming BAR's retired plaintext entry", () => {
 
   it("resolves the official server onto the SSL entry", () => {
     const { official } = resolveProfileServerRules({ official: "bar" });
-    expect(official).toMatchObject({ id: "bar-ssl", port: 8200, tls: true });
+    expect(official).toMatchObject({ id: "bar-ssl", port: 8200, tls: false });
   });
 
   it("leaves a current id alone and still ignores an unknown one", () => {

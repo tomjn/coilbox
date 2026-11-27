@@ -187,7 +187,8 @@ export const BUILTIN_SERVERS: LobbyServer[] = [
     name: "Beyond All Reason",
     host: "server4.beyondallreason.info",
     port: 8200,
-    tls: true,
+    // BAR turned TLS off on its lobby server, so STLS now fails the handshake.
+    tls: false,
     allowSelfSigned: false,
   },
   {
