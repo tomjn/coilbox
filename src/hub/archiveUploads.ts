@@ -139,7 +139,7 @@ const hubReplayUploadStart = defineCommand<
     gameId: string;
     name: string;
     summary: unknown;
-    grant: string;
+    grant?: string;
   },
   { upload: ArchiveUploadState }
 >("coilbox-hub", "hub_replay_upload_start");
@@ -151,7 +151,9 @@ const hubReplayUploadStart = defineCommand<
  *
  * `name` is the name the user was in the battle under, and `summary` what the
  * replay page read out of the file (`content/replaySummary.ts`). `grant` is the
- * one a press of the replay's send button opened.
+ * one a press of the replay's send button opened. Without one the send is only
+ * allowed while the player's "send my finished matches" switch is on (issue
+ * #5494).
  */
 export async function startReplayUpload(
   hubUrl: string,
@@ -159,7 +161,7 @@ export async function startReplayUpload(
   gameId: string,
   name: string,
   summary: unknown,
-  grant: string,
+  grant?: string,
 ): Promise<ArchiveUploadState> {
   const { upload } = await hubReplayUploadStart({
     hubUrl,
@@ -167,7 +169,7 @@ export async function startReplayUpload(
     gameId,
     name,
     summary,
-    grant,
+    ...(grant ? { grant } : {}),
   });
   return upload;
 }

@@ -480,10 +480,10 @@ async fn hub_archive_upload_start<R: Runtime>(
 ///
 /// `summary` is what the replay page read out of the file, which the hub checks
 /// against it. The file's hash and size are worked out here, from the file
-/// itself. `name` is the name the user was in the battle under. `grant` must be
-/// the one a press of the replay's send button opened. The upload is followed
-/// as an archive's is, through `hub_archive_upload_list` and its event, with
-/// `kind` `replay`.
+/// itself. `name` is the name the user was in the battle under. `grant` is the
+/// one a press of the replay's send button opened. Without one the switch that
+/// sends finished matches has to be on. The upload is followed as an archive's
+/// is, through `hub_archive_upload_list` and its event, with `kind` `replay`.
 #[tauri::command]
 async fn hub_replay_upload_start<R: Runtime>(
     app: AppHandle<R>,
@@ -494,7 +494,7 @@ async fn hub_replay_upload_start<R: Runtime>(
     summary: Value,
     grant: Option<String>,
 ) -> CliResult {
-    let consent = match consent::AssetUploadConsent::check(&app, grant.as_deref()) {
+    let consent = match consent::AssetUploadConsent::check_replay(&app, grant.as_deref()) {
         Ok(consent) => consent,
         Err(refused) => return CliResult::err(refused),
     };

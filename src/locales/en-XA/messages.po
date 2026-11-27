@@ -3143,6 +3143,7 @@ msgid "{label} volume"
 msgstr ""
 
 #: src/content/pages/components/SendReplayToHub.tsx
+#: src/hub/replaySend/runner.ts
 msgid "{label} was not sent"
 msgstr ""
 
@@ -8395,6 +8396,10 @@ msgstr ""
 msgid "About sending what your maps say"
 msgstr ""
 
+#: src/hub/replaySend/ReplayAutoSendControl.tsx
+msgid "About sending your matches"
+msgstr ""
+
 #: src/lego/pages/components/CollisionPanel.tsx
 msgid "About shooting at each piece"
 msgstr ""
@@ -9920,7 +9925,7 @@ msgstr ""
 msgid "Another unit already has this name"
 msgstr ""
 
-#: src/content/pages/components/SendReplayToHub.tsx
+#: src/hub/replaySend/messages.ts
 msgid "Another version of the game is installed, so Coilbox cannot say which unit each build order was for. Install the version it was played on, then try again."
 msgstr ""
 
@@ -13774,7 +13779,7 @@ msgstr ""
 msgid "Coilbox cannot read this unit's build pic. The game ships one, in a format the decoder does not handle."
 msgstr ""
 
-#: src/content/pages/components/SendReplayToHub.tsx
+#: src/hub/replaySend/messages.ts
 msgid "Coilbox cannot say what every unit built in this match is or costs. Install the game it was played on, then try again."
 msgstr ""
 
@@ -13878,7 +13883,7 @@ msgstr ""
 msgid "Coilbox could not read {game}: {said}"
 msgstr ""
 
-#: src/content/pages/components/SendReplayToHub.tsx
+#: src/hub/replaySend/messages.ts
 msgid "Coilbox could not read every build order in this replay, and the hub checks all of them."
 msgstr ""
 
@@ -13894,7 +13899,7 @@ msgstr ""
 msgid "Coilbox could not read the file."
 msgstr ""
 
-#: src/content/pages/components/SendReplayToHub.tsx
+#: src/hub/replaySend/messages.ts
 msgid "Coilbox could not read the game's factions, which the hub checks. Install the game it was played on, then try again."
 msgstr ""
 
@@ -22175,6 +22180,10 @@ msgstr ""
 
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 msgid "If nothing arrives, start again and ask for a new code."
+msgstr ""
+
+#: src/hub/replaySend/ReplayAutoSendControl.tsx
+msgid "If the hub cannot be reached, Coilbox keeps trying for a week. Turning this off forgets anything still waiting."
 msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
@@ -34744,8 +34753,13 @@ msgstr ""
 #: src/content/pages/ReplaysPage.tsx
 #: src/content/pages/StatsPage.tsx
 #: src/content/storageLabels.ts
+#: src/hub/replaySend/ReplayAutoSendControl.tsx
 #: src/play/index.ts
 msgid "Replays"
+msgstr ""
+
+#: src/hub/replaySend/ReplayAutoSendControl.tsx
+msgid "Replays on the hub are public. Sending needs you to be signed in."
 msgstr ""
 
 #: src/general/ErrorBoundary.tsx
@@ -36801,6 +36815,10 @@ msgstr ""
 #: src/account/pages/SettingsSection.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 msgid "Send code"
+msgstr ""
+
+#: src/hub/replaySend/ReplayAutoSendControl.tsx
+msgid "Send my finished matches to the hub"
 msgstr ""
 
 #: src/hub/pages/components/GamePicturesControl.tsx
@@ -42129,7 +42147,7 @@ msgstr ""
 msgid "The recording could not be made into a track."
 msgstr ""
 
-#: src/content/pages/components/SendReplayToHub.tsx
+#: src/hub/replaySend/messages.ts
 msgid "The recording stops before the end of the match, and the hub only takes a whole match."
 msgstr ""
 
@@ -42161,9 +42179,8 @@ msgstr ""
 msgid "The reload failed"
 msgstr ""
 
-#. placeholder {0}: problem.name
-#: src/content/pages/components/SendReplayToHub.tsx
-msgid "The replay does not say which team {0} was on."
+#: src/hub/replaySend/messages.ts
+msgid "The replay does not say which team {name} was on."
 msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
@@ -42177,6 +42194,10 @@ msgstr ""
 #. placeholder {0}: info.mapName
 #: src/content/pages/components/SendReplayToHub.tsx
 msgid "The replay on {0}"
+msgstr ""
+
+#: src/hub/replaySend/runner.ts
+msgid "The replay on {mapName}"
 msgstr ""
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
@@ -47311,6 +47332,10 @@ msgstr ""
 msgid "Wheels turning"
 msgstr ""
 
+#: src/hub/replaySend/ReplayAutoSendControl.tsx
+msgid "When a match ends, Coilbox sends its replay if you played in it or watched it, people were on two or more sides, and it reached game over. Anyone can download it and see the players, the build orders and the totals, and the hub notes that you sent it."
+msgstr ""
+
 #: src/content/pages/components/ReplayTracksStorage.tsx
 msgid "When a new track is stored and the tracks take more than the limit, the least recently watched are removed until they fit. Tracks that are out of date go first. The new track is never removed, so a track larger than the limit is kept and every other one goes."
 msgstr ""
@@ -48590,6 +48615,10 @@ msgstr ""
 
 #: src/hub/pages/components/AssetUploadControl.tsx
 msgid "Your distribution has switched off sending pictures to the hub, so Coilbox will not upload any."
+msgstr ""
+
+#: src/hub/replaySend/ReplayAutoSendControl.tsx
+msgid "Your distribution has switched off sending to the hub."
 msgstr ""
 
 #: src/scenario/pages/components/BlueprintPanel.tsx

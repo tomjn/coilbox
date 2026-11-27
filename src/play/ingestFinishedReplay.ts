@@ -4,6 +4,7 @@ import {
   type ReplayFile,
   STATS_UPDATED_EVENT,
 } from "../content/bindings";
+import { queueFinishedReplay } from "../hub/replaySend/queue";
 
 /** Replays already ingested (or being ingested) this session, by path. */
 const seen = new Set<string>();
@@ -22,6 +23,9 @@ export function forgetIngestedReplays(): void {
  * watcher does, on the Rust side), so this emits it, and only when the pass
  * changed the store.
  *
+ * It also queues the replay for the hub, when the player has asked for that
+ * (`../hub/replaySend/queue.ts`).
+ *
  * Call it after the caller has what it needs from the replay. It never throws.
  * A failure leaves the replay for the next stats page open to pick up.
  */
@@ -31,6 +35,7 @@ export async function ingestFinishedReplay(
 ): Promise<void> {
   if (!replay || seen.has(replay.path)) return;
   seen.add(replay.path);
+  queueFinishedReplay(target, replay);
   try {
     const { summary } = await contentStatsIngest({
       roots: [target.dataDir],
