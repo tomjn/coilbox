@@ -65,15 +65,15 @@ export const LEAST_HALF_MARK = 1.5;
 const FACING_REACH = 2.5;
 /** A projectile's line, shortest and longest, and how many frames of its
  *  travel the line stands for between the two. */
-const SHOT_SHORTEST = 2;
-const SHOT_LONGEST = 9;
-const SHOT_FRAMES = 3;
-const HALF_WRECK = 1;
+export const SHOT_SHORTEST = 2;
+export const SHOT_LONGEST = 9;
+export const SHOT_FRAMES = 3;
+export const HALF_WRECK = 1;
 /** An explosion's circle at its fullest, in elmos and as least in CSS pixels,
  *  so it can be seen on a large map. A unit's death is the larger. Chosen by
  *  eye on a real battle. */
-const SHOT_BLAST_ELMOS = 20;
-const SHOT_BLAST_LEAST = 5;
+export const SHOT_BLAST_ELMOS = 20;
+export const SHOT_BLAST_LEAST = 5;
 export const DEATH_BLAST_ELMOS = 44;
 export const DEATH_BLAST_LEAST = 11;
 /** How big a circle is when it begins, as a part of its full size. */
@@ -95,8 +95,8 @@ const FAINT_FLOOR = 0.12;
 
 const DARK_EDGE = "rgba(9, 13, 22, 0.9)";
 const PALE_EDGE = "rgba(226, 232, 240, 0.85)";
-const WRECK = "rgba(148, 156, 170, 0.85)";
-const SHOT = "rgba(255, 236, 170, 0.95)";
+export const WRECK = "rgba(148, 156, 170, 0.85)";
+export const SHOT = "rgba(255, 236, 170, 0.95)";
 /** The colour of an explosion's circle. */
 export const BLAST_FILL = "rgb(255, 196, 0)";
 const RING = "rgba(255, 255, 255, 0.95)";
