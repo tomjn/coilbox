@@ -4,11 +4,12 @@ import { describe, expect, it, vi } from "vitest";
 import type { MapScene3D } from "@/lib/mapScene";
 import { fieldFromGrid } from "@/placement/terrain";
 import fixture from "../fixtures/replay-track-window.json";
+import { DEATH_BLASTS } from "./blasts3d";
 import { createReplayClock } from "./clock";
-import { BLASTS_NAME } from "./deathBlasts3d";
+import { SHOTS_NAME, WRECKS_NAME } from "./effects3d";
 import type { UnitIcons } from "./icons";
 import type { TeamStyle } from "./paint";
-import { createMapScene } from "./scene";
+import { collectScene, createMapScene } from "./scene";
 import { testTrack } from "./testTrack";
 import {
   createUnitDotsLayer,
@@ -216,7 +217,7 @@ describe("the unit dots layer", () => {
   it("marks where a unit died with a circle part way through its fade, and only while explosions are on", async () => {
     const { track, clock, view, frames, layer } = await setup();
     const blasts = () =>
-      view.scene.getObjectByName(BLASTS_NAME) as THREE.Points;
+      view.scene.getObjectByName(DEATH_BLASTS.name) as THREE.Points;
     // Unit 1's last frame is 89, so at 95 it died 6 frames ago.
     clock.set(95);
     await track.seek(95);
@@ -232,6 +233,41 @@ describe("the unit dots layer", () => {
     clock.set(110);
     frames.run();
     expect(blasts().geometry.drawRange.count).toBe(0);
+  });
+
+  it("draws the flat map's projectiles and wrecks on the ground", async () => {
+    const { track, clock, view, frames } = await setup();
+    const count = (name: string) =>
+      (view.scene.getObjectByName(name) as THREE.Points).geometry.drawRange
+        .count;
+    frames.run();
+    expect(count(SHOTS_NAME)).toBe(0);
+    expect(count(WRECKS_NAME)).toBe(0);
+
+    // At frame 50 projectiles are in the air, and the wreck that appeared
+    // at frame 40 is on the ground. Its scenery feature from frame 0 is not.
+    clock.set(50);
+    await track.seek(50);
+    frames.run();
+    // Two vertices a projectile, as many as the flat map's scene holds.
+    const flat = createMapScene();
+    collectScene(track.handle, 50, flat);
+    expect(flat.projectiles).toBeGreaterThan(0);
+    expect(count(SHOTS_NAME)).toBe(flat.projectiles * 2);
+    expect(count(WRECKS_NAME)).toBe(1);
+    const wreck = (view.scene.getObjectByName(WRECKS_NAME) as THREE.Points)
+      .geometry.attributes.position.array;
+    expect(wreck[0]).toBeCloseTo((1200.5 - 500) * 0.01);
+    expect(wreck[2]).toBeCloseTo((300.25 - 500) * 0.01);
+  });
+
+  it("gives each unit an opacity, solid once built", async () => {
+    const { view, frames } = await setup();
+    frames.run();
+    const colour = pointsOf(view).geometry.attributes.color;
+    expect(colour.itemSize).toBe(4);
+    expect(colour.array[3]).toBeGreaterThan(0);
+    expect(colour.array[3]).toBeLessThanOrEqual(1);
   });
 
   it("removes its points and frees the GPU objects when disposed", async () => {

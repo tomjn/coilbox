@@ -1,12 +1,12 @@
 /**
- * A yellow circle where each unit died, on the replay's 3D terrain, growing and
- * fading as the flat map's does (#5317). Its size and fade come from the
- * flat map's constants, so the two views read the same.
+ * A yellow circle where each unit died or shot landed, on the replay's 3D
+ * terrain, growing and fading as the flat map's does (#5317). Its size and fade
+ * come from the flat map's constants, so the two views read the same.
  *
  * A circle's full size is in elmos, so it shrinks with distance like the
  * terrain, but is never smaller on screen than the flat map's least size. Each
  * circle carries its own progress, which the shader turns into its size and
- * opacity, so one `THREE.Points` draws every circle.
+ * opacity, so one `THREE.Points` draws every circle of one kind.
  */
 
 import * as THREE from "three";
@@ -17,10 +17,29 @@ import {
   BLAST_START,
   DEATH_BLAST_ELMOS,
   DEATH_BLAST_LEAST,
+  SHOT_BLAST_ELMOS,
+  SHOT_BLAST_LEAST,
 } from "./paint";
 
-/** What the circles hang off, so the layer can be found in the scene. */
-export const BLASTS_NAME = "replay-unit-deaths";
+/** One kind of circle: what it hangs off in the scene, its full radius in
+ *  elmos and the least that radius is on screen, in CSS pixels. */
+export interface BlastKind {
+  name: string;
+  fullElmos: number;
+  leastPixels: number;
+}
+
+export const DEATH_BLASTS: BlastKind = {
+  name: "replay-unit-deaths",
+  fullElmos: DEATH_BLAST_ELMOS,
+  leastPixels: DEATH_BLAST_LEAST,
+};
+
+export const SHOT_BLASTS: BlastKind = {
+  name: "replay-shot-landings",
+  fullElmos: SHOT_BLAST_ELMOS,
+  leastPixels: SHOT_BLAST_LEAST,
+};
 
 const VERTEX = /* glsl */ `
 attribute float progress;
@@ -55,7 +74,7 @@ void main() {
 }
 `;
 
-export interface DeathBlasts {
+export interface Blasts {
   points: THREE.Points;
   /** Room for `count` circles, and the arrays to write them into. */
   reserve(count: number): { positions: Float32Array; progress: Float32Array };
@@ -64,8 +83,8 @@ export interface DeathBlasts {
   dispose(): void;
 }
 
-/** `sceneScale` is the scene units one elmo is. */
-export function createDeathBlasts(sceneScale: number): DeathBlasts {
+/** Circles of one `kind`. `sceneScale` is the scene units one elmo is. */
+export function createBlasts(kind: BlastKind, sceneScale: number): Blasts {
   // The shader writes its colour as is, with no conversion to the screen's
   // colour space, so it is given the sRGB values the flat map paints.
   const color = new THREE.Color(BLAST_FILL).convertLinearToSRGB();
@@ -76,8 +95,8 @@ export function createDeathBlasts(sceneScale: number): DeathBlasts {
       color: { value: color },
       opacity: { value: BLAST_OPACITY },
       start: { value: BLAST_START },
-      fullRadius: { value: DEATH_BLAST_ELMOS * sceneScale },
-      leastRadius: { value: DEATH_BLAST_LEAST },
+      fullRadius: { value: kind.fullElmos * sceneScale },
+      leastRadius: { value: kind.leastPixels },
       viewHeight: { value: 1 },
     },
     transparent: true,
@@ -86,7 +105,7 @@ export function createDeathBlasts(sceneScale: number): DeathBlasts {
   });
   let geometry = new THREE.BufferGeometry();
   const points = new THREE.Points(geometry, material);
-  points.name = BLASTS_NAME;
+  points.name = kind.name;
   // Under the units, which are at 2.
   points.renderOrder = 1;
   points.frustumCulled = false;
@@ -95,7 +114,7 @@ export function createDeathBlasts(sceneScale: number): DeathBlasts {
     renderer.getDrawingBufferSize(size);
     material.uniforms.viewHeight.value = size.y;
     material.uniforms.leastRadius.value =
-      DEATH_BLAST_LEAST * renderer.getPixelRatio();
+      kind.leastPixels * renderer.getPixelRatio();
   };
 
   let capacity = -1;
