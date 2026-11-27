@@ -41580,6 +41580,7 @@ msgstr "Αναφορά"
 msgid "Reference unit"
 msgstr "Μονάδα αναφοράς"
 
+#: src/content/pages/components/RefightPanel.tsx
 #: src/content/pages/PlayerDossierPage.tsx
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
@@ -41590,11 +41591,6 @@ msgstr "Νέα μάχη"
 #, fuzzy
 msgid "Refight now"
 msgstr "Νέα μάχη τώρα"
-
-#: src/content/pages/components/RefightPanel.tsx
-#, fuzzy
-msgid "Refight this setup"
-msgstr "Νέα μάχη με αυτή τη ρύθμιση"
 
 #: src/content/pages/components/RefightPanel.tsx
 #, fuzzy

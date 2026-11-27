@@ -111,7 +111,7 @@ export function PresetLibraryToolbar({
 
       <div className="flex items-center gap-2 border-b border-border/60 px-5 py-3">
         {/* Seed a preset from a decoded replay's setup, the other end of the
-         * refight pipeline from the replay detail page's "Refight this setup". */}
+         * refight pipeline from the replay detail page's "Refight". */}
         <NewPresetFromReplayButton
           onSave={onSaveFromReplay}
           disabled={disabled}

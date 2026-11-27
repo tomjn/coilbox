@@ -41562,6 +41562,7 @@ msgstr "リファレンス"
 msgid "Reference unit"
 msgstr "比較用ユニット"
 
+#: src/content/pages/components/RefightPanel.tsx
 #: src/content/pages/PlayerDossierPage.tsx
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
@@ -41572,11 +41573,6 @@ msgstr "再挑戦"
 #, fuzzy
 msgid "Refight now"
 msgstr "今すぐ再挑戦"
-
-#: src/content/pages/components/RefightPanel.tsx
-#, fuzzy
-msgid "Refight this setup"
-msgstr "この設定で再挑戦"
 
 #: src/content/pages/components/RefightPanel.tsx
 #, fuzzy

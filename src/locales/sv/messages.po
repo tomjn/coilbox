@@ -41580,6 +41580,7 @@ msgstr "Referens"
 msgid "Reference unit"
 msgstr "Referensenhet"
 
+#: src/content/pages/components/RefightPanel.tsx
 #: src/content/pages/PlayerDossierPage.tsx
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
@@ -41590,11 +41591,6 @@ msgstr "Spela om"
 #, fuzzy
 msgid "Refight now"
 msgstr "Spela om nu"
-
-#: src/content/pages/components/RefightPanel.tsx
-#, fuzzy
-msgid "Refight this setup"
-msgstr "Spela om den här uppsättningen"
 
 #: src/content/pages/components/RefightPanel.tsx
 #, fuzzy

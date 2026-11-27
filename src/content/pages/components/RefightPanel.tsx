@@ -33,7 +33,7 @@ const aiValue = (a: { kind: string; shortName: string }) =>
   `${a.kind}:${a.shortName}`;
 
 /**
- * "Refight this setup" (#368): converts a decoded replay into a launchable
+ * "Refight" (#368): converts a decoded replay into a launchable
  * `SkirmishDraft` (every seated player becomes an AI opponent, see
  * `demoInfoToSkirmishDraft`) and offers "Refight now" (launch it immediately)
  * or "Save as preset" (via the shared `SaveAsPresetButton`). Disabled with a
@@ -57,7 +57,7 @@ export function RefightPanel({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="outline" className="gap-1.5">
-          <Swords className="size-4" /> <Trans>Refight this setup</Trans>
+          <Swords className="size-4" /> <Trans>Refight</Trans>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="flex w-80 flex-col gap-3">
@@ -144,7 +144,7 @@ function RefightForm({
     return (
       <div className="flex flex-col gap-1">
         <h3 className="text-sm font-medium">
-          <Trans>Refight this setup</Trans>
+          <Trans>Refight</Trans>
         </h3>
         <ScanFailed noun={t`games or maps`} reason={scanFailure} />
       </div>
@@ -155,7 +155,7 @@ function RefightForm({
     return (
       <div className="flex flex-col gap-1">
         <h3 className="text-sm font-medium">
-          <Trans>Refight this setup</Trans>
+          <Trans>Refight</Trans>
         </h3>
         <p className="text-xs text-muted-foreground">
           {missingGame && missingMap
@@ -251,7 +251,7 @@ function RefightForm({
     <>
       <div className="flex flex-col gap-1">
         <h3 className="text-sm font-medium">
-          <Trans>Refight this setup</Trans>
+          <Trans>Refight</Trans>
         </h3>
         <p className="text-xs text-muted-foreground">
           <Trans>
