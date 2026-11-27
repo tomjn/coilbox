@@ -208,7 +208,7 @@ fn decode_stream_until(bytes: &[u8], until: Until) -> Result<DemoStream, String>
 
     // The script sits between the header and the stream, so it is all there
     // whenever any of the stream is.
-    let game = recorded_game(&bytes[h.header_size as usize..start]);
+    let game = recorded_game(&bytes[h.header_size..start]);
 
     let mut stream = walk_with(have, until, &game, DECODERS);
     if stream.stopped.is_none() && end > bytes.len() {

@@ -32,7 +32,6 @@ pub(super) struct LuaMsg<'a> {
 }
 
 /// Reads one kind of message.
-#[cfg_attr(not(test), expect(dead_code, reason = "DECODERS is empty"))]
 pub(super) struct LuaDecoder {
     /// What the walk counts this decoder's messages under. Unique in the list.
     pub name: &'static str,
