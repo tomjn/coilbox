@@ -20937,6 +20937,10 @@ msgstr ""
 msgid "Going away"
 msgstr ""
 
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "Golden cow"
+msgstr ""
+
 #: src/content/index.ts
 msgid "Graphics"
 msgstr ""
@@ -26204,6 +26208,10 @@ msgstr ""
 
 #: src/lego/buildPicture.ts
 msgid "Most of this game's PNG build pictures are {commonWidth} by {commonHeight} pixels. This one is {size} by {size}."
+msgstr ""
+
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "Most resources produced"
 msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
@@ -40920,6 +40928,10 @@ msgstr ""
 
 #: src/workshop/pages/components/UnitFieldRow.tsx
 msgid "The game changes this field as it loads. Its files say {fileValue} and it loads as {loadedValue}."
+msgstr ""
+
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "The game chose these awards and worked out their figures, and wrote them into the replay when the match ended. The golden cow goes to a player who won every other award."
 msgstr ""
 
 #: src/multiplayer/battle/CompatHostExport.tsx

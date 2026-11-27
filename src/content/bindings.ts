@@ -3,6 +3,7 @@ import type { Channel } from "@tauri-apps/api/core";
 import type { DownloadProgress } from "../downloads/bindings";
 import type { ArchiveFacts } from "../hub/archiveUploads";
 import type { LaunchEvent, LaunchOutcome } from "../play/bindings";
+import type { Award } from "./replayAwards";
 import { gameArchivePath, gameRefs, mapHint, mapRefs } from "./scanHints";
 
 /**
@@ -913,7 +914,13 @@ export type TimelineEvent = {
  */
 export const contentDemoChat = defineCommand<
   { replayPath: string },
-  { messages: ChatLine[]; incomplete: boolean; events: TimelineEvent[] }
+  {
+    messages: ChatLine[];
+    incomplete: boolean;
+    events: TimelineEvent[];
+    /** The awards the game recorded in the replay. Empty for most games. */
+    awards: Award[];
+  }
 >("coilbox-content", "content_demo_chat");
 
 /** What issued an order. `lua` is a widget on the player's own machine acting

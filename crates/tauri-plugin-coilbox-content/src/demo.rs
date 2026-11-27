@@ -2013,6 +2013,7 @@ fn chat_from_stream(
     let mut messages = Vec::new();
     let mut events = Vec::new();
     let mut dead_teams = Vec::new();
+    let mut awards = Vec::new();
     for e in &stream.events {
         let (player, dest, text, system) = match &e.kind {
             StreamEventKind::NewPlayer {
@@ -2097,6 +2098,13 @@ fn chat_from_stream(
                 events.push(timeline_event(e, *player, &names, kind));
                 continue;
             }
+            // The copies agree, so the first is the one kept.
+            StreamEventKind::MatchAwards { awards: sent } => {
+                if awards.is_empty() {
+                    awards.clone_from(sent);
+                }
+                continue;
+            }
             StreamEventKind::Chat { from, dest, text } => (*from, Some(*dest), text, false),
             StreamEventKind::SystemMessage { player, text } => (*player, None, text, true),
             _ => continue,
@@ -2115,6 +2123,7 @@ fn chat_from_stream(
         messages,
         incomplete: stream.stopped.is_some(),
         events,
+        awards,
     }
 }
 
@@ -3871,6 +3880,7 @@ mod tests {
                         StreamEventKind::PlayerLeft { .. } => "playerLeft",
                         StreamEventKind::Team { .. } => "team",
                         StreamEventKind::NewPlayer { .. } => "newPlayer",
+                        StreamEventKind::MatchAwards { .. } => "matchAwards",
                     })
                     .or_default() += 1;
             }
@@ -5471,6 +5481,21 @@ mod tests {
         assert_eq!(m.dest, Some(ChatDest::Everyone));
         assert_eq!(m.text, "gg");
         assert!(!m.system);
+    }
+
+    #[test]
+    fn the_chat_read_carries_the_awards_of_a_beyond_all_reason_replay() {
+        let s = Packets::default()
+            .keyframe(0)
+            .lua_msg(0, 100, 0, b"\xa12:97270")
+            .lua_msg(1, 100, 0, b"\xa12:97270");
+        let script = "[game]\n{\ngametype=Beyond All Reason test-1;\n}\n";
+        let mut f = fixture_with_stream(s.bytes());
+        f.script = script.to_string();
+        let c = chat_of("chat_awards.sdf", f);
+        assert_eq!(c.awards.len(), 1);
+        assert_eq!(c.awards[0].places[0].team, 1);
+        assert!(c.messages.is_empty());
     }
 
     #[test]

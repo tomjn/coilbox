@@ -25669,6 +25669,10 @@ msgstr "Περνά από τη διαδρομή mutator. Η εγγραφή επ�
 msgid "Going away"
 msgstr "Απομακρύνεται"
 
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "Golden cow"
+msgstr ""
+
 #: src/content/index.ts
 #, fuzzy
 msgid "Graphics"
@@ -32122,6 +32126,10 @@ msgstr ""
 #, fuzzy
 msgid "Most of this game's PNG build pictures are {commonWidth} by {commonHeight} pixels. This one is {size} by {size}."
 msgstr "Οι περισσότερες εικόνες κατασκευής PNG αυτού του παιχνιδιού είναι {commonWidth} επί {commonHeight} pixel. Αυτή είναι {size} επί {size}."
+
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "Most resources produced"
+msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
 msgid "Motion and effects"
@@ -50219,6 +50227,10 @@ msgstr "Το παιχνίδι {game} δεν περιέχει πλέον τον �
 #, fuzzy
 msgid "The game changes this field as it loads. Its files say {fileValue} and it loads as {loadedValue}."
 msgstr "Το παιχνίδι αλλάζει αυτό το πεδίο κατά τη φόρτωση. Τα αρχεία του λένε {fileValue} και φορτώνεται ως {loadedValue}."
+
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "The game chose these awards and worked out their figures, and wrote them into the replay when the match ended. The golden cow goes to a player who won every other award."
+msgstr ""
 
 #: src/multiplayer/battle/CompatHostExport.tsx
 #: src/multiplayer/battles/useHostCompat.ts
