@@ -3,7 +3,6 @@ import type {
   DemoInfo,
   DemoTrailer,
   ReplayPlayer,
-  TeamStatSample,
   UnitDatasetEntry,
 } from "./bindings";
 import { resolveBuildUnit } from "./replayBuildOrders";
@@ -60,28 +59,9 @@ export type SummaryProblem =
   /** No unit list says what this id is, with a cost. */
   | { kind: "unknownUnit"; unitDefId: number };
 
-/** The hub's names for the trailer's totals, by `TeamStatSample` field. */
-const TOTALS: [keyof TeamStatSample, string][] = [
-  ["metalUsed", "metal_used"],
-  ["energyUsed", "energy_used"],
-  ["metalProduced", "metal_produced"],
-  ["energyProduced", "energy_produced"],
-  ["metalExcess", "metal_excess"],
-  ["energyExcess", "energy_excess"],
-  ["metalReceived", "metal_received"],
-  ["energyReceived", "energy_received"],
-  ["metalSent", "metal_sent"],
-  ["energySent", "energy_sent"],
-  ["damageDealt", "damage_dealt"],
-  ["damageReceived", "damage_received"],
-  ["unitsProduced", "units_produced"],
-  ["unitsDied", "units_died"],
-  ["unitsReceived", "units_received"],
-  ["unitsSent", "units_sent"],
-  ["unitsCaptured", "units_captured"],
-  ["unitsOutCaptured", "units_out_captured"],
-  ["unitsKilled", "units_killed"],
-];
+/** The hub's name for a sample field, in snake case. */
+const snakeCase = (field: string) =>
+  field.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
 
 /**
  * The faction a player played, as the summary sends it.
@@ -144,7 +124,10 @@ export function buildReplaySummary(
     const entry: { team: number } & Record<string, number> = {
       team: series.team,
     };
-    for (const [field, key] of TOTALS) entry[key] = last[field];
+    // Every figure but the frame, which the hub reads by the same names.
+    for (const [field, value] of Object.entries(last)) {
+      if (field !== "frame") entry[snakeCase(field)] = value;
+    }
     return [entry];
   });
 
