@@ -26,6 +26,7 @@ import {
 } from "../../skyboxNote";
 import { generatedSkyCanvas } from "../../skyCanvas";
 import { skyboxImageKind } from "../../skyPanorama";
+import { type ExpandBounds, useExpandedFrame } from "./useExpandedFrame";
 import { WheelCoalescer } from "./wheelCoalescer";
 import { groundHit, releaseWheel } from "./wheelGate";
 
@@ -316,6 +317,7 @@ export function MapPreview3D({
   initialWater,
   stillWater = false,
   clearAir = false,
+  expandBounds,
   onScene,
 }: {
   /** File path to the heightmap image (mapconv flow); resolved via `mc_image_info`. */
@@ -415,6 +417,11 @@ export function MapPreview3D({
    * it is simply never attached.
    */
   clearAir?: boolean;
+  /** Where the view goes when it is maximised. Without it the view fills the
+   * whole window. With it, the view fills `content` and stops above `below`,
+   * so the app's bars and whatever sits at the bottom of the page stay in
+   * reach. */
+  expandBounds?: ExpandBounds;
   /** Handed the built scene so a view can add its own content to the map and
    * retune the camera. Called with null when that scene is torn down, which is
    * the point at which anything the view added is already gone. Changing the
@@ -441,6 +448,7 @@ export function MapPreview3D({
   const [water, setWater] = useState(true);
   const [wireframe, setWireframe] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const expandedStyle = useExpandedFrame(expandBounds, expanded);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   // Set by the scene effect; the toggle effects mutate through them.
@@ -1313,9 +1321,13 @@ uniform vec2 wPlane;`,
 
   return (
     <div
+      style={expanded ? expandedStyle : undefined}
       className={
         expanded
-          ? "fixed inset-0 z-50 overflow-hidden bg-background"
+          ? cn(
+              "fixed z-50 overflow-hidden bg-background",
+              !expandedStyle && "inset-0",
+            )
           : cn(
               framed
                 ? "relative aspect-[16/10] max-h-[32rem] w-full overflow-hidden rounded-md border border-border bg-gradient-to-b from-muted/20 to-muted/40"

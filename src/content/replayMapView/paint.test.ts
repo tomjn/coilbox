@@ -333,6 +333,7 @@ function fakeIcons(edges: Record<number, number>): UnitIcons {
             height: edges[def] * ratio,
           } satisfies FakeSprite as unknown as CanvasImageSource)
         : null,
+    type: () => null,
   };
 }
 

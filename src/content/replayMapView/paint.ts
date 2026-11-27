@@ -74,15 +74,15 @@ const HALF_WRECK = 1;
  *  eye on a real battle. */
 const SHOT_BLAST_ELMOS = 20;
 const SHOT_BLAST_LEAST = 5;
-const DEATH_BLAST_ELMOS = 44;
-const DEATH_BLAST_LEAST = 11;
+export const DEATH_BLAST_ELMOS = 44;
+export const DEATH_BLAST_LEAST = 11;
 /** How big a circle is when it begins, as a part of its full size. */
-const BLAST_START = 0.3;
+export const BLAST_START = 0.3;
 /** A circle is drawn in this many bands of opacity, so a frame costs this many
  *  fills however many circles it holds. */
 export const BLAST_BANDS = 4;
 /** How solid a circle is when it begins. */
-const BLAST_OPACITY = 0.9;
+export const BLAST_OPACITY = 0.9;
 /** How much of a unit shows when construction has only just started. A unit
  *  at 0 would otherwise be invisible while it is on the map. */
 const FAINTEST = 0.25;

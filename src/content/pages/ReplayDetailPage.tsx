@@ -275,7 +275,10 @@ export default function ReplayDetailPage() {
     : [];
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-y-auto [container-type:size]">
+    <div
+      data-replay-content
+      className="flex h-full min-h-0 flex-col overflow-y-auto [container-type:size]"
+    >
       {/* The title and the actions share a row until the title has 20rem, and
        * below that the actions drop to their own line rather than taking the
        * last of it (#1215). `min-w-0` truncates a long filename, but on its own

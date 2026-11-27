@@ -689,6 +689,7 @@ export function ReplayTimelineDock({
       {/* biome-ignore lint/a11y/useSemanticElements: a box that holds the transport, the scrubber and the lanes, which a fieldset would restyle. */}
       <div
         role="group"
+        data-replay-dock
         aria-label={tr`Timeline`}
         // rtl: spatial. Time runs left to right in every language.
         dir="ltr"

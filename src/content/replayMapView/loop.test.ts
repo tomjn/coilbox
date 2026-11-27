@@ -263,6 +263,7 @@ describe("createMapView", () => {
     const icons: UnitIcons = {
       edge: (def) => (def === 1 ? 40 : 0),
       sprite: () => null,
+      type: () => null,
     };
     expect(s.view.pick(390, 250)).toBeNull();
     s.view.setIcons(icons);
@@ -278,7 +279,7 @@ describe("createMapView", () => {
     s.raf.run();
     await s.load();
     expect(s.pictures()).toBe(1);
-    s.view.setIcons({ edge: () => 0, sprite: () => null });
+    s.view.setIcons({ edge: () => 0, sprite: () => null, type: () => null });
     expect(s.raf.waiting()).toBe(1);
     s.raf.run();
     expect(s.pictures()).toBe(2);
