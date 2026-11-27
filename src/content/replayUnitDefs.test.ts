@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import incomeLines from "../../lua/replay-logger/tests/fixtures/unit_defs_income.jsonl?raw";
 import type {
   ReplayUnitDefSets,
+  StoredUnitDef,
   UnitDatasetEntry,
   UnitDefLink,
 } from "./bindings";
@@ -104,6 +106,41 @@ describe("a unit list through the store and back", () => {
       stats: { metalCost: Number.NaN, energyCost: "12", metalMake: Infinity },
     });
     expect(stored).toEqual({ name: "odd" });
+  });
+});
+
+describe("income a game declares in customParams", () => {
+  // What the logger writes in its own test, which fails if it stops writing
+  // exactly this. A stored list is these lines without `kind` and `id`.
+  const logged: StoredUnitDef[] = incomeLines
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line))
+    .filter((line) => line.kind === "unit_def")
+    .map(({ kind: _kind, id: _id, ...def }) => def);
+
+  it("is economy after the logger's line and the stored list", () => {
+    const [solar, extractor, rock] = logged.map(storedToUnit);
+    expect(solar.stats).toEqual({
+      metalCost: 70,
+      energyCost: 70,
+      incomeEnergy: 2,
+    });
+    expect(classifyUnit(solar)).toBe("economy");
+    expect(classifyUnit(extractor)).toBe("economy");
+    expect(classifyUnit(rock)).toBe("unclassified");
+  });
+
+  it("is kept from an installed game's list too", () => {
+    for (const stats of [
+      { incomeEnergy: 2 },
+      { incomeMetal: 0.5 },
+      { metalExtractorMult: 1 },
+    ]) {
+      const back = storedToUnit(unitToStored({ name: "paid", stats }));
+      expect(back.stats).toEqual(stats);
+      expect(classifyUnit(back)).toBe("economy");
+    }
   });
 });
 

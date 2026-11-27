@@ -23,7 +23,7 @@
 --                        unitDefs, damageFrames, gridWidth, gridHeight
 --   unit_def             id, name, humanName, iconType, metalCost, energyCost, mobile,
 --                        builder, builds, armed, and the numbers under
---                        DEF_NUMBERS
+--                        DEF_NUMBERS and DEF_PARAMS
 --   game_start           frame
 --   unit_created         frame, unit, def, team, x, y, z, startUnit, builder
 --   unit_finished        frame, unit, def, team, x, y, z, startUnit
@@ -93,7 +93,10 @@
 -- the game's own files say. The engine gives "default" to a unit that names no
 -- type. "mobile", "builder", "builds" (it has a build menu) and "armed"
 -- (it has a weapon) are left out when false, and a number other than a cost is
--- left out when zero.
+-- left out when zero. "incomeEnergy", "incomeMetal" and "metalExtractorMult"
+-- are the customParams income_energy, income_metal and metal_extractor_mult,
+-- which a game declares when its own Lua pays the income, as Zero-K does. Each
+-- is left out when the definition has no such number.
 --
 -- "start_unit_position" is where a living start unit was, every
 -- "positionFrames" frames, left out when it has not moved since the last
@@ -906,6 +909,15 @@ else
 		"radarDistanceJam", "sonarDistanceJam", "seismicDistance",
 	}
 
+	-- Income a game pays from its own Lua, so the engine's numbers above are
+	-- zero. Each is the name it is written under and the customParam it comes
+	-- from, which the engine holds as a string.
+	local DEF_PARAMS = {
+		{ "incomeEnergy", "income_energy" },
+		{ "incomeMetal", "income_metal" },
+		{ "metalExtractorMult", "metal_extractor_mult" },
+	}
+
 	-- A definition's number to four decimal places with the trailing zeros
 	-- gone, which is all a unit definition's numbers carry.
 	local function stat(value)
@@ -950,11 +962,18 @@ else
 		if type(def.weapons) == "table" and #def.weapons > 0 then
 			parts[#parts + 1] = '"armed":true'
 		end
-		for _, key in ipairs(DEF_NUMBERS) do
-			local text = stat(def[key])
+		local function add(key, value)
+			local text = stat(value)
 			if text ~= "0" then
 				parts[#parts + 1] = '"' .. key .. '":' .. text
 			end
+		end
+		for _, key in ipairs(DEF_NUMBERS) do
+			add(key, def[key])
+		end
+		local params = def.customParams or {}
+		for _, param in ipairs(DEF_PARAMS) do
+			add(param[1], tonumber(params[param[2]]))
 		end
 		return table.concat(parts, ",") .. "}"
 	end

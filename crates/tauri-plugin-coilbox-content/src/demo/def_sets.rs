@@ -148,10 +148,21 @@ pub struct UnitDef {
     /// from the engine's own run.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon_type: Option<String>,
+    /// Energy a second the game's own Lua pays, from the definition's
+    /// `customParams.income_energy`, as Zero-K declares it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub income_energy: Option<f64>,
+    /// The same for metal, from `customParams.income_metal`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub income_metal: Option<f64>,
+    /// From `customParams.metal_extractor_mult`, which marks a Zero-K metal
+    /// extractor.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metal_extractor_mult: Option<f64>,
 }
 
 impl UnitDef {
-    fn numbers(&self) -> [Option<f64>; 18] {
+    fn numbers(&self) -> [Option<f64>; 21] {
         [
             self.metal_cost,
             self.energy_cost,
@@ -171,6 +182,9 @@ impl UnitDef {
             self.radar_distance_jam,
             self.sonar_distance_jam,
             self.seismic_distance,
+            self.income_energy,
+            self.income_metal,
+            self.metal_extractor_mult,
         ]
     }
 }
