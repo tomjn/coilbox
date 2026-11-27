@@ -122,6 +122,10 @@ vi.mock("../../play/PlayProvider", () => ({
 }));
 vi.mock("./components/RefightPanel", () => ({ RefightPanel: () => null }));
 vi.mock("./components/RemixPanel", () => ({ RemixPanel: () => null }));
+// What the awards say is `ReplayAwards.dom.test.tsx`'s. Here, where they sit.
+vi.mock("./components/ReplayAwards", () => ({
+  ReplayAwards: () => <p>awards section</p>,
+}));
 vi.mock("./components/ReplayBuildOrders", () => ({
   ReplayBuildOrders: () => <p>build orders section</p>,
 }));
@@ -197,6 +201,9 @@ describe("ReplayDetailPage", () => {
     expect(screen.queryByText("match stats chart")).not.toBeNull();
     expect(screen.queryByText("build orders section")).not.toBeNull();
     expect(screen.queryByText("event list with analysis")).not.toBeNull();
+    expect(
+      screen.getByText("awards section").closest("[role=tabpanel]")?.id,
+    ).toMatch(/summary$/);
   });
 
   it("hides the match statistics section when the profile hides it", () => {
@@ -207,6 +214,7 @@ describe("ReplayDetailPage", () => {
     expect(screen.queryByText("match stats tiles")).toBeNull();
     expect(screen.queryByText("match stats chart")).toBeNull();
     expect(screen.queryByText("build orders section")).toBeNull();
+    expect(screen.queryByText("awards section")).toBeNull();
     // The chat and player events are read from the file, so the list stays.
     expect(screen.queryByText("event list without analysis")).not.toBeNull();
   });

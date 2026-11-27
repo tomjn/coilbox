@@ -673,6 +673,11 @@ msgstr "{0, plural, one {# verlies was buiten de kaart en wordt niet getekend.} 
 msgid "{0, plural, one {# def override} other {# def overrides}}"
 msgstr "{0, plural, one {# def-override} other {# def-overrides}}"
 
+#. placeholder {0}: analysed.unpriced
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "{0, plural, one {# destroyed unit has no metal cost in this unit list and counts nothing.} other {# destroyed units have no metal cost in this unit list and count nothing.}}"
+msgstr ""
+
 #. placeholder {0}: state.report.groups.length
 #: src/content/pages/components/DuplicateContent.tsx
 #, fuzzy
@@ -2499,6 +2504,10 @@ msgstr "{counts}, in bouwvolgorde"
 msgid "{currentName} (not installed)"
 msgstr "{currentName} (niet geïnstalleerd)"
 
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "{damage} damage"
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "{damageOtherGrid, plural, one {# match recorded its damage on a map of another size and is left out.} other {# matches recorded their damage on a map of another size and are left out.}}"
@@ -3069,6 +3078,10 @@ msgstr "{game} declareert {names} niet."
 #, fuzzy
 msgid "{game} is not installed, so nothing says what a unit costs or what it is for."
 msgstr "{game} is niet geïnstalleerd, dus niets vertelt wat een eenheid kost of waar hij voor dient."
+
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "{game} is not installed, so nothing says what a unit costs. The awards that need a cost are left out."
+msgstr ""
 
 #: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
@@ -4632,6 +4645,7 @@ msgid "{menuOps, plural, one {# build menu edit} other {# build menu edits}}"
 msgstr "{menuOps, plural, one {# wijziging in het bouwmenu} other {# wijzigingen in het bouwmenu}}"
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
+#: src/content/pages/components/ReplayAwards.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
 #, fuzzy
 msgid "{metal} metal"
@@ -6118,6 +6132,10 @@ msgstr "{rate, plural, one {{shown} {one}} other {{shown} {many}}}"
 #, fuzzy
 msgid "{rate} a minute"
 msgstr "{rate} per minuut"
+
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "{ratio} metal destroyed for each metal spent"
+msgstr ""
 
 #: src/content/pages/components/ReplayRoster.tsx
 #, fuzzy
@@ -12998,6 +13016,11 @@ msgstr "Vermijdt vuren door kaartobjecten heen"
 msgid "Avoids firing through neutral units"
 msgstr "Vermijdt vuren door neutrale eenheden heen"
 
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "awards"
+msgstr ""
+
+#: src/content/pages/components/ReplayAwards.tsx
 #: src/multiplayer/DebriefingDrawer.tsx
 #, fuzzy
 msgid "Awards"
@@ -18694,6 +18717,7 @@ msgid "Costs"
 msgstr "Kosten"
 
 #: src/content/pages/components/LivingValueChart.tsx
+#: src/content/pages/components/ReplayAwards.tsx
 #, fuzzy
 msgid "Costs and kinds"
 msgstr "Kosten en soorten"
@@ -21898,6 +21922,10 @@ msgstr "Economie"
 #, fuzzy
 msgid "Economy and durability"
 msgstr "Economie en duurzaamheid"
+
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "Economy destroyed counts the metal cost of enemy economy buildings. Fighting units destroyed counts the metal cost of enemy units and turrets with a weapon, apart from those that build. Efficiency is the metal cost of every enemy unit destroyed, divided by the metal spent. A unit still being built counts nothing."
+msgstr ""
 
 #: src/conquest/pages/components/StartPositionSelect.tsx
 #, fuzzy
@@ -30356,6 +30384,10 @@ msgstr "lang"
 msgid "Longest"
 msgstr "Langste"
 
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "Longest time without a kill"
+msgstr ""
+
 #: src/play/pages/EngineLogSection.tsx
 msgid "Look for the log again"
 msgstr ""
@@ -31568,6 +31600,10 @@ msgstr "metaal per seconde"
 msgid "Metal produced"
 msgstr "Geproduceerd metaal"
 
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "Metal produced and damage taken are the engine's totals at the end of the game. The time without a kill runs from the start of the game, and stops when a team has no units left."
+msgstr ""
+
 #: src/content/metricLabels.ts
 #, fuzzy
 msgid "Metal received"
@@ -32045,10 +32081,30 @@ msgstr "Meeste"
 msgid "Most {metricName}"
 msgstr "Meeste {metricName}"
 
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "Most damage taken"
+msgstr ""
+
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "Most efficient"
+msgstr ""
+
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "Most enemy economy destroyed"
+msgstr ""
+
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "Most enemy fighting units destroyed"
+msgstr ""
+
 #: src/components/HeatLegend.tsx
 #, fuzzy
 msgid "Most is {peak}."
 msgstr "Het meeste is {peak}."
+
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "Most metal produced"
+msgstr ""
 
 #: src/lego/buildPicture.ts
 #, fuzzy
@@ -40854,6 +40910,7 @@ msgstr "Engineversies lezen…"
 msgid "Reading events and unit definitions…"
 msgstr "Gebeurtenissen en eenheidsdefinities lezen…"
 
+#: src/content/pages/components/ReplayAwards.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
 #: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
@@ -41077,6 +41134,7 @@ msgid "Reading this replay's statistics…"
 msgstr "De statistieken van deze replay lezen…"
 
 #: src/content/pages/components/MapAggregate.tsx
+#: src/content/pages/components/ReplayAwards.tsx
 #, fuzzy
 msgid "Reading unit definitions…"
 msgstr "Eenheidsdefinities lezen…"
@@ -48766,6 +48824,7 @@ msgid "Team {number}"
 msgstr "Team {number}"
 
 #: src/content/matchStats.ts
+#: src/content/pages/components/ReplayAwards.tsx
 #: src/mapconv/pages/components/MapinfoOptions.tsx
 #, fuzzy
 msgid "Team {team}"
@@ -48827,6 +48886,10 @@ msgstr "Teams"
 #, fuzzy
 msgid "Teams and bots"
 msgstr "Teams en bots"
+
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "Teams with the same score share a place, and a score of nothing wins nothing. A team wins every award by being alone in first place in all of the others. Energy is not counted, because metal and energy are never added together."
+msgstr ""
 
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/RunPage.tsx
@@ -49922,6 +49985,7 @@ msgid "the events and chat"
 msgstr "de gebeurtenissen en chat"
 
 #: src/content/pages/components/LivingValueChart.tsx
+#: src/content/pages/components/ReplayAwards.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
 msgid "The events could not be read from this replay's analysis."
@@ -52345,6 +52409,10 @@ msgstr "De eenheden van het spel van deze replay konden niet gelezen worden, dus
 msgid "The units of this replay's game could not be read, so nothing says which finished units are buildings, so this layer needs the game installed."
 msgstr "De eenheden van het spel van deze replay konden niet gelezen worden, dus niets zegt welke voltooide eenheden gebouwen zijn. Deze laag heeft het spel geïnstalleerd nodig."
 
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "The units of this replay's game could not be read, so the awards that need a cost are left out."
+msgstr ""
+
 #: src/downloads/pages/components/EngineUpload.tsx
 msgid "The upload of {filename} stopped."
 msgstr ""
@@ -53891,6 +53959,7 @@ msgid "This replay was played on {recorded}, which is not installed. Unit names 
 msgstr "Deze replay is gespeeld op {recorded}, dat niet geïnstalleerd is. De eenheidsnamen komen uit {gameName}, een andere build, en kunnen fout zijn."
 
 #: src/content/pages/components/LivingValueChart.tsx
+#: src/content/pages/components/ReplayAwards.tsx
 #, fuzzy
 msgid "This replay was played on {recordedGame}, which is not installed. Costs and kinds come from {installedGame}, a different build, and may be wrong."
 msgstr "Deze replay is gespeeld op {recordedGame}, dat niet geïnstalleerd is. Kosten en soorten komen uit {installedGame}, een andere build, en kunnen fout zijn."
@@ -53916,6 +53985,7 @@ msgid "This replay was recorded on the replay playback game. It has no match of 
 msgstr "Deze replay is opgenomen in het afspeelspel voor replays. Er is geen eigen wedstrijd om op te nemen."
 
 #: src/content/pages/components/LivingValueChart.tsx
+#: src/content/pages/components/ReplayAwards.tsx
 #: src/content/pages/components/ReplayBuildOrders.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
 #: src/content/pages/components/ReplayEventList.tsx
@@ -58640,6 +58710,10 @@ msgstr "Gewonnen"
 #, fuzzy
 msgid "won {won} of {known}"
 msgstr "{won} van {known} gewonnen"
+
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "Won every award"
+msgstr ""
 
 #: src/runlite/pages/components/RunHud.tsx
 #, fuzzy
