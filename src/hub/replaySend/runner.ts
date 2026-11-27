@@ -2,6 +2,7 @@ import { t } from "@lingui/core/macro";
 import {
   contentDemoInfo,
   contentReplayAnalysis,
+  contentReplayTrackUploadFacts,
   type DemoInfo,
 } from "@/content/bindings";
 import { userNameInReplay } from "@/content/replayHubName";
@@ -23,6 +24,7 @@ import {
   trackWorthAnotherTry,
 } from "../replayExtras/messages";
 import {
+  hubHasTrack,
   readReplayExtras,
   rememberTrackOnHub,
   replayExtrasOn,
@@ -328,7 +330,8 @@ async function sendExtras(
     } else if (sent.state === "refused") {
       return { kind: "done" };
     }
-    if (record?.track) return { kind: "done" };
+    const { track } = await contentReplayTrackUploadFacts({ gameId });
+    if (hubHasTrack(record, track)) return { kind: "done" };
 
     await followArchiveUploads();
     const filename = trackFilename(gameId);
@@ -350,9 +353,14 @@ async function sendExtras(
       const { outcome } = state;
       if (!outcome || outcome.kind === "cancelled") return { kind: "done" };
       if (outcome.kind === "listed") {
-        rememberTrackOnHub(gameId, state.hubUrl);
+        if (state.recorderVersion !== undefined) {
+          rememberTrackOnHub(gameId, state.hubUrl, state.recorderVersion);
+        }
         return { kind: "done" };
       }
+      // The hub cannot replace its track yet. It is asked again when the match
+      // is next analysed and recorded, or from the replay's page (issue #5525).
+      if (outcome.code === "older_kept") return { kind: "done" };
       const again = trackWorthAnotherTry(outcome);
       if (theirs && !again) return { kind: "done" };
       const said = describeTrackEnd(outcome, match, state.heldAlready);

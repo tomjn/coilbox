@@ -163,6 +163,10 @@ describe("the background sender", () => {
     state: "current",
     lastWatchedMs: Date.now(),
   });
+  const recorded = (recorderVersion: number) => ({
+    ...track("m"),
+    recorderVersion,
+  });
 
   it("queues nothing when an old recording is watched (#5523)", () => {
     turn(true);
@@ -197,10 +201,22 @@ describe("the background sender", () => {
     analyses = new Map([["m", analysis("m", Date.now())]]);
     rerender(<ReplayAutoSend />);
     act(() => dropQueuedExtras("m"));
-    rememberTrackOnHub("m", "https://hub.test");
-    tracks = new Map([["m", track("m")]]);
+    rememberTrackOnHub("m", "https://hub.test", 5);
+    tracks = new Map([["m", recorded(5)]]);
     rerender(<ReplayAutoSend />);
     expect(readReplayExtrasQueue()).toEqual([]);
+  });
+
+  it("queues a track from a newer recorder than the hub's (#5525)", () => {
+    turn(true);
+    const { rerender } = render(<ReplayAutoSend />);
+    analyses = new Map([["m", analysis("m", Date.now())]]);
+    rerender(<ReplayAutoSend />);
+    act(() => dropQueuedExtras("m"));
+    rememberTrackOnHub("m", "https://hub.test", 4);
+    tracks = new Map([["m", recorded(5)]]);
+    rerender(<ReplayAutoSend />);
+    expect(readReplayExtrasQueue().map((one) => one.gameId)).toEqual(["m"]);
   });
 
   it("stops everything while the setting is off", () => {

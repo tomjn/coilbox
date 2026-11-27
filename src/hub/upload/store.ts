@@ -223,8 +223,9 @@ async function announceEnd(state: ArchiveUploadState): Promise<void> {
   }
   const subject = subjects.get(state.sha256);
   if (state.kind === "track") {
-    if (outcome.kind === "listed" && subject?.gameId) {
-      rememberTrackOnHub(subject.gameId, state.hubUrl);
+    const version = state.recorderVersion;
+    if (outcome.kind === "listed" && subject?.gameId && version !== undefined) {
+      rememberTrackOnHub(subject.gameId, state.hubUrl, version);
     }
     void notify(
       endingToNotification(

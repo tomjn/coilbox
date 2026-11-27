@@ -219,6 +219,8 @@ A Send analysis button appears beside On the hub when the replay has an analysis
 3. Once the hub has passed the analysis, the button says Send track if the replay has an up to date recording. Select it.
 4. The button says Sending track…, then The hub is checking the track…, then Track on the hub.
 
+The button also offers Send track when the hub has a track from an older version of coilbox's recorder and you record the match again with a newer one. The hub puts the new track in the old one's place once it has checked it. If the hub cannot replace its track yet, the button says Track not sent, and you can try again later.
+
 If the hub refuses the analysis, the button says Analysis refused. Select it to see why. Coilbox does not offer the track then.
 
 If the track is not sent, the button says Track not sent. Select it to see why. Where trying again could help, for example when someone else is sending a track of the same match, there is a Send again button.
@@ -255,7 +257,7 @@ It sends nothing until you are signed in to the hub. A match that ended while yo
 
 If the hub or a mirror cannot take a replay, coilbox tries again later, waiting longer each time. It keeps trying for a week after the match. If the hub refuses the replay, or the week runs out, coilbox tells you the replay was not sent and why.
 
-With the setting on, coilbox also sends a match's analysis, then its track, when you analyse and record it. It waits until the hub has the replay. If the hub is still checking the analysis, coilbox asks again every minute, and sends the track once the analysis has passed. A match you analysed before turning the setting on is not sent by itself. Use the buttons on its page.
+With the setting on, coilbox also sends a match's analysis, then its track, when you analyse and record it. It waits until the hub has the replay. If the hub is still checking the analysis, coilbox asks again every minute, and sends the track once the analysis has passed. If the hub cannot replace an older track yet, coilbox says nothing and asks again when you next analyse and record that match. A match you analysed before turning the setting on is not sent by itself. Use the buttons on its page.
 
 Turning the setting off forgets every replay, analysis and track still waiting to be sent, and stops one that is being sent.
 

@@ -117,6 +117,9 @@ export interface ArchiveUploadState {
   pageUrl: string | null;
   /** The hub held this replay before this send, so nothing was uploaded. */
   heldAlready: boolean;
+  /** A track's alone: the recorder version of the track being sent, or once
+   *  the hub says it holds one, of the hub's. */
+  recorderVersion?: number;
   /** Set when `phase` is `done`. */
   outcome: ArchiveUploadOutcome | null;
 }
@@ -182,6 +185,7 @@ const hubReplayTrackUploadStart = defineCommand<
     gameId: string;
     path: string;
     formatVersion: number;
+    recorderVersion: number;
     grant?: string;
   },
   { upload: ArchiveUploadState }
@@ -190,14 +194,15 @@ const hubReplayTrackUploadStart = defineCommand<
 /**
  * Start sending a match's recorded track (issue #5495), and answer as soon as
  * it is running. It is followed like an archive upload, with `kind` `track`
- * and the file name `<game id>.cbtrack`. `path` and `formatVersion` are what
- * `contentReplayTrackUploadFacts` answers.
+ * and the file name `<game id>.cbtrack`. `path`, `formatVersion` and
+ * `recorderVersion` are what `contentReplayTrackUploadFacts` answers.
  */
 export async function startTrackUpload(
   hubUrl: string,
   gameId: string,
   path: string,
   formatVersion: number,
+  recorderVersion: number,
   grant?: string,
 ): Promise<ArchiveUploadState> {
   const { upload } = await hubReplayTrackUploadStart({
@@ -205,6 +210,7 @@ export async function startTrackUpload(
     gameId,
     path,
     formatVersion,
+    recorderVersion,
     ...(grant ? { grant } : {}),
   });
   return upload;

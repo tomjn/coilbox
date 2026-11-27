@@ -18,6 +18,7 @@ import {
 } from "@/hub/replayExtras/messages";
 import {
   analysisPassed,
+  hubHasTrack,
   replayExtrasOn,
   useReplayExtras,
 } from "@/hub/replayExtras/onHub";
@@ -229,7 +230,7 @@ export function SendReplayExtrasToHub({ info }: { info: DemoInfo }) {
       ? upload.outcome
       : null;
 
-  if (record?.track || ending?.kind === "listed") {
+  if (hubHasTrack(record, track) || ending?.kind === "listed") {
     return (
       <Button size="sm" variant="outline" className="gap-1.5" disabled>
         {icons(t`Track on the hub`, true)}

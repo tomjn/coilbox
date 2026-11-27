@@ -259,6 +259,45 @@ describe("sending a replay's analysis and track from its page", () => {
     expect(button(/Analysis on the hub/)).toHaveProperty("disabled", true);
   });
 
+  it.each([
+    [4, /Send track/],
+    [5, /Track on the hub/],
+  ])("with a version %s track on the hub and a version 5 one recorded, shows %s (#5525)", (theirs, name) => {
+    analysisOnHub("kept");
+    const record = extras[GAME_ID];
+    if (record) record.trackRecorderVersion = theirs;
+    tracks = new Map([
+      [GAME_ID, { gameId: GAME_ID, state: "current", recorderVersion: 5 }],
+    ]);
+    render(<SendReplayExtrasToHub info={INFO} />);
+    expect(button(name)).toBeTruthy();
+  });
+
+  it("says the hub is keeping its older track, and lets the track go again (#5525)", () => {
+    analysisOnHub("kept");
+    tracks = new Map([[GAME_ID, { gameId: GAME_ID, state: "current" }]]);
+    render(<SendReplayExtrasToHub info={INFO} />);
+    act(() =>
+      rememberUpload(
+        trackUpload({
+          phase: "done",
+          outcome: {
+            kind: "stopped",
+            source: "hub",
+            code: "older_kept",
+            status: 200,
+            said: "said",
+          },
+        }),
+        { kind: "track", label: "the match on Tabula", gameId: GAME_ID },
+      ),
+    );
+    fireEvent.click(button(/Track not sent/));
+    expect(screen.getByText(/The hub is keeping its older track/)).toBeTruthy();
+    fireEvent.click(button("Send again"));
+    expect(button(/Send track/)).toBeTruthy();
+  });
+
   it("follows the track's upload and says when the hub has it", async () => {
     analysisOnHub("kept");
     tracks = new Map([[GAME_ID, { gameId: GAME_ID, state: "current" }]]);

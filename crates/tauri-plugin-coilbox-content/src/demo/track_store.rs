@@ -67,6 +67,9 @@ pub struct StoredTrack {
     /// When the track was last stored or watched, as milliseconds since the
     /// Unix epoch. A budget removes the lowest first.
     pub last_watched_ms: u64,
+    /// The recorder version in the header of a current track. None for a stale
+    /// one.
+    pub recorder_version: Option<u16>,
 }
 
 /// The folder tracks are kept in, given the app's data directory.
@@ -248,8 +251,11 @@ pub fn list(dir: &Path) -> Vec<StoredTrack> {
             // Only the lowercase form, so one id is one file.
             let id = valid_game_id(id).ok().filter(|valid| valid == id)?;
             let meta = entry.metadata().ok()?;
+            let state = inspect(&entry.path(), &id).unwrap_or(TrackState::Stale);
             Some(StoredTrack {
-                state: inspect(&entry.path(), &id).unwrap_or(TrackState::Stale),
+                state,
+                // A current track's header holds this build's version.
+                recorder_version: (state == TrackState::Current).then_some(RECORDER_VERSION),
                 game_id: id,
                 size_bytes: meta.len(),
                 last_watched_ms: meta
@@ -274,23 +280,27 @@ pub fn stored_for_replay(dir: &Path, replay: &Path) -> Option<(String, u64)> {
     Some((game_id, size))
 }
 
-/// A match's stored track as the hub takes it (issue #5495): its path and the
-/// format version in its header. None unless the track is a current one for
+/// A match's stored track as the hub takes it (issue #5495): its path, and the
+/// format version and recorder version in its header. None unless the track is a current one for
 /// this game id, so only a track recorded from this replay by this recorder is
 /// ever sent, exactly as it was stored.
-pub fn upload_facts(dir: &Path, game_id: &str) -> Result<Option<(PathBuf, u16)>, String> {
+pub fn upload_facts(dir: &Path, game_id: &str) -> Result<Option<(PathBuf, u16, u16)>, String> {
     let path = track_path(dir, game_id)?;
     if state(dir, game_id)? != Some(TrackState::Current) {
         return Ok(None);
     }
-    // The reader opens only the one format version it knows, so a current
-    // track is in that one.
-    Ok(Some((path, coilbox_track::FORMAT_VERSION)))
+    // The reader opens only the one format version it knows, and a current
+    // track is from this build's recorder, so its header holds these two.
+    Ok(Some((
+        path,
+        coilbox_track::FORMAT_VERSION,
+        RECORDER_VERSION,
+    )))
 }
 
 /// `content_replay_track_upload_facts`: what sending a match's track to the
-/// hub needs. Answers `track` with `path` and `formatVersion`, or null when the
-/// match has no current track.
+/// hub needs. Answers `track` with `path`, `formatVersion` and
+/// `recorderVersion`, or null when the match has no current track.
 #[tauri::command]
 pub(crate) async fn content_replay_track_upload_facts<R: Runtime>(
     app: AppHandle<R>,
@@ -302,9 +312,10 @@ pub(crate) async fn content_replay_track_upload_facts<R: Runtime>(
     };
     match tauri::async_runtime::spawn_blocking(move || upload_facts(&dir, &game_id)).await {
         Ok(Ok(facts)) => picoframe_core::CliResult::ok(serde_json::json!({
-            "track": facts.map(|(path, version)| serde_json::json!({
+            "track": facts.map(|(path, format, recorder)| serde_json::json!({
                 "path": path.to_string_lossy(),
-                "formatVersion": version,
+                "formatVersion": format,
+                "recorderVersion": recorder,
             })),
         })),
         Ok(Err(e)) => picoframe_core::CliResult::err(e),
@@ -386,7 +397,11 @@ mod tests {
         store_current(dir.path(), ID);
         assert_eq!(
             upload_facts(dir.path(), ID).unwrap(),
-            Some((track_path(dir.path(), ID).unwrap(), FORMAT_VERSION))
+            Some((
+                track_path(dir.path(), ID).unwrap(),
+                FORMAT_VERSION,
+                RECORDER_VERSION
+            ))
         );
         assert!(upload_facts(dir.path(), "../x").is_err());
     }
@@ -568,8 +583,10 @@ mod tests {
         assert_eq!(listed[0].game_id, ID);
         assert_eq!(listed[0].size_bytes, a);
         assert_eq!(listed[0].state, TrackState::Current);
+        assert_eq!(listed[0].recorder_version, Some(RECORDER_VERSION));
         assert_eq!(listed[1].game_id, OTHER);
         assert_eq!(listed[1].state, TrackState::Stale);
+        assert_eq!(listed[1].recorder_version, None);
         assert!(listed.iter().all(|t| t.last_watched_ms > 0));
     }
 

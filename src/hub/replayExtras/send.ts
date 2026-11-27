@@ -69,6 +69,7 @@ export async function startStoredTrack(
     gameId,
     track.path,
     track.formatVersion,
+    track.recorderVersion,
     grant,
   );
   rememberUpload(upload, { kind: "track", label, gameId });

@@ -7,7 +7,11 @@ import { useLastLogin, useLobbyAccounts } from "@/lobby-servers/config";
 import { isHubAssetUploadOffered } from "@/profile/profile";
 import { useHubAccount } from "../account";
 import { useHubUrl } from "../config";
-import { readReplayExtras, replayExtrasOn } from "../replayExtras/onHub";
+import {
+  hubHasTrack,
+  readReplayExtras,
+  replayExtrasOn,
+} from "../replayExtras/onHub";
 import {
   AUTO_SEND_REPLAYS_KEY,
   queueReplayExtras,
@@ -60,11 +64,11 @@ function FinishedRuns() {
       if (analysedAtMs < since || outcome !== "reproduced") continue;
       const keys = [`${gameId}:${analysedAtMs}`];
       // A track the hub is known to hold has nothing to be sent, which is
-      // every track downloaded from it (issue #5520).
-      if (
-        tracks.get(gameId)?.state === "current" &&
-        !replayExtrasOn(held, hubUrl, gameId)?.track
-      ) {
+      // every track downloaded from it (issue #5520). One from a newer
+      // recorder than the hub's does (issue #5525).
+      const track = tracks.get(gameId);
+      const record = replayExtrasOn(held, hubUrl, gameId);
+      if (track?.state === "current" && !hubHasTrack(record, track)) {
         keys.push(`${gameId}:${analysedAtMs}:track`);
       }
       if (keys.every((key) => seen.current.has(key))) continue;
