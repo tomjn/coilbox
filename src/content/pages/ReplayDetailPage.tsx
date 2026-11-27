@@ -43,6 +43,7 @@ import { MissingContentNotice } from "./components/MissingContentNotice";
 import { RefightPanel } from "./components/RefightPanel";
 import { RemixPanel } from "./components/RemixPanel";
 import { ReplayAnalysisSection } from "./components/ReplayAnalysisSection";
+import { ReplayAwards } from "./components/ReplayAwards";
 import { BasePicturesProvider } from "./components/ReplayBaseCrops";
 import { ReplayBuildOrders } from "./components/ReplayBuildOrders";
 import { ReplayEventList } from "./components/ReplayEventList";
@@ -475,6 +476,7 @@ export default function ReplayDetailPage() {
                             />
                           )}
                           <ReplayRoster info={info} replayPath={replay?.path} />
+                          {showStats && <ReplayAwards info={info} />}
                           <section className="flex flex-col gap-2">
                             <h2 className="text-sm font-medium">{t`Details`}</h2>
                             <dl className="grid grid-cols-[minmax(7rem,auto)_1fr] gap-x-4 gap-y-1 rounded-lg border border-border/50 bg-card p-3 text-sm">

@@ -673,6 +673,11 @@ msgstr "{0, plural, one {# strata była poza mapą, więc jej nie narysowano.} f
 msgid "{0, plural, one {# def override} other {# def overrides}}"
 msgstr "{0, plural, one {# nadpisanie definicji} few {# nadpisania definicji} many {# nadpisań definicji} other {# nadpisania definicji}}"
 
+#. placeholder {0}: analysed.unpriced
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "{0, plural, one {# destroyed unit has no metal cost in this unit list and counts nothing.} other {# destroyed units have no metal cost in this unit list and count nothing.}}"
+msgstr ""
+
 #. placeholder {0}: state.report.groups.length
 #: src/content/pages/components/DuplicateContent.tsx
 #, fuzzy
@@ -2498,6 +2503,10 @@ msgstr "{counts}, w kolejności budowy"
 msgid "{currentName} (not installed)"
 msgstr "{currentName} (nie zainstalowano)"
 
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "{damage} damage"
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "{damageOtherGrid, plural, one {# match recorded its damage on a map of another size and is left out.} other {# matches recorded their damage on a map of another size and are left out.}}"
@@ -3068,6 +3077,10 @@ msgstr "{game} nie deklaruje {names}."
 #, fuzzy
 msgid "{game} is not installed, so nothing says what a unit costs or what it is for."
 msgstr "Gra {game} nie jest zainstalowana, więc nic nie mówi, ile kosztuje jednostka ani do czego służy."
+
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "{game} is not installed, so nothing says what a unit costs. The awards that need a cost are left out."
+msgstr ""
 
 #: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
@@ -4631,6 +4644,7 @@ msgid "{menuOps, plural, one {# build menu edit} other {# build menu edits}}"
 msgstr "{menuOps, plural, one {# zmiana menu budowy} few {# zmiany menu budowy} many {# zmian menu budowy} other {# zmiany menu budowy}}"
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
+#: src/content/pages/components/ReplayAwards.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
 #, fuzzy
 msgid "{metal} metal"
@@ -6117,6 +6131,10 @@ msgstr "{rate, plural, one {{shown} {one}} few {{shown} {many}} many {{shown} {m
 #, fuzzy
 msgid "{rate} a minute"
 msgstr "{rate} na minutę"
+
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "{ratio} metal destroyed for each metal spent"
+msgstr ""
 
 #: src/content/pages/components/ReplayRoster.tsx
 #, fuzzy
@@ -12997,6 +13015,11 @@ msgstr "Unika strzelania przez obiekty mapy"
 msgid "Avoids firing through neutral units"
 msgstr "Unika strzelania przez neutralne jednostki"
 
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "awards"
+msgstr ""
+
+#: src/content/pages/components/ReplayAwards.tsx
 #: src/multiplayer/DebriefingDrawer.tsx
 #, fuzzy
 msgid "Awards"
@@ -18690,6 +18713,7 @@ msgid "Costs"
 msgstr "Koszty"
 
 #: src/content/pages/components/LivingValueChart.tsx
+#: src/content/pages/components/ReplayAwards.tsx
 #, fuzzy
 msgid "Costs and kinds"
 msgstr "Koszty i rodzaje"
@@ -21893,6 +21917,10 @@ msgstr "Ekonomia"
 #, fuzzy
 msgid "Economy and durability"
 msgstr "Ekonomia i wytrzymałość"
+
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "Economy destroyed counts the metal cost of enemy economy buildings. Fighting units destroyed counts the metal cost of enemy units and turrets with a weapon, apart from those that build. Efficiency is the metal cost of every enemy unit destroyed, divided by the metal spent. A unit still being built counts nothing."
+msgstr ""
 
 #: src/conquest/pages/components/StartPositionSelect.tsx
 #, fuzzy
@@ -30345,6 +30373,10 @@ msgstr "długa"
 msgid "Longest"
 msgstr "Najdłuższe"
 
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "Longest time without a kill"
+msgstr ""
+
 #: src/play/pages/EngineLogSection.tsx
 msgid "Look for the log again"
 msgstr ""
@@ -31556,6 +31588,10 @@ msgstr "metal na sekundę"
 msgid "Metal produced"
 msgstr "Wyprodukowany metal"
 
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "Metal produced and damage taken are the engine's totals at the end of the game. The time without a kill runs from the start of the game, and stops when a team has no units left."
+msgstr ""
+
 #: src/content/metricLabels.ts
 #, fuzzy
 msgid "Metal received"
@@ -32033,10 +32069,30 @@ msgstr "Najwięcej"
 msgid "Most {metricName}"
 msgstr "Maks. {metricName}"
 
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "Most damage taken"
+msgstr ""
+
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "Most efficient"
+msgstr ""
+
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "Most enemy economy destroyed"
+msgstr ""
+
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "Most enemy fighting units destroyed"
+msgstr ""
+
 #: src/components/HeatLegend.tsx
 #, fuzzy
 msgid "Most is {peak}."
 msgstr "Maksimum to {peak}."
+
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "Most metal produced"
+msgstr ""
 
 #: src/lego/buildPicture.ts
 #, fuzzy
@@ -40836,6 +40892,7 @@ msgstr "Odczytywanie wersji silnika…"
 msgid "Reading events and unit definitions…"
 msgstr "Odczytywanie zdarzeń i definicji jednostek…"
 
+#: src/content/pages/components/ReplayAwards.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
 #: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
@@ -41059,6 +41116,7 @@ msgid "Reading this replay's statistics…"
 msgstr "Odczytywanie statystyk tej powtórki…"
 
 #: src/content/pages/components/MapAggregate.tsx
+#: src/content/pages/components/ReplayAwards.tsx
 #, fuzzy
 msgid "Reading unit definitions…"
 msgstr "Odczytywanie definicji jednostek…"
@@ -48736,6 +48794,7 @@ msgid "Team {number}"
 msgstr "Drużyna {number}"
 
 #: src/content/matchStats.ts
+#: src/content/pages/components/ReplayAwards.tsx
 #: src/mapconv/pages/components/MapinfoOptions.tsx
 #, fuzzy
 msgid "Team {team}"
@@ -48797,6 +48856,10 @@ msgstr "Drużyny"
 #, fuzzy
 msgid "Teams and bots"
 msgstr "Drużyny i boty"
+
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "Teams with the same score share a place, and a score of nothing wins nothing. A team wins every award by being alone in first place in all of the others. Energy is not counted, because metal and energy are never added together."
+msgstr ""
 
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/RunPage.tsx
@@ -49892,6 +49955,7 @@ msgid "the events and chat"
 msgstr "zdarzenia i czat"
 
 #: src/content/pages/components/LivingValueChart.tsx
+#: src/content/pages/components/ReplayAwards.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
 msgid "The events could not be read from this replay's analysis."
@@ -52315,6 +52379,10 @@ msgstr "Nie udało się odczytać jednostek gry tej powtórki, więc nic nie mó
 msgid "The units of this replay's game could not be read, so nothing says which finished units are buildings, so this layer needs the game installed."
 msgstr "Nie udało się odczytać jednostek gry tej powtórki, więc nic nie mówi, które ukończone jednostki są budynkami, dlatego ta warstwa wymaga zainstalowanej gry."
 
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "The units of this replay's game could not be read, so the awards that need a cost are left out."
+msgstr ""
+
 #: src/downloads/pages/components/EngineUpload.tsx
 msgid "The upload of {filename} stopped."
 msgstr ""
@@ -53861,6 +53929,7 @@ msgid "This replay was played on {recorded}, which is not installed. Unit names 
 msgstr "Tę powtórkę rozegrano na {recorded}, która nie jest zainstalowana. Nazwy jednostek pochodzą z {gameName}, innej wersji, i mogą być błędne."
 
 #: src/content/pages/components/LivingValueChart.tsx
+#: src/content/pages/components/ReplayAwards.tsx
 #, fuzzy
 msgid "This replay was played on {recordedGame}, which is not installed. Costs and kinds come from {installedGame}, a different build, and may be wrong."
 msgstr "Tę powtórkę rozegrano na {recordedGame}, która nie jest zainstalowana. Koszty i rodzaje pochodzą z {installedGame}, innej wersji, i mogą być błędne."
@@ -53886,6 +53955,7 @@ msgid "This replay was recorded on the replay playback game. It has no match of 
 msgstr "Tę powtórkę nagrano w grze do odtwarzania powtórek. Nie ma własnego meczu do nagrania."
 
 #: src/content/pages/components/LivingValueChart.tsx
+#: src/content/pages/components/ReplayAwards.tsx
 #: src/content/pages/components/ReplayBuildOrders.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
 #: src/content/pages/components/ReplayEventList.tsx
@@ -58609,6 +58679,10 @@ msgstr "Wygrane"
 #, fuzzy
 msgid "won {won} of {known}"
 msgstr "wygrane {won} z {known}"
+
+#: src/content/pages/components/ReplayAwards.tsx
+msgid "Won every award"
+msgstr ""
 
 #: src/runlite/pages/components/RunHud.tsx
 #, fuzzy

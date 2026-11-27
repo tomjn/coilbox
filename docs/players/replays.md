@@ -131,7 +131,21 @@ While it runs, the section shows how far it has got and Cancel. You can leave th
 
 The analysis needs the replay's engine, game and map installed. The result is only kept if the run plays out exactly as the recorded match did. If it does not, the section says so and keeps nothing.
 
-After an analysis, five more map layers turn on. A Recorded events list appears, with what the run saw, such as units made and lost. Value of living units by kind fills in too.
+After an analysis, five more map layers turn on. A Recorded events list appears, with what the run saw, such as units made and lost. Value of living units by kind fills in too, and Awards appear under the players.
+
+## Awards
+
+An analysed replay has awards:
+
+- Most enemy economy destroyed, by the metal cost of the economy buildings destroyed. Three places.
+- Most enemy fighting units destroyed, by the metal cost of the armed units and turrets destroyed. Units that can build, such as many commanders, are not counted. Three places.
+- Most efficient, by the metal cost of everything destroyed for each metal spent. Three places.
+- Most metal produced.
+- Most damage taken.
+- Longest time without a kill. A team's time stops counting when it has no units left.
+- Won every award, for a team alone in first place in all six.
+
+Awards go to teams, so players who share control of a team share them. Teams with the same score share a place, and an award nobody scored in is not shown. A unit destroyed before it was finished is not counted towards the first three. Energy is not counted. Some games do not say which buildings make resources in a way coilbox can read, and then fewer buildings count as economy.
 
 ## Timeline and chat log
 
