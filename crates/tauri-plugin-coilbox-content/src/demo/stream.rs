@@ -18,6 +18,10 @@
 //! source alone: `NETMSG_AICOMMAND_TRACKED`, and a `NETMSG_AICOMMAND` sent by a
 //! skirmish AI. Every `NETMSG_AICOMMAND` measured came from a Lua widget.
 //!
+//! `NETMSG_LUAMSG` is read as far as its header, then offered to the decoders
+//! in [`super::lua_msg`]. Its layout agrees with all 346,587 of them in a Beyond
+//! All Reason replay from engine 2026.06.24.
+//!
 //! A stream that breaks is not an error. The walk stops, reports where, and
 //! keeps what it had, and the trailer is unaffected because
 //! [`super::decode_trailer`] finds it from the header's sizes and never from
@@ -27,13 +31,14 @@ use std::collections::BTreeMap;
 use std::io::Read;
 use std::path::Path;
 
+use super::lua_msg::{LuaDecoder, LuaMsg, DECODERS};
 use super::{
-    open_maybe_gzip, read_all_maybe_gzip, DemoHeader, DEMO_VERSION, HEADER_V5_SIZE, MAGIC,
-    MIN_HEADER,
+    open_maybe_gzip, read_all_maybe_gzip, recorded_game, DemoHeader, DEMO_VERSION, HEADER_V5_SIZE,
+    MAGIC, MIN_HEADER,
 };
 use crate::model::{
-    ChatDest, CommandOrigin, DemoStream, LeaveReason, Order, StreamEvent, StreamEventKind,
-    StreamStop, TeamAction, TeamStartPosition, PREGAME_FRAME,
+    ChatDest, CommandOrigin, DemoStream, LeaveReason, LuaMessageCounts, Order, StreamEvent,
+    StreamEventKind, StreamStop, TeamAction, TeamStartPosition, PREGAME_FRAME,
 };
 
 /// `DemoStreamChunkHeader`: `f32 modGameTime`, `u32 length`.
@@ -53,6 +58,7 @@ const NETMSG_GAMEOVER: u8 = 30;
 const NETMSG_SYSTEMMSG: u8 = 35;
 const NETMSG_STARTPOS: u8 = 36;
 const NETMSG_PLAYERLEFT: u8 = 39;
+const NETMSG_LUAMSG: u8 = 50;
 const NETMSG_TEAM: u8 = 51;
 const NETMSG_CREATE_NEWPLAYER: u8 = 75;
 const NETMSG_AICOMMAND_TRACKED: u8 = 76;
@@ -200,7 +206,11 @@ fn decode_stream_until(bytes: &[u8], until: Until) -> Result<DemoStream, String>
         )
     })?;
 
-    let mut stream = walk(have, until);
+    // The script sits between the header and the stream, so it is all there
+    // whenever any of the stream is.
+    let game = recorded_game(&bytes[h.header_size..start]);
+
+    let mut stream = walk_with(have, until, &game, DECODERS);
     if stream.stopped.is_none() && end > bytes.len() {
         stream.stopped = Some(StreamStop {
             offset: have.len(),
@@ -231,12 +241,19 @@ fn unknown_format(
 ///
 /// With [`Until::GameStarts`] the walk ends at the first packet after the frame
 /// clock leaves [`PREGAME_FRAME`], and says nothing about why in `stopped`.
+#[cfg(test)]
 fn walk(stream: &[u8], until: Until) -> DemoStream {
+    walk_with(stream, until, "", DECODERS)
+}
+
+/// The walk, for a replay of `game` and with the Lua message decoders to try.
+fn walk_with(stream: &[u8], until: Until, game: &str, decoders: &[LuaDecoder]) -> DemoStream {
     let mut out = DemoStream {
         events: Vec::new(),
         last_frame: PREGAME_FRAME,
         packets: 0,
         undecoded: 0,
+        lua_messages: LuaMessageCounts::default(),
         stopped: None,
     };
     let mut at = 0;
@@ -283,6 +300,24 @@ fn walk(stream: &[u8], until: Until) -> DemoStream {
                 out.last_frame = out.last_frame.saturating_add(1);
                 payload.len() == 1
             }
+            Some(&NETMSG_LUAMSG) => match lua_message(payload, game) {
+                Some(msg) => {
+                    out.lua_messages.total += 1;
+                    let claim = decoders
+                        .iter()
+                        .find_map(|d| (d.decode)(&msg).map(|kind| (d.name, kind)));
+                    if let Some((name, kind)) = claim {
+                        *out.lua_messages.claimed.entry(name).or_default() += 1;
+                        out.events.push(StreamEvent {
+                            frame: out.last_frame,
+                            time,
+                            kind,
+                        });
+                    }
+                    true
+                }
+                None => false,
+            },
             Some(&id) => match decoder(id) {
                 Some(decode) => match decode(payload) {
                     Some(kind) => {
@@ -438,6 +473,19 @@ fn player_name(payload: &[u8]) -> Option<StreamEventKind> {
     Some(StreamEventKind::PlayerName {
         player: r.u8()?,
         name: r.cstr()?,
+    })
+}
+
+/// `SendLuaMsg`: `u16 size, u8 player, u16 script, u8 mode`, then the message
+/// bytes to the end, with no length of their own and no terminator.
+fn lua_message<'a>(payload: &'a [u8], game: &'a str) -> Option<LuaMsg<'a>> {
+    let mut r = Reader::sized16(payload)?;
+    Some(LuaMsg {
+        game,
+        player: r.u8()?,
+        handle: r.u16()?,
+        mode: r.u8()?,
+        data: r.rest(),
     })
 }
 
@@ -772,6 +820,14 @@ pub(crate) mod fixture {
             b.extend_from_slice(text.as_bytes());
             b.push(0);
             self.sized16(NETMSG_SYSTEMMSG, &b)
+        }
+
+        pub(crate) fn lua_msg(self, player: u8, handle: u16, mode: u8, data: &[u8]) -> Self {
+            let mut b = vec![player];
+            b.extend_from_slice(&handle.to_le_bytes());
+            b.push(mode);
+            b.extend_from_slice(data);
+            self.sized16(NETMSG_LUAMSG, &b)
         }
 
         /// `i32 id, i32 timeout, u8 options, u32 numParams`, the tracking id
@@ -1321,8 +1377,8 @@ mod tests {
     fn a_message_the_walk_does_not_read_is_skipped_by_its_length() {
         let s = walked(
             Packets::default()
-                // NETMSG_LUAMSG, the commonest packet in a real stream.
-                .raw(&[50, 9, 0, 1, 2, 3, 4, 5, 6])
+                // NETMSG_SYNCRESPONSE.
+                .raw(&[33, 1, 2, 3, 4, 5, 6, 7, 8, 9])
                 // An id past NETMSG_LAST.
                 .raw(&[200, 1, 2, 3])
                 .chat(1, 254, "still here"),
@@ -1336,6 +1392,82 @@ mod tests {
                 text: "still here".into()
             }]
         );
+    }
+
+    /// A made up decoder claiming messages that open with `prefix`, which puts
+    /// everything it was handed into the event's text.
+    fn echo(msg: &LuaMsg, prefix: &[u8]) -> Option<StreamEventKind> {
+        let rest = msg.data.strip_prefix(prefix)?;
+        Some(StreamEventKind::SystemMessage {
+            player: msg.player,
+            text: format!("{}|{}|{}|{rest:?}", msg.game, msg.handle, msg.mode),
+        })
+    }
+
+    const TEST_DECODERS: &[LuaDecoder] = &[
+        LuaDecoder {
+            name: "faction",
+            decode: |m| echo(m, b"F:"),
+        },
+        LuaDecoder {
+            name: "award",
+            decode: |m| echo(m, &[0xA1]),
+        },
+        // Wants what `faction` wants, so it only ever sees them second.
+        LuaDecoder {
+            name: "late",
+            decode: |m| echo(m, b"F"),
+        },
+    ];
+
+    #[test]
+    fn lua_messages_are_counted_and_the_claimed_ones_become_events() {
+        let p = Packets::default()
+            .lua_msg(3, 100, 0, b"F:arm")
+            .lua_msg(4, 2000, b'a', b"mouse 10 20")
+            .keyframe(60)
+            .lua_msg(5, 300, b's', &[0xA1, 0, 7])
+            .lua_msg(6, 2000, 0, b"F:cor")
+            // A message with no bytes at all.
+            .lua_msg(7, 100, 0, b"");
+        let s = walk_with(&p.bytes(), Until::TheEnd, "Game 1", TEST_DECODERS);
+
+        assert_eq!(s.packets, 6);
+        assert_eq!(s.undecoded, 0);
+        assert_eq!(s.lua_messages.total, 5);
+        assert_eq!(
+            s.lua_messages.claimed,
+            BTreeMap::from([("award", 1), ("faction", 2)])
+        );
+        let said = |frame, time, player, text: &str| StreamEvent {
+            frame,
+            time,
+            kind: StreamEventKind::SystemMessage {
+                player,
+                text: text.into(),
+            },
+        };
+        assert_eq!(
+            s.events,
+            vec![
+                said(PREGAME_FRAME, 0.0, 3, "Game 1|100|0|[97, 114, 109]"),
+                said(60, 1.5, 5, "Game 1|300|115|[0, 7]"),
+                said(60, 2.0, 6, "Game 1|2000|0|[99, 111, 114]"),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_lua_message_that_does_not_fit_its_layout_is_undecoded_and_not_counted() {
+        let p = Packets::default()
+            // The size field says 30 in a 9 byte packet.
+            .raw(&[NETMSG_LUAMSG, 30, 0, 1, 100, 0, 0, b'F', b':'])
+            // One byte short of a whole header.
+            .raw(&[NETMSG_LUAMSG, 6, 0, 1, 100, 0]);
+        let s = walk_with(&p.bytes(), Until::TheEnd, "", TEST_DECODERS);
+        assert_eq!(s.undecoded, 2);
+        assert_eq!(s.lua_messages, LuaMessageCounts::default());
+        assert_eq!(s.events, vec![]);
     }
 
     #[test]

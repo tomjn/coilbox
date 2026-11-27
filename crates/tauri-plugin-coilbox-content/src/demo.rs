@@ -43,6 +43,7 @@ use crate::model::{
 pub(crate) mod analysis;
 mod build_orders;
 pub(crate) mod def_sets;
+mod lua_msg;
 pub mod map_grids;
 pub(crate) mod match_setup;
 mod orders;
@@ -1421,6 +1422,16 @@ fn strip_remix_marker(script: &str) -> String {
     out.push_str(&script[..start]);
     out.push_str(&script[end..]);
     out
+}
+
+/// The game a replay's messages came from: the start script's `gametype`, or
+/// for a remix the one its marker says it was recorded on. Empty when the script
+/// names none.
+fn recorded_game(script: &[u8]) -> String {
+    let game = find_game(&parse_tdf(&String::from_utf8_lossy(script)));
+    read_remix_marker(&game)
+        .source
+        .unwrap_or_else(|| game.get("gametype").unwrap_or("").to_string())
 }
 
 /// The `[coilbox]` remix marker read back from a start-script.
@@ -3824,7 +3835,7 @@ mod tests {
     }
 
     /// End-to-end over real replays, for the check a synthetic stream cannot
-    /// make: that the layouts agree with packets the engine wrote. Ignored by
+    /// make: thatthe layouts agree with packets the engine wrote. Ignored by
     /// default, it needs replays on disk.
     ///
     ///   COILBOX_REAL_DEMO_DIR=~/.spring/demos \
@@ -5207,6 +5218,19 @@ mod tests {
         assert!(js.contains("\"originFilename\":\"jb_src.sdf\""), "{js}");
 
         let _ = std::fs::remove_file(&dst);
+    }
+
+    #[test]
+    fn a_remix_sent_its_lua_messages_as_the_game_it_was_recorded_on() {
+        let plain = "[game]\n{\ngametype=Old Game 1;\nmapname=M;\n}\n";
+        assert_eq!(recorded_game(plain.as_bytes()), "Old Game 1");
+        let remix = inject_remix_marker(
+            &replace_gametype(plain, "New Game 2").unwrap(),
+            "Old Game 1",
+            "orig.sdfz",
+        );
+        assert_eq!(recorded_game(remix.as_bytes()), "Old Game 1");
+        assert_eq!(recorded_game(b"[game]{mapname=M;}"), "");
     }
 
     #[test]
