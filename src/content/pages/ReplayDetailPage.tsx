@@ -285,131 +285,136 @@ export default function ReplayDetailPage() {
        * it also lets the column shrink to one character wide, because the
        * button row is `shrink-0` and every pixel the window loses comes out of
        * the text. The basis is where that column stops giving. */}
-      <header className="flex flex-wrap items-start justify-between gap-4 px-4 pt-4">
-        <div className="flex min-w-0 grow basis-80 flex-col gap-1">
-          <Link
-            to="/play/replays"
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
-          >
-            <ArrowLeft className="size-3.5" /> {t`Replays`}
-          </Link>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="break-words text-lg font-semibold">
-              {info?.mapName || filename}
-            </h1>
-            {info?.remixed && (
-              <Badge
-                variant="ghost"
-                className="shrink-0 gap-1 rounded bg-primary/15 px-1.5 py-0.5 text-[11px] font-medium text-primary"
-              >
-                <Code2 className="size-3" /> {t`Remix`}
-              </Badge>
-            )}
-            <OriginBadge origin={origin} />
+      <header className="flex flex-col gap-1 px-4 pt-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex min-w-0 grow basis-80 flex-col gap-1">
+            <Link
+              to="/play/replays"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
+            >
+              <ArrowLeft className="size-3.5" /> {t`Replays`}
+            </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="break-words text-lg font-semibold">
+                {info?.mapName || filename}
+              </h1>
+              {info?.remixed && (
+                <Badge
+                  variant="ghost"
+                  className="shrink-0 gap-1 rounded bg-primary/15 px-1.5 py-0.5 text-[11px] font-medium text-primary"
+                >
+                  <Code2 className="size-3" /> {t`Remix`}
+                </Badge>
+              )}
+              <OriginBadge origin={origin} />
+            </div>
           </div>
-          {facts.length > 0 && (
-            <ul
-              aria-label={t`Replay facts`}
-              className="flex flex-wrap items-center gap-1.5"
-            >
-              {facts.map((fact) => (
-                <li key={fact.id}>
-                  <Badge
-                    variant="outline"
-                    className="rounded-full px-2.5 py-0.5 text-xs font-normal text-muted-foreground"
-                  >
-                    {fact.text}
-                  </Badge>
-                </li>
-              ))}
-            </ul>
+          {replay && (info || unfinished) && (
+            // Destructive + secondary actions first, and the primary CTA (Watch)
+            // last so it lands in the top-right corner. Once the row wraps there
+            // is no corner left to sit in, and the block lines up with the title's
+            // own left edge instead, which is what reads as the heading's actions
+            // rather than a band floating between two sections.
+            <div className="flex max-w-full shrink-0 flex-wrap items-start gap-2">
+              <DeleteReplayButton
+                replayPath={replay.path}
+                onDeleted={onDeleted}
+                unfinished={unfinished}
+              />
+              {/* No remixing a remix — its detail links back to the original instead. */}
+              {selected && info && !info.remixed && (
+                <RemixPanel
+                  replayPath={replay.path}
+                  recordedGameType={info.gameType}
+                  recordedEngineVersion={info.engineVersion}
+                  enginePath={selected.enginePath}
+                  dataDir={selected.rootPath}
+                  onRemixed={onRemixed}
+                />
+              )}
+              {info && (
+                <RefightPanel
+                  info={info}
+                  filename={filename}
+                  factionsPending={factionsPending}
+                />
+              )}
+              {/* The raw read, whose sides are the start script's: the hub
+               * checks the summary against the file. */}
+              {decoded.info && (
+                <SendReplayToHub info={decoded.info} replayPath={replay.path} />
+              )}
+              {decoded.info && <SendReplayExtrasToHub info={decoded.info} />}
+              {info && (
+                <WatchWithRewindButton
+                  replayPath={replay.path}
+                  info={info}
+                  watch={engine.watch}
+                  dependencyBlock={dependencyBlock}
+                  playbackBlock={playbackBlock}
+                  missingGame={missingGame}
+                  missingMap={missingMap}
+                  game={playbackGame?.name}
+                />
+              )}
+              {info && (
+                <WatchButton
+                  replayPath={replay.path}
+                  engineVersion={info.engineVersion}
+                  watch={engine.watch}
+                  dependencyBlock={dependencyBlock}
+                />
+              )}
+            </div>
           )}
-          {info?.remixed && info.originFilename && (
-            <Link
-              to={`/play/replays/${encodeURIComponent(info.originFilename)}`}
-              className="inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline"
-            >
-              <ArrowLeft className="size-3.5" /> {t`Back to original replay`}
-            </Link>
-          )}
-          {link && (
-            <Link
-              to={link.to}
-              className="inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline"
-            >
-              <ArrowLeft className="size-3.5" /> {link.label}
-            </Link>
-          )}
-          {info &&
-            resolved &&
-            !resolved.matched &&
-            engine.watch.kind === "fallback" && (
-              <p className="max-w-md text-xs text-amber-600 dark:text-amber-400">
-                <Trans>
-                  Recorded on {recordedOn}. Watching with {watchingWith} — may
-                  not sync.
-                </Trans>
-              </p>
-            )}
         </div>
-        {replay && (info || unfinished) && (
-          // Destructive + secondary actions first, and the primary CTA (Watch)
-          // last so it lands in the top-right corner. Once the row wraps there
-          // is no corner left to sit in, and the block lines up with the title's
-          // own left edge instead, which is what reads as the heading's actions
-          // rather than a band floating between two sections.
-          <div className="flex max-w-full shrink-0 flex-wrap items-start gap-2">
-            <DeleteReplayButton
-              replayPath={replay.path}
-              onDeleted={onDeleted}
-              unfinished={unfinished}
-            />
-            {/* No remixing a remix — its detail links back to the original instead. */}
-            {selected && info && !info.remixed && (
-              <RemixPanel
-                replayPath={replay.path}
-                recordedGameType={info.gameType}
-                recordedEngineVersion={info.engineVersion}
-                enginePath={selected.enginePath}
-                dataDir={selected.rootPath}
-                onRemixed={onRemixed}
-              />
-            )}
-            {info && (
-              <RefightPanel
-                info={info}
-                filename={filename}
-                factionsPending={factionsPending}
-              />
-            )}
-            {/* The raw read, whose sides are the start script's: the hub
-             * checks the summary against the file. */}
-            {decoded.info && (
-              <SendReplayToHub info={decoded.info} replayPath={replay.path} />
-            )}
-            {decoded.info && <SendReplayExtrasToHub info={decoded.info} />}
-            {info && (
-              <WatchWithRewindButton
-                replayPath={replay.path}
-                info={info}
-                watch={engine.watch}
-                dependencyBlock={dependencyBlock}
-                playbackBlock={playbackBlock}
-                missingGame={missingGame}
-                missingMap={missingMap}
-                game={playbackGame?.name}
-              />
-            )}
-            {info && (
-              <WatchButton
-                replayPath={replay.path}
-                engineVersion={info.engineVersion}
-                watch={engine.watch}
-                dependencyBlock={dependencyBlock}
-              />
-            )}
-          </div>
+        {/* The facts and links have a row of their own under the title and the
+         * actions, so they use the page's width and not only the title's
+         * column. */}
+        {facts.length > 0 && (
+          <ul
+            aria-label={t`Replay facts`}
+            className="flex flex-wrap items-center gap-1.5"
+          >
+            {facts.map((fact) => (
+              <li key={fact.id}>
+                <Badge
+                  variant="outline"
+                  className="rounded-full px-2.5 py-0.5 text-xs font-normal text-muted-foreground"
+                >
+                  {fact.text}
+                </Badge>
+              </li>
+            ))}
+          </ul>
         )}
+        {info?.remixed && info.originFilename && (
+          <Link
+            to={`/play/replays/${encodeURIComponent(info.originFilename)}`}
+            className="inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline"
+          >
+            <ArrowLeft className="size-3.5" /> {t`Back to original replay`}
+          </Link>
+        )}
+        {link && (
+          <Link
+            to={link.to}
+            className="inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline"
+          >
+            <ArrowLeft className="size-3.5" /> {link.label}
+          </Link>
+        )}
+        {info &&
+          resolved &&
+          !resolved.matched &&
+          engine.watch.kind === "fallback" && (
+            <p className="max-w-md text-xs text-amber-600 dark:text-amber-400">
+              <Trans>
+                Recorded on {recordedOn}. Watching with {watchingWith} — may not
+                sync.
+              </Trans>
+            </p>
+          )}
       </header>
 
       {/* The notices stay above everything, at the page's full width (#5304). */}
