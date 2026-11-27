@@ -51,6 +51,8 @@ const subjects = new Map<string, UploadSubject>();
 const announced = new Set<string>();
 /** Hashes of uploads a bulk run started, which it reports on itself. */
 const quiet = new Set<string>();
+/** Replays being sent in the background, by file name. */
+const muted = new Set<string>();
 let following: Promise<void> | null = null;
 
 function emit(): void {
@@ -86,6 +88,18 @@ export function rememberUpload(
   subjects.set(state.sha256, subject);
   if (options.quiet) quiet.add(state.sha256);
   apply(state, true);
+}
+
+/**
+ * Say nothing when this replay's upload ends, because whoever is sending it in
+ * the background reports on it. By file name, so it can be asked for before the
+ * upload has a hash. Call the returned function to stop.
+ */
+export function muteReplayUpload(filename: string): () => void {
+  muted.add(filename);
+  return () => {
+    muted.delete(filename);
+  };
 }
 
 /** Hear about every change to the uploads held. Call the returned function to
@@ -196,7 +210,10 @@ export function endingToNotification(ending: UploadEnding): NotifyInput {
 async function announceEnd(state: ArchiveUploadState): Promise<void> {
   const { outcome } = state;
   if (!outcome) return;
-  if (quiet.has(state.sha256)) {
+  if (
+    quiet.has(state.sha256) ||
+    (state.kind === "replay" && muted.has(state.filename))
+  ) {
     noteHubChanged();
     return;
   }
@@ -223,6 +240,7 @@ export function forgetArchiveUploads(): void {
   subjects.clear();
   announced.clear();
   quiet.clear();
+  muted.clear();
   following = null;
   emit();
 }

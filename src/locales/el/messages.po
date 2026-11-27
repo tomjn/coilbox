@@ -3848,6 +3848,7 @@ msgid "{label} volume"
 msgstr "Ένταση {label}"
 
 #: src/content/pages/components/SendReplayToHub.tsx
+#: src/hub/replaySend/runner.ts
 msgid "{label} was not sent"
 msgstr ""
 
@@ -10326,6 +10327,10 @@ msgstr ""
 msgid "About sending what your maps say"
 msgstr ""
 
+#: src/hub/replaySend/ReplayAutoSendControl.tsx
+msgid "About sending your matches"
+msgstr ""
+
 #: src/lego/pages/components/CollisionPanel.tsx
 #, fuzzy
 msgid "About shooting at each piece"
@@ -12188,7 +12193,7 @@ msgstr "Ένα άλλο παράθυρο ερώτησης είναι ακόμη 
 msgid "Another unit already has this name"
 msgstr "Μια άλλη μονάδα έχει ήδη αυτό το όνομα"
 
-#: src/content/pages/components/SendReplayToHub.tsx
+#: src/hub/replaySend/messages.ts
 msgid "Another version of the game is installed, so Coilbox cannot say which unit each build order was for. Install the version it was played on, then try again."
 msgstr ""
 
@@ -16892,7 +16897,7 @@ msgstr "Το Coilbox δεν μπορεί να διαβάσει το skybox αυ�
 msgid "Coilbox cannot read this unit's build pic. The game ships one, in a format the decoder does not handle."
 msgstr "Το Coilbox δεν μπορεί να διαβάσει την εικόνα κατασκευής αυτής της μονάδας. Το παιχνίδι περιέχει μία, σε μορφή που ο αποκωδικοποιητής δεν υποστηρίζει."
 
-#: src/content/pages/components/SendReplayToHub.tsx
+#: src/hub/replaySend/messages.ts
 msgid "Coilbox cannot say what every unit built in this match is or costs. Install the game it was played on, then try again."
 msgstr ""
 
@@ -17016,7 +17021,7 @@ msgstr "το coilbox δεν μπόρεσε να διαβάσει"
 msgid "Coilbox could not read {game}: {said}"
 msgstr "Το Coilbox δεν μπόρεσε να διαβάσει το {game}: {said}"
 
-#: src/content/pages/components/SendReplayToHub.tsx
+#: src/hub/replaySend/messages.ts
 msgid "Coilbox could not read every build order in this replay, and the hub checks all of them."
 msgstr ""
 
@@ -27186,6 +27191,10 @@ msgstr "Αν δεν είναι εκεί, πατήστε Enter και πληκτ�
 #, fuzzy
 msgid "If nothing arrives, start again and ask for a new code."
 msgstr "Αν δεν φτάσει τίποτα, ξεκινήστε ξανά και ζητήστε νέο κωδικό."
+
+#: src/hub/replaySend/ReplayAutoSendControl.tsx
+msgid "If the hub cannot be reached, Coilbox keeps trying for a week. Turning this off forgets anything still waiting."
+msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "If the server drops the connection, Coilbox logs back in and rejoins your channels and last battle."
@@ -42610,10 +42619,15 @@ msgstr "επαναλήψεις"
 #: src/content/pages/ReplaysPage.tsx
 #: src/content/pages/StatsPage.tsx
 #: src/content/storageLabels.ts
+#: src/hub/replaySend/ReplayAutoSendControl.tsx
 #: src/play/index.ts
 #, fuzzy
 msgid "Replays"
 msgstr "Επαναλήψεις"
+
+#: src/hub/replaySend/ReplayAutoSendControl.tsx
+msgid "Replays on the hub are public. Sending needs you to be signed in."
+msgstr ""
 
 #: src/general/ErrorBoundary.tsx
 #: src/general/pages/AboutCoilbox.tsx
@@ -45126,6 +45140,10 @@ msgstr ""
 #, fuzzy
 msgid "Send code"
 msgstr "Αποστολή κωδικού"
+
+#: src/hub/replaySend/ReplayAutoSendControl.tsx
+msgid "Send my finished matches to the hub"
+msgstr ""
 
 #: src/hub/pages/components/GamePicturesControl.tsx
 #, fuzzy
@@ -51692,7 +51710,7 @@ msgstr "Το καταγεγραμμένο ίχνος είναι παρωχημέ
 msgid "The recording could not be made into a track."
 msgstr "Δεν ήταν δυνατή η μετατροπή της εγγραφής σε ίχνος."
 
-#: src/content/pages/components/SendReplayToHub.tsx
+#: src/hub/replaySend/messages.ts
 msgid "The recording stops before the end of the match, and the hub only takes a whole match."
 msgstr ""
 
@@ -51731,9 +51749,8 @@ msgstr "η αρχειοθήκη έκδοσης για τη ζητούμενη έ
 msgid "The reload failed"
 msgstr "Η επαναφόρτωση απέτυχε"
 
-#. placeholder {0}: problem.name
-#: src/content/pages/components/SendReplayToHub.tsx
-msgid "The replay does not say which team {0} was on."
+#: src/hub/replaySend/messages.ts
+msgid "The replay does not say which team {name} was on."
 msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
@@ -51749,6 +51766,10 @@ msgstr "Η επανάληψη δεν όρισε διάστημα, οπότε χ�
 #. placeholder {0}: info.mapName
 #: src/content/pages/components/SendReplayToHub.tsx
 msgid "The replay on {0}"
+msgstr ""
+
+#: src/hub/replaySend/runner.ts
+msgid "The replay on {mapName}"
 msgstr ""
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
@@ -58083,6 +58104,10 @@ msgstr "Τροχοί"
 msgid "Wheels turning"
 msgstr "Περιστροφή τροχών"
 
+#: src/hub/replaySend/ReplayAutoSendControl.tsx
+msgid "When a match ends, Coilbox sends its replay if you played in it or watched it, people were on two or more sides, and it reached game over. Anyone can download it and see the players, the build orders and the totals, and the hub notes that you sent it."
+msgstr ""
+
 #: src/content/pages/components/ReplayTracksStorage.tsx
 #, fuzzy
 msgid "When a new track is stored and the tracks take more than the limit, the least recently watched are removed until they fit. Tracks that are out of date go first. The new track is never removed, so a track larger than the limit is kept and every other one goes."
@@ -59661,6 +59686,10 @@ msgstr "Το αντίγραφό σας του {cloneSource}, στη θέση α�
 #, fuzzy
 msgid "Your distribution has switched off sending pictures to the hub, so Coilbox will not upload any."
 msgstr "Η διανομή σας έχει απενεργοποιήσει την αποστολή εικόνων στο hub, οπότε το Coilbox δεν θα μεταφορτώσει καμία."
+
+#: src/hub/replaySend/ReplayAutoSendControl.tsx
+msgid "Your distribution has switched off sending to the hub."
+msgstr ""
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy

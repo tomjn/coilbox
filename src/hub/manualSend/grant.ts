@@ -52,8 +52,8 @@ const hubReplaySendBegin = defineCommand<
 
 /**
  * Open a grant for one replay somebody pressed send for, named by its game id.
- * The uploads switch never admits a replay, so this grant is the only way one
- * is sent.
+ * The uploads switch never admits a replay. Besides this grant, only the switch
+ * that sends finished matches does (`../replaySend/queue.ts`).
  */
 export async function beginReplaySend(gameId: string): Promise<string> {
   const { grant } = await hubReplaySendBegin({

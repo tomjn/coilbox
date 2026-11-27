@@ -10,6 +10,10 @@ vi.mock("../content/bindings", () => ({
 vi.mock("@tauri-apps/api/event", () => ({
   emit: (...args: unknown[]) => emit(...args),
 }));
+const queued = vi.fn();
+vi.mock("../hub/replaySend/queue", () => ({
+  queueFinishedReplay: (...args: unknown[]) => queued(...args),
+}));
 
 import {
   forgetIngestedReplays,
@@ -42,6 +46,7 @@ function summary(over: Partial<Record<string, number>> = {}) {
 beforeEach(() => {
   ingest.mockReset();
   emit.mockReset();
+  queued.mockReset();
   forgetIngestedReplays();
 });
 
@@ -128,5 +133,13 @@ describe("ingestFinishedReplay", () => {
   it("does nothing when no replay was found", async () => {
     await ingestFinishedReplay(target, null);
     expect(ingest).not.toHaveBeenCalled();
+    expect(queued).not.toHaveBeenCalled();
+  });
+
+  it("offers the finished replay for sending to the hub, ingest or no", async () => {
+    ingest.mockRejectedValue(new Error("boom"));
+    const r = replay("/data/demos/a.sdfz");
+    await ingestFinishedReplay(target, r);
+    expect(queued).toHaveBeenCalledWith(target, r);
   });
 });

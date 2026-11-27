@@ -1,4 +1,5 @@
 import { useHubUrl } from "../config";
+import { ReplayAutoSendControl } from "../replaySend/ReplayAutoSendControl";
 import { MapArchivesControl } from "./components/MapArchivesControl";
 import { ShareAssetsPanel } from "./components/ShareAssetsPanel";
 
@@ -23,14 +24,16 @@ import { ShareAssetsPanel } from "./components/ShareAssetsPanel";
  * (`./components/ShareAssetsPanel.tsx`), shared with the hub page's Share menu
  * (issue #2562) so the same panel does the work wherever it is opened from.
  *
- * Uploading map files in bulk (`./components/MapArchivesControl.tsx`) sits below
- * the panel and only here, not in the Share menu.
+ * Sending finished matches (`../replaySend/ReplayAutoSendControl.tsx`, issue
+ * #5494) and uploading map files in bulk (`./components/MapArchivesControl.tsx`)
+ * sit below the panel and only here, not in the Share menu.
  */
 export default function HubSettings() {
   const hubUrl = useHubUrl();
   return (
     <div className="flex flex-col gap-10">
       <ShareAssetsPanel hubUrl={hubUrl} />
+      <ReplayAutoSendControl />
       <MapArchivesControl hubUrl={hubUrl} />
     </div>
   );

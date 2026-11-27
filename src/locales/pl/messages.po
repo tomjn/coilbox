@@ -3847,6 +3847,7 @@ msgid "{label} volume"
 msgstr "Głośność: {label}"
 
 #: src/content/pages/components/SendReplayToHub.tsx
+#: src/hub/replaySend/runner.ts
 msgid "{label} was not sent"
 msgstr ""
 
@@ -10325,6 +10326,10 @@ msgstr ""
 msgid "About sending what your maps say"
 msgstr ""
 
+#: src/hub/replaySend/ReplayAutoSendControl.tsx
+msgid "About sending your matches"
+msgstr ""
+
 #: src/lego/pages/components/CollisionPanel.tsx
 #, fuzzy
 msgid "About shooting at each piece"
@@ -12187,7 +12192,7 @@ msgstr "Inne pytanie jest nadal otwarte. Odpowiedz na nie lub je zamknij, a pote
 msgid "Another unit already has this name"
 msgstr "Inna jednostka ma już tę nazwę"
 
-#: src/content/pages/components/SendReplayToHub.tsx
+#: src/hub/replaySend/messages.ts
 msgid "Another version of the game is installed, so Coilbox cannot say which unit each build order was for. Install the version it was played on, then try again."
 msgstr ""
 
@@ -16889,7 +16894,7 @@ msgstr "Coilbox nie potrafi odczytać skyboxa tej mapy, więc podgląd rysuje ni
 msgid "Coilbox cannot read this unit's build pic. The game ships one, in a format the decoder does not handle."
 msgstr "Coilbox nie potrafi odczytać obrazka do menu budowy tej jednostki. Gra go zawiera, ale w formacie, którego dekoder nie obsługuje."
 
-#: src/content/pages/components/SendReplayToHub.tsx
+#: src/hub/replaySend/messages.ts
 msgid "Coilbox cannot say what every unit built in this match is or costs. Install the game it was played on, then try again."
 msgstr ""
 
@@ -17013,7 +17018,7 @@ msgstr "coilbox nie mógł odczytać"
 msgid "Coilbox could not read {game}: {said}"
 msgstr "Coilbox nie mógł odczytać {game}: {said}"
 
-#: src/content/pages/components/SendReplayToHub.tsx
+#: src/hub/replaySend/messages.ts
 msgid "Coilbox could not read every build order in this replay, and the hub checks all of them."
 msgstr ""
 
@@ -27178,6 +27183,10 @@ msgstr "Jeśli jej tam nie ma, naciśnij Enter i wpisz <0>/cheat</0>, a potem <1
 #, fuzzy
 msgid "If nothing arrives, start again and ask for a new code."
 msgstr "Jeśli nic nie przyjdzie, zacznij od nowa i poproś o nowy kod."
+
+#: src/hub/replaySend/ReplayAutoSendControl.tsx
+msgid "If the hub cannot be reached, Coilbox keeps trying for a week. Turning this off forgets anything still waiting."
+msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "If the server drops the connection, Coilbox logs back in and rejoins your channels and last battle."
@@ -42591,10 +42600,15 @@ msgstr "powtórki"
 #: src/content/pages/ReplaysPage.tsx
 #: src/content/pages/StatsPage.tsx
 #: src/content/storageLabels.ts
+#: src/hub/replaySend/ReplayAutoSendControl.tsx
 #: src/play/index.ts
 #, fuzzy
 msgid "Replays"
 msgstr "Powtórki"
+
+#: src/hub/replaySend/ReplayAutoSendControl.tsx
+msgid "Replays on the hub are public. Sending needs you to be signed in."
+msgstr ""
 
 #: src/general/ErrorBoundary.tsx
 #: src/general/pages/AboutCoilbox.tsx
@@ -45104,6 +45118,10 @@ msgstr ""
 #, fuzzy
 msgid "Send code"
 msgstr "Wyślij kod"
+
+#: src/hub/replaySend/ReplayAutoSendControl.tsx
+msgid "Send my finished matches to the hub"
+msgstr ""
 
 #: src/hub/pages/components/GamePicturesControl.tsx
 #, fuzzy
@@ -51662,7 +51680,7 @@ msgstr "Nagrana ścieżka jest nieaktualna. Nagrać ją ponownie, a potem obejrz
 msgid "The recording could not be made into a track."
 msgstr "Nie udało się zamienić nagrania w ścieżkę."
 
-#: src/content/pages/components/SendReplayToHub.tsx
+#: src/hub/replaySend/messages.ts
 msgid "The recording stops before the end of the match, and the hub only takes a whole match."
 msgstr ""
 
@@ -51701,9 +51719,8 @@ msgstr "archiwum wydania dla żądanej wersji"
 msgid "The reload failed"
 msgstr "Przeładowanie nie powiodło się"
 
-#. placeholder {0}: problem.name
-#: src/content/pages/components/SendReplayToHub.tsx
-msgid "The replay does not say which team {0} was on."
+#: src/hub/replaySend/messages.ts
+msgid "The replay does not say which team {name} was on."
 msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
@@ -51719,6 +51736,10 @@ msgstr "Powtórka nie podała okresu, więc użyto wartości domyślnej silnika.
 #. placeholder {0}: info.mapName
 #: src/content/pages/components/SendReplayToHub.tsx
 msgid "The replay on {0}"
+msgstr ""
+
+#: src/hub/replaySend/runner.ts
+msgid "The replay on {mapName}"
 msgstr ""
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
@@ -58052,6 +58073,10 @@ msgstr "Koła"
 msgid "Wheels turning"
 msgstr "Obracające się koła"
 
+#: src/hub/replaySend/ReplayAutoSendControl.tsx
+msgid "When a match ends, Coilbox sends its replay if you played in it or watched it, people were on two or more sides, and it reached game over. Anyone can download it and see the players, the build orders and the totals, and the hub notes that you sent it."
+msgstr ""
+
 #: src/content/pages/components/ReplayTracksStorage.tsx
 #, fuzzy
 msgid "When a new track is stored and the tracks take more than the limit, the least recently watched are removed until they fit. Tracks that are out of date go first. The new track is never removed, so a track larger than the limit is kept and every other one goes."
@@ -59629,6 +59654,10 @@ msgstr "Twoja kopia {cloneSource}, zastępująca wersję z gry"
 #, fuzzy
 msgid "Your distribution has switched off sending pictures to the hub, so Coilbox will not upload any."
 msgstr "Twoja dystrybucja wyłączyła wysyłanie obrazków do hubu, więc Coilbox nie prześle żadnych."
+
+#: src/hub/replaySend/ReplayAutoSendControl.tsx
+msgid "Your distribution has switched off sending to the hub."
+msgstr ""
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy

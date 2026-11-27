@@ -8,6 +8,7 @@ import { isHubEnabled } from "../profile/profile";
 import UploadRunBadge from "./assets/UploadRunBadge";
 import { isHubItemPageReachable } from "./config";
 import HubSettings from "./pages/SettingsSection";
+import ReplayAutoSend from "./replaySend/ReplayAutoSend";
 import ArchiveUploadBadge from "./upload/ArchiveUploadBadge";
 
 /**
@@ -66,6 +67,9 @@ const hubPlugin: FramePlugin = {
   slots: [
     { slot: "topbar.right", order: 2.5, Component: UploadRunBadge },
     { slot: "topbar.right", order: 2.6, Component: ArchiveUploadBadge },
+    // Draws nothing. It sends finished matches while the player has asked for
+    // that (issue #5494).
+    { slot: "topbar.right", order: 2.7, Component: ReplayAutoSend },
   ],
   settings: [
     {
