@@ -60,6 +60,13 @@ export interface LobbyServer {
   builtin?: boolean;
   /** Our support for this server is alpha, which the UI badges wherever it lists it. */
   alpha?: boolean;
+  /** Our support for this server is beta, badged like `alpha` but as a softer caution. */
+  beta?: boolean;
+  /**
+   * Left out of the catalog unless a profile names it in `presets` or as `official`.
+   * Built-in entries only.
+   */
+  disabled?: boolean;
   /**
    * A caution shown under the entry in Settings, for something a player would
    * otherwise only discover by hitting it. Built-in entries only.
@@ -187,7 +194,8 @@ export const BUILTIN_SERVERS: LobbyServer[] = [
     name: "Beyond All Reason",
     host: "server4.beyondallreason.info",
     port: 8200,
-    tls: true,
+    // BAR turned TLS off on its lobby server, so STLS now fails the handshake.
+    tls: false,
     allowSelfSigned: false,
   },
   {
@@ -203,6 +211,7 @@ export const BUILTIN_SERVERS: LobbyServer[] = [
     allowSelfSigned: false,
     protocol: "tachyon",
     alpha: true,
+    disabled: true,
     notice: lazyText(TACHYON_NOTICE),
   },
   {
@@ -216,7 +225,7 @@ export const BUILTIN_SERVERS: LobbyServer[] = [
     tls: false,
     allowSelfSigned: false,
     protocol: "zerok",
-    alpha: true,
+    beta: true,
   },
   // Last on purpose: it is the least likely destination for a Recoil or BAR player,
   // and the one nobody can register a new account on.
@@ -285,7 +294,7 @@ export function buildCatalog(
   const builtins = BUILTIN_SERVERS.filter(
     (s) =>
       s.id !== officialId &&
-      (rules.presets == null || rules.presets.includes(s.id)),
+      (rules.presets == null ? !s.disabled : rules.presets.includes(s.id)),
   ).map((s) => ({ ...s, builtin: true }));
   const list: LobbyServer[] = [];
   if (rules.official) list.push({ ...rules.official, builtin: true });

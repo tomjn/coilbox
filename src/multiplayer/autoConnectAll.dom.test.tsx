@@ -64,6 +64,20 @@ vi.mock("@picoframe/frame", async () => {
         "lobbyServers.lastLogin": settings.lastLogin,
         "lobbyServers.accounts": settings.accounts,
         "multiplayer.autoConnect": settings.autoConnect,
+        // BAR's Tachyon endpoint, added by hand now the built-in is disabled.
+        "lobbyServers.servers": {
+          servers: [
+            {
+              id: "bar-tachyon",
+              name: "Beyond All Reason (Tachyon)",
+              host: "server4.beyondallreason.info",
+              port: 443,
+              tls: true,
+              allowSelfSigned: false,
+              protocol: "tachyon",
+            },
+          ],
+        },
       };
       const seed = key in preset ? (preset[key] as T) : initial;
       return react.useState<T>(seed);

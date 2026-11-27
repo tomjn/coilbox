@@ -32,7 +32,12 @@ export function serverOptions(servers: LobbyServer[]) {
   return servers.map((s) => {
     const name = s.name || s.host;
     const base = s.builtin ? s.name : t`${name} (custom)`;
-    return { value: s.id, label: s.alpha ? t`${base} (alpha)` : base };
+    const label = s.alpha
+      ? t`${base} (alpha)`
+      : s.beta
+        ? t`${base} (beta)`
+        : base;
+    return { value: s.id, label };
   });
 }
 

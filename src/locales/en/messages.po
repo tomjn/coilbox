@@ -1513,6 +1513,10 @@ msgstr "{base} ({copyNumber})"
 msgid "{base} (alpha)"
 msgstr "{base} (alpha)"
 
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "{base} (beta)"
+msgstr "{base} (beta)"
+
 #: src/multiplayer/UserBadges.tsx
 msgid "{base}. {detail}"
 msgstr "{base}. {detail}"
@@ -11351,6 +11355,11 @@ msgstr "Best win run"
 #: src/content/pages/components/ResolveContentDrawer.tsx
 msgid "Best-effort by name — a download may not be an exact match. See <0>Content folders settings</0> for the destination folder."
 msgstr "Best-effort by name — a download may not be an exact match. See <0>Content folders settings</0> for the destination folder."
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+#: src/multiplayer/LobbyStatusButton.tsx
+msgid "Beta"
+msgstr "Beta"
 
 #: src/lego/pages/components/TimelineTab.tsx
 msgid "Between two keys a piece moves at a steady speed, as the game moves it."

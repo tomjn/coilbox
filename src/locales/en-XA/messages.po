@@ -1513,6 +1513,10 @@ msgstr ""
 msgid "{base} (alpha)"
 msgstr ""
 
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "{base} (beta)"
+msgstr ""
+
 #: src/multiplayer/UserBadges.tsx
 msgid "{base}. {detail}"
 msgstr ""
@@ -11349,6 +11353,11 @@ msgstr ""
 
 #: src/content/pages/components/ResolveContentDrawer.tsx
 msgid "Best-effort by name — a download may not be an exact match. See <0>Content folders settings</0> for the destination folder."
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+#: src/multiplayer/LobbyStatusButton.tsx
+msgid "Beta"
 msgstr ""
 
 #: src/lego/pages/components/TimelineTab.tsx

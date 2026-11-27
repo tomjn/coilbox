@@ -1826,6 +1826,10 @@ msgstr "{base} ({copyNumber})"
 msgid "{base} (alpha)"
 msgstr "{base} (alfa)"
 
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "{base} (beta)"
+msgstr ""
+
 #: src/multiplayer/UserBadges.tsx
 #, fuzzy
 msgid "{base}. {detail}"
@@ -13918,6 +13922,11 @@ msgstr "Melhor expedição vencedora"
 #, fuzzy
 msgid "Best-effort by name — a download may not be an exact match. See <0>Content folders settings</0> for the destination folder."
 msgstr "Melhor esforço pelo nome — um download pode não corresponder exatamente. Veja <0>Configurações de pastas de conteúdo</0> para a pasta de destino."
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+#: src/multiplayer/LobbyStatusButton.tsx
+msgid "Beta"
+msgstr ""
 
 #: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy

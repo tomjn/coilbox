@@ -95,7 +95,20 @@ const BASE_ACCOUNTS = [
 
 const settings: Record<string, unknown> = {
   "lobbyServers.accounts": { accounts: BASE_ACCOUNTS },
-  "lobbyServers.servers": { servers: [] },
+  // BAR's Tachyon endpoint, added by hand now the built-in is disabled.
+  "lobbyServers.servers": {
+    servers: [
+      {
+        id: "bar-tachyon",
+        name: "Beyond All Reason (Tachyon)",
+        host: "server4.beyondallreason.info",
+        port: 443,
+        tls: true,
+        allowSelfSigned: false,
+        protocol: "tachyon",
+      },
+    ],
+  },
   "lobbyServers.lastLogin": { serverId: "bar-ssl", username: "alice" },
   "multiplayer.autoConnect": false,
 };

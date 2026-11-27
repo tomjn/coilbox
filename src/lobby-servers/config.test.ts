@@ -48,7 +48,7 @@ const custom: LobbyServer = {
 
 describe("allServers", () => {
   it("puts built-ins first, tagged builtin, then custom servers", () => {
-    const n = BUILTIN_SERVERS.length;
+    const n = BUILTIN_SERVERS.filter((s) => !s.disabled).length;
     const all = allServers([custom]);
     expect(all).toHaveLength(n + 1);
     expect(all.slice(0, n).every((s) => s.builtin)).toBe(true);
@@ -92,9 +92,9 @@ describe("tlsModeFor", () => {
     expect(tlsModeFor(custom)).toBe("none");
   });
 
-  it("upgrades BAR in-band, since its 8201 port never sends the greeting", () => {
+  it("connects to BAR in plaintext, since BAR turned TLS off", () => {
     const bar = BUILTIN_SERVERS.find((s) => s.id === "bar-ssl");
-    expect(tlsModeFor(bar as LobbyServer)).toBe("stls");
+    expect(tlsModeFor(bar as LobbyServer)).toBe("none");
   });
 });
 
@@ -137,7 +137,7 @@ describe("serverProtocol", () => {
   });
 });
 
-describe("the Tachyon built-in, offered like any other server", () => {
+describe("the Tachyon built-in, disabled until a profile asks for it", () => {
   it("is in the built-in list with the Tachyon shape", () => {
     expect(BUILTIN_SERVERS.find((s) => s.id === "bar-tachyon")).toMatchObject({
       host: "server4.beyondallreason.info",
@@ -147,11 +147,9 @@ describe("the Tachyon built-in, offered like any other server", () => {
     });
   });
 
-  it("is in the catalog, so a user can select it", () => {
-    expect(allServers([]).some((s) => s.id === "bar-tachyon")).toBe(true);
-    expect(resolveServer("bar-tachyon", [])).toMatchObject({
-      protocol: "tachyon",
-    });
+  it("is left out of the catalog, so a user cannot select it", () => {
+    expect(allServers([]).some((s) => s.id === "bar-tachyon")).toBe(false);
+    expect(resolveServer("bar-tachyon", [])).toBeUndefined();
   });
 
   it("is kept when a profile preset names it", () => {
@@ -297,7 +295,7 @@ describe("a profile naming BAR's retired plaintext entry", () => {
 
   it("resolves the official server onto the SSL entry", () => {
     const { official } = resolveProfileServerRules({ official: "bar" });
-    expect(official).toMatchObject({ id: "bar-ssl", port: 8200, tls: true });
+    expect(official).toMatchObject({ id: "bar-ssl", port: 8200, tls: false });
   });
 
   it("leaves a current id alone and still ignores an unknown one", () => {
@@ -517,7 +515,9 @@ describe("dedupeByHost", () => {
   // bar-ssl and bar-tachyon are the same server behind two protocols, on the
   // same host but different ports (issue #2848), the clashing pair below.
   const barSsl = servers.find((s) => s.id === "bar-ssl") as LobbyServer;
-  const barTachyon = servers.find((s) => s.id === "bar-tachyon") as LobbyServer;
+  const barTachyon = BUILTIN_SERVERS.find(
+    (s) => s.id === "bar-tachyon",
+  ) as LobbyServer;
   const techa = servers.find((s) => s.id === "techa") as LobbyServer;
 
   it("keeps only one login per host", () => {

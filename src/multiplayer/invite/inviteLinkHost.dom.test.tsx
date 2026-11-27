@@ -183,7 +183,7 @@ describe("an invite link to a server with a saved login", () => {
     press("Connect as alice and join");
     expect(mp.connect).toHaveBeenCalledTimes(1);
     const [server, username] = mp.connect.mock.calls[0];
-    expect(server).toMatchObject({ id: "bar-ssl", tls: true });
+    expect(server).toMatchObject({ id: "bar-ssl", tls: false });
     expect(username).toBe("alice");
   });
 
