@@ -3846,6 +3846,10 @@ msgstr "{piece} 的 {label}，第 {frame} 帧，{elmos} elmo"
 msgid "{label} volume"
 msgstr "{label} 音量"
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "{label} was not sent"
+msgstr ""
+
 #: src/hub/manualSend/run.ts
 #, fuzzy
 msgid "{label} was not sent to the hub"
@@ -12183,6 +12187,10 @@ msgstr "另一个提示仍未处理。请答复或关闭它，然后重新打开
 msgid "Another unit already has this name"
 msgstr "另一个单位已使用此名称"
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Another version of the game is installed, so Coilbox cannot say which unit each build order was for. Install the version it was played on, then try again."
+msgstr ""
+
 #: src/scenario/pages/components/useMapKeyboard.ts
 #, fuzzy
 msgid "Answered the question at {spot}."
@@ -15194,6 +15202,7 @@ msgstr "不会伤害自己的单位"
 #: src/content/pages/components/ReplaySetsManager.tsx
 #: src/content/pages/components/ReplayTracksStorage.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
+#: src/content/pages/components/SendReplayToHub.tsx
 #: src/content/pages/FoldersSection.tsx
 #: src/deeplink/ConfirmDialog.tsx
 #: src/direct/HostRoomForm.tsx
@@ -16636,6 +16645,7 @@ msgstr "移动时隐形消耗"
 #: src/content/pages/components/ReclaimCachesButton.tsx
 #: src/content/pages/components/ReclaimSpaceButton.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
+#: src/content/pages/components/SendReplayToHub.tsx
 #: src/deeplink/ConfirmDialog.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 #: src/hub/upload/UploadToHubButton.tsx
@@ -16879,6 +16889,10 @@ msgstr "Coilbox 无法读取这张地图的天空盒，因此预览改用地图�
 msgid "Coilbox cannot read this unit's build pic. The game ships one, in a format the decoder does not handle."
 msgstr "Coilbox 无法读取此单位的建造图片。游戏附带了一张，但其格式解码器无法处理。"
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Coilbox cannot say what every unit built in this match is or costs. Install the game it was played on, then try again."
+msgstr ""
+
 #. placeholder {0}: unknown.join(", ")
 #: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
@@ -16998,6 +17012,14 @@ msgstr "coilbox 无法读取"
 #, fuzzy
 msgid "Coilbox could not read {game}: {said}"
 msgstr "Coilbox 无法读取 {game}：{said}"
+
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Coilbox could not read every build order in this replay, and the hub checks all of them."
+msgstr ""
+
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Coilbox could not read the build orders in this replay."
+msgstr ""
 
 #: src/hub/assets/pictureSweep.ts
 #, fuzzy
@@ -28388,6 +28410,10 @@ msgstr "不是在这里制作的：这是 .3do，一种较旧的模型格式。C
 msgid "It was not made here: this is one of the formats the engine reads through Assimp, and coilbox has never written one, so it cannot be a unit coming home as parts. Its nodes have been read as pieces as they stand."
 msgstr "不是在这里制作的：这是引擎通过 Assimp 读取的格式之一，coilbox 从未写出过这种格式，所以它不可能是以零件形式回流的单位。其节点已按原样读取为部件。"
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "It will be public. Anyone can download it and see the players, the build orders and the totals."
+msgstr ""
+
 #: src/hub/games/factsSweep.ts
 #, fuzzy
 msgid "It would not take {factionsSaid}."
@@ -35891,6 +35917,10 @@ msgstr ""
 msgid "not sent"
 msgstr "未发送"
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Not sent"
+msgstr ""
+
 #: src/multiplayer/admin/AdminRequestStatus.tsx
 #, fuzzy
 msgid "Not sent to the server"
@@ -36532,6 +36562,10 @@ msgstr "此回放没有记录任何内容。"
 msgid "Nothing was recorded."
 msgstr "没有记录任何内容。"
 
+#: src/hub/upload/messages.ts
+msgid "Nothing was uploaded. The hub has you down as having sent it too."
+msgstr ""
+
 #: src/direct/hostingRoute.ts
 #, fuzzy
 msgid "Nothing would open the ports and this server has no relay, so only players who can already reach this machine can join."
@@ -36929,11 +36963,16 @@ msgstr "在一处 {reach} 范围内平均占一场对局 {many} 的 {share}，{o
 msgid "on ground too steep for it, in amber"
 msgstr "地面太陡（琥珀色）"
 
+#: src/content/pages/ReplaysPage.tsx
+msgid "On hub"
+msgstr ""
+
 #: src/lego/banking.ts
 #, fuzzy
 msgid "on or off"
 msgstr "开或关"
 
+#: src/content/pages/components/SendReplayToHub.tsx
 #: src/hub/pages/components/MapArchivesControl.tsx
 #, fuzzy
 msgid "On the hub"
@@ -41080,6 +41119,10 @@ msgstr "正在读取回放列表…"
 msgid "Reading the replay to see how the mission went."
 msgstr "正在读取回放，查看任务结果。"
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Reading the replay…"
+msgstr ""
+
 #: src/play/PresetChanges.tsx
 #, fuzzy
 msgid "Reading the slots…"
@@ -45026,6 +45069,7 @@ msgstr "自爆爆炸"
 msgid "Self-destructs"
 msgstr "自爆"
 
+#: src/content/pages/components/SendReplayToHub.tsx
 #: src/hub/pages/components/SendButton.tsx
 #: src/multiplayer/admin/AnnouncementsSection.tsx
 #: src/multiplayer/battle/BonusButton.tsx
@@ -45050,6 +45094,10 @@ msgstr "通过变异器路径发送 {unitName}"
 #, fuzzy
 msgid "Send a raw command…"
 msgstr "发送原始命令…"
+
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Send again"
+msgstr ""
 
 #: src/account/pages/SettingsSection.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
@@ -45087,6 +45135,10 @@ msgstr "将此更改发送到变异器"
 msgid "Send this copy to the mutator"
 msgstr "将此副本发送到变异器"
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Send this replay to the hub?"
+msgstr ""
+
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
 msgid "Send to a game"
@@ -45097,6 +45149,7 @@ msgstr "发送到游戏"
 msgid "Send to every player?"
 msgstr "发送给所有玩家？"
 
+#: src/content/pages/components/SendReplayToHub.tsx
 #: src/hub/manualSend/HubSendControl.tsx
 #: src/hub/upload/UploadToHubButton.tsx
 #, fuzzy
@@ -45165,6 +45218,10 @@ msgstr "正在为中心发送图片。打开可停止。"
 #, fuzzy
 msgid "Sending to hub"
 msgstr "正在发送到中心"
+
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Sending to hub…"
+msgstr ""
 
 #: src/hub/assets/UploadRunBadge.tsx
 #, fuzzy
@@ -47088,6 +47145,10 @@ msgstr "部分服务器会通过电子邮件发送验证码来确认你的账号
 #, fuzzy
 msgid "Someone else calls a vote to kick, ban or move you to spectators, or to make you boss."
 msgstr "其他人发起投票，要踢出、封禁你，把你移到观战者，或让你成为主持人。"
+
+#: src/hub/upload/messages.ts
+msgid "Someone else who was in the match is sending it right now. Try again later, and the hub links you to theirs once it is on the hub."
+msgstr ""
 
 #: src/sound/events.ts
 #, fuzzy
@@ -50670,6 +50731,10 @@ msgid "The hub did not accept your sign-in. Sign in again, then upload it again.
 msgstr "中心不接受你的登录。请重新登录，然后再次上传。"
 
 #: src/hub/upload/messages.ts
+msgid "The hub did not keep it. Its check may have found the replay did not match what Coilbox read from it, and the hub does not say why."
+msgstr ""
+
+#: src/hub/upload/messages.ts
 #, fuzzy
 msgid "The hub does not know this game yet. Send it to the hub first, then upload the file."
 msgstr "中心尚不认识此游戏。请先将它发送到中心，然后再上传文件。"
@@ -50683,6 +50748,10 @@ msgstr "中心尚不认识此地图。请先将它发送到中心，然后再上
 #, fuzzy
 msgid "The hub features no games."
 msgstr "中心没有推荐任何游戏。"
+
+#: src/hub/upload/messages.ts
+msgid "The hub found nobody in the replay under the name it was sent with."
+msgstr ""
 
 #: src/hub/api.ts
 #, fuzzy
@@ -50718,6 +50787,10 @@ msgstr "中心上还没有此游戏的内容。此版本 Coilbox 只列出该游
 msgid "The hub has nothing on it yet. Anything you share will show up here."
 msgstr "中心上还没有任何内容。你分享的任何内容都会显示在这里。"
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "The hub is checking it…"
+msgstr ""
+
 #: src/hub/upload/UploadToHubButton.tsx
 #, fuzzy
 msgid "The hub keeps the name of your account, privately."
@@ -50738,6 +50811,10 @@ msgstr "中心可能在一段空闲后正在唤醒，这需要几秒钟。请稍
 #, fuzzy
 msgid "The hub named no download source for {label}."
 msgstr "中心没有为 {label} 指定下载来源。"
+
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "The hub notes that you sent it, as {name}."
+msgstr ""
 
 #: src/hub/maps/pictureSweep.ts
 #, fuzzy
@@ -51585,6 +51662,10 @@ msgstr "录制轨道已过期。重新录制，然后带倒带观看？"
 msgid "The recording could not be made into a track."
 msgstr "无法将录制内容生成为录制轨道。"
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "The recording stops before the end of the match, and the hub only takes a whole match."
+msgstr ""
+
 #: src/multiplayer/admin/ServerAddressSection.tsx
 #, fuzzy
 msgid "The refresh failed"
@@ -51620,6 +51701,11 @@ msgstr "所请求版本的发行版归档"
 msgid "The reload failed"
 msgstr "重新加载失败"
 
+#. placeholder {0}: problem.name
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "The replay does not say which team {0} was on."
+msgstr ""
+
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
 msgid "The replay itself records what was produced and lost, not what a player owned at any moment."
@@ -51629,6 +51715,11 @@ msgstr "回放本身记录的是产出和损失的内容，而不是玩家在任
 #, fuzzy
 msgid "The replay named no period, so the engine's default is used."
 msgstr "回放没有指定时间间隔，所以使用引擎的默认值。"
+
+#. placeholder {0}: info.mapName
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "The replay on {0}"
+msgstr ""
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy
