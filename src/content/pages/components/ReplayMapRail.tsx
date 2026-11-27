@@ -43,7 +43,7 @@ import { SectionHelp } from "./SectionHelp";
  * it, so the whole map shows above the dock. It is unset, and so nothing, where
  * the page has two columns and the dock is under them.
  */
-const MAP_VIEW_HEIGHT =
+export const MAP_VIEW_HEIGHT =
   "max(16rem, 100cqh - var(--replay-dock-reserve, 0px) - 4.5rem)";
 
 /**
@@ -57,8 +57,9 @@ export function ReplayMapLayout({
   map,
   rail,
 }: {
-  /** The map's width and height, which give the box its shape. */
-  shape: { width: number; height: number };
+  /** The map's width and height, which give the box its shape. Null for a view
+   *  that fills the column whatever its size, as the 3D view does. */
+  shape: { width: number; height: number } | null;
   map: ReactNode;
   rail: ReactNode;
 }) {
@@ -73,9 +74,13 @@ export function ReplayMapLayout({
           // the map keep its shape inside the share of the window's height it
           // may take, so a tall map still fits on screen. The rail takes the
           // width the map does not.
-          style={{
-            maxWidth: `calc(${MAP_VIEW_HEIGHT} * ${shape.width} / ${shape.height})`,
-          }}
+          style={
+            shape
+              ? {
+                  maxWidth: `calc(${MAP_VIEW_HEIGHT} * ${shape.width} / ${shape.height})`,
+                }
+              : undefined
+          }
           className="min-w-0 @xl:w-full @xl:shrink @xl:grow-0"
         >
           {map}

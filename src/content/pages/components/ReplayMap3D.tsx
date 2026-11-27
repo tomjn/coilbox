@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { type ComponentProps, useState } from "react";
+import { type ComponentProps, type CSSProperties, useState } from "react";
 import { HEAT_KIND_OF_LAYER } from "@/lib/heatRamp";
 import type { MapScene3D } from "@/lib/mapScene";
 import { useHeatmapLayer } from "@/lib/useHeatmapLayer";
@@ -10,6 +10,7 @@ import { useReplayMapLayers } from "../../useReplayMapLayers";
 import { EventLayerNotes } from "./ReplayEventLayers";
 import {
   HeatLegends,
+  MAP_VIEW_HEIGHT,
   LayerSwitches,
   LayersHelp,
   MapHelp,
@@ -54,7 +55,7 @@ export function ReplayMap3D({
     heightmap,
     shown: SCENE_LAYERS,
   });
-  const { ev, field, orderField, world, ratio, aspect } = layers;
+  const { ev, field, orderField, world } = layers;
   const skybox = useUnitsyncMapSkybox(enginePath, dataDir, mapName);
 
   const [handle, setHandle] = useState<MapScene3D | null>(null);
@@ -68,12 +69,12 @@ export function ReplayMap3D({
 
   return (
     <ReplayMapLayout
-      shape={{ width: ratio, height: 1 }}
+      shape={null}
       map={
         <div
           data-map-3d
-          style={{ aspectRatio: aspect }}
-          className="relative w-full overflow-hidden rounded-md border border-border bg-gradient-to-b from-muted/20 to-muted/40"
+          style={{ "--map-view-height": MAP_VIEW_HEIGHT } as CSSProperties}
+          className="relative h-(--map-view-height) w-full overflow-hidden rounded-md border border-border bg-gradient-to-b from-muted/20 to-muted/40"
         >
           <MapPreview3D
             {...preview}

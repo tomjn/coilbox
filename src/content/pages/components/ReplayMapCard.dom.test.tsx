@@ -2173,6 +2173,24 @@ describe("the map card's modes", () => {
   });
 });
 
+describe("the 3D view's viewport", () => {
+  it("fills the map column and is limited by height, not held to the map's shape", async () => {
+    await show();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("radio", { name: "3D" }));
+    });
+    await settle();
+    const view = document.querySelector("[data-map-3d]") as HTMLElement;
+    expect(view.style.aspectRatio).toBe("");
+    expect(view.style.getPropertyValue("--map-view-height")).toBe(
+      "max(16rem, 100cqh - var(--replay-dock-reserve, 0px) - 4.5rem)",
+    );
+    expect(view.className).toContain("h-(--map-view-height)");
+    const column = view.closest("[data-map-column]") as HTMLElement;
+    expect(column.style.maxWidth).toBe("");
+  });
+});
+
 describe("the Heat window lane (#5309)", () => {
   const lane = () => screen.getByTestId("heat-window-lane");
   const pick = async (name: string) => {
