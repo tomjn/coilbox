@@ -567,11 +567,10 @@ function UnitsView({
             className="relative w-full overflow-hidden rounded-md border border-border/50 bg-[#0d1117]"
           >
             {minimapUrl && (
-              // Dimmed, so a team colour stands out from ground of the same hue.
               <img
                 src={minimapUrl}
                 alt={tr`Minimap of ${mapName}`}
-                className="absolute inset-0 size-full object-fill opacity-55 saturate-50"
+                className="absolute inset-0 size-full object-fill"
               />
             )}
             {/* Under the canvas, so a box or a dot never hides a unit or takes

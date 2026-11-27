@@ -577,6 +577,8 @@ describe("a current track", () => {
     await show();
     const img = screen.getByAltText("Minimap of Test Map") as HTMLImageElement;
     expect(img.getAttribute("src")).toBe("asset://minimap.png");
+    // At full colour, not dimmed.
+    expect(img.className).not.toMatch(/opacity|saturate/);
     const ground = document.querySelector("[data-map-ground]") as HTMLElement;
     expect(ground.style.aspectRatio).toBe("8192 / 6144");
     expect(canvas()).not.toBeNull();
