@@ -93,6 +93,13 @@ export function UnitListHelp({ fit }: { fit?: OrderFit | null }) {
       </p>
       <p>
         <Trans>
+          A Beyond All Reason replay also carries the names of its units. Its
+          build orders are named from those when its version is not installed
+          and no list was kept. They hold no costs.
+        </Trans>
+      </p>
+      <p>
+        <Trans>
           A list read from a loose game folder is what the folder held that day.
           A folder can change under the same name, and a packaged archive
           cannot. Analysing a replay records the list the engine itself used,

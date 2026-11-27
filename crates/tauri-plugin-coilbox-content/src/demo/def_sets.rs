@@ -189,6 +189,12 @@ impl UnitDef {
     }
 }
 
+/// Whether text can be a definition's key or name: no longer than
+/// [`MAX_NAME_BYTES`] and with no control characters.
+pub fn usable_text(text: &str) -> bool {
+    text.len() <= MAX_NAME_BYTES && !text.chars().any(char::is_control)
+}
+
 /// Refuse a list that is not one before anything is hashed or written. A list
 /// arrives from the frontend or out of an engine's log, and both are input.
 pub fn validate(units: &[UnitDef]) -> Result<(), String> {
@@ -203,22 +209,20 @@ pub fn validate(units: &[UnitDef]) -> Result<(), String> {
     }
     for (index, unit) in units.iter().enumerate() {
         let id = index + 1;
-        let text_ok =
-            |text: &str| text.len() <= MAX_NAME_BYTES && !text.chars().any(char::is_control);
-        if unit.name.is_empty() || !text_ok(&unit.name) {
+        if unit.name.is_empty() || !usable_text(&unit.name) {
             return Err(format!("unit definition {id} has no usable key"));
         }
         if unit
             .human_name
             .as_deref()
-            .is_some_and(|name| !text_ok(name))
+            .is_some_and(|name| !usable_text(name))
         {
             return Err(format!("unit definition {id} has no usable name"));
         }
         if unit
             .icon_type
             .as_deref()
-            .is_some_and(|icon| icon.is_empty() || !text_ok(icon))
+            .is_some_and(|icon| icon.is_empty() || !usable_text(icon))
         {
             return Err(format!("unit definition {id} has no usable icon type"));
         }

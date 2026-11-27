@@ -3868,6 +3868,7 @@ mod tests {
             for e in &s.events {
                 *counts
                     .entry(match e.kind {
+                        StreamEventKind::UnitDefNames { .. } => "unitDefNames",
                         StreamEventKind::PlayerName { .. } => "playerName",
                         StreamEventKind::Chat { .. } => "chat",
                         StreamEventKind::SystemMessage { .. } => "systemMessage",
