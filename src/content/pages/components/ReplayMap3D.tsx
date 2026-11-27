@@ -1,12 +1,22 @@
 import { useLingui } from "@lingui/react/macro";
-import { type ComponentProps, type CSSProperties, useState } from "react";
+import {
+  type ComponentProps,
+  type CSSProperties,
+  useMemo,
+  useState,
+} from "react";
 import { HEAT_KIND_OF_LAYER } from "@/lib/heatRamp";
 import type { MapScene3D } from "@/lib/mapScene";
 import { useHeatmapLayer } from "@/lib/useHeatmapLayer";
+import { fieldFromGrid } from "@/placement/terrain";
+import { useHeightGrid } from "@/placement/useHeightGrid";
 import { MapPreview3D } from "../../../mapconv/pages/components/MapPreview3D";
 import type { DemoInfo } from "../../bindings";
-import { useUnitsyncMapSkybox } from "../../config";
+import { useUnitsyncHeightField, useUnitsyncMapSkybox } from "../../config";
+import type { ReplayTrackHandle } from "../../replayTrack";
 import { useReplayMapLayers } from "../../useReplayMapLayers";
+import { useUnitDots3d } from "../../useUnitDots3d";
+import { useUnitMapStyles } from "../../useUnitMapStyles";
 import { EventLayerNotes } from "./ReplayEventLayers";
 import {
   HeatLegends,
@@ -25,11 +35,17 @@ export type Preview3D = Omit<
   "onScene" | "worldWidth" | "worldHeight" | "className" | "skyboxSrc"
 >;
 
+const NO_TEAMS: ReplayTrackHandle["header"]["teams"] = [];
+
 /**
  * The 3D mode of the replay's map card: the map as terrain, with the 3D view's
  * own options (water, wireframe, fullscreen) on the view itself. The layers
  * that paint on the ground, the two densities and deaths or damage, have their
  * switches and legends in the rail, and read through the time window.
+ *
+ * The recorded units stand on the terrain as dots in their team's colour, at
+ * the page's match clock. They are drawn from `track`, the handle the card
+ * holds open for the flat map too.
  */
 export function ReplayMap3D({
   info,
@@ -39,6 +55,7 @@ export function ReplayMap3D({
   dataDir,
   heightmap,
   preview,
+  track,
 }: {
   info: DemoInfo;
   replayPath: string | undefined;
@@ -47,6 +64,9 @@ export function ReplayMap3D({
   dataDir: string | undefined;
   heightmap: { width?: number; height?: number } | null | undefined;
   preview: Preview3D;
+  /** The open track once the match clock has its range, else null and no units
+   *  are drawn. */
+  track: ReplayTrackHandle | null;
 }) {
   const { t } = useLingui();
   const layers = useReplayMapLayers({
@@ -66,6 +86,41 @@ export function ReplayMap3D({
   useHeatmapLayer(handle, field, HEAT_KIND_OF_LAYER.density);
   useHeatmapLayer(handle, ev.field, HEAT_KIND_OF_LAYER.deaths);
   useHeatmapLayer(handle, ev.damageField, HEAT_KIND_OF_LAYER.damage);
+
+  // The dots stand on the map's own 16 bit heights, which the terrain's
+  // displacement picture only approximates. Without them there are no dots,
+  // because a dot at a guessed height would sit inside a hill.
+  const heightField = useUnitsyncHeightField(enginePath, dataDir, mapName);
+  const heights = useHeightGrid(
+    heightField.url ?? undefined,
+    heightField.data?.width,
+    heightField.data?.height,
+  );
+  const ground = useMemo(
+    () =>
+      heights.grid && world.worldWidth > 0 && world.worldHeight > 0
+        ? {
+            field: fieldFromGrid(heights.grid),
+            worldWidth: world.worldWidth,
+            worldHeight: world.worldHeight,
+            minHeight: preview.minHeight,
+            maxHeight: preview.maxHeight,
+          }
+        : null,
+    [
+      heights.grid,
+      world.worldWidth,
+      world.worldHeight,
+      preview.minHeight,
+      preview.maxHeight,
+    ],
+  );
+  const teams = useUnitMapStyles(
+    info,
+    replayPath,
+    track?.header.teams ?? NO_TEAMS,
+  );
+  useUnitDots3d(handle, track, teams, ground);
 
   return (
     <ReplayMapLayout

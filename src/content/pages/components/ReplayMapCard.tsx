@@ -226,6 +226,7 @@ function MapCard({
               dataDir={dataDir}
               heightmap={heightmap.data}
               preview={preview}
+              track={adopted && track.status === "ready" ? track.handle : null}
             />
           ) : (
             <div className="flex h-48 items-center justify-center">

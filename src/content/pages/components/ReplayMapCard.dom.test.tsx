@@ -18,7 +18,9 @@ import {
   screen,
   within,
 } from "@testing-library/react";
+import { useEffect } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
+import * as THREE from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   ChatLine,
@@ -117,6 +119,11 @@ vi.mock("../../config", () => ({
     loading: false,
   }),
   useUnitsyncMapSkybox: () => ({ dataUrl: null, loading: false }),
+  useUnitsyncHeightField: () => ({
+    url: "asset://height-field.bin",
+    data: { width: 513, height: 385 },
+    loading: false,
+  }),
   useScanTargetSelection: () => ({
     selected: { enginePath: "/engine", rootPath: "/data" },
   }),
@@ -138,8 +145,27 @@ vi.mock("../../useMatchStats", () => ({
     error: null,
   }),
 }));
+/** The scene the 3D view hands over, which a test reads the dots from. */
+let VIEW_3D: {
+  scene: THREE.Scene;
+  scale: number;
+  render: () => void;
+} | null = null;
 vi.mock("../../../mapconv/pages/components/MapPreview3D", () => ({
-  MapPreview3D: () => <div data-testid="preview-3d" />,
+  MapPreview3D: ({ onScene }: { onScene?: (scene: unknown) => void }) => {
+    useEffect(() => {
+      onScene?.(VIEW_3D);
+    }, [onScene]);
+    return <div data-testid="preview-3d" />;
+  },
+}));
+/** The map's raw heights, which the dots stand on: flat at the map's floor. */
+vi.mock("@/placement/useHeightGrid", () => ({
+  useHeightGrid: () => ({
+    grid: { width: 2, height: 2, words: new Uint16Array(4) },
+    read: true,
+    error: null,
+  }),
 }));
 
 /** The installed games, and the start boxes a Zero-K file gives (#5313). */
@@ -325,6 +351,7 @@ beforeEach(() => {
   headerReleases.length = 0;
   MINIMAP = "asset://minimap.png";
   HEIGHTMAP = { width: 513, height: 385 };
+  VIEW_3D = { scene: new THREE.Scene(), scale: 0.01, render: () => {} };
   HIDE = [];
   hidden = false;
   onScreen = undefined;
@@ -2157,6 +2184,54 @@ describe("the map card's modes", () => {
         .getAllByRole("button")
         .map((b) => b.textContent),
     ).toEqual(["Building density", "Order density", "Deaths", "Damage dealt"]);
+  });
+
+  describe("the units in 3D", () => {
+    const dots = () =>
+      VIEW_3D?.scene.getObjectByName("replay-unit-dots") as
+        | THREE.Points
+        | undefined;
+
+    it("stands the recorded units on the terrain as dots, drawn from the card's own track", async () => {
+      await show();
+      await pick("3D");
+      expect(dots()?.geometry.drawRange.count).toBe(1);
+      // The one handle the card opened for the flat map is the one that fed it.
+      expect(headerReads).toEqual([ID]);
+
+      const [x, z] = [
+        fixture.transform.find((t) => t.serial === 0 && t.frame === 0),
+      ].flatMap((at) => (at ? [at.x, at.z] : []));
+      const positions = dots()?.geometry.attributes.position.array;
+      // The map is 4,096 by 3,072 elmos from the heightmap's 513 by 385
+      // samples, which the terrain is laid out over.
+      expect(positions?.[0]).toBeCloseTo((x - 2048) * 0.01);
+      expect(positions?.[1]).toBeCloseTo(0);
+      expect(positions?.[2]).toBeCloseTo((z - 1536) * 0.01);
+    });
+
+    it("follows the match clock while the 3D view is open", async () => {
+      await show();
+      await pick("3D");
+      await press("PageUp", 3);
+      expect(dots()?.geometry.drawRange.count).toBe(2);
+      await press("Home");
+      expect(dots()?.geometry.drawRange.count).toBe(1);
+    });
+
+    it("takes the dots off the scene when the mode changes", async () => {
+      await show();
+      await pick("3D");
+      expect(dots()).toBeDefined();
+      await pick("Heat");
+      expect(dots()).toBeUndefined();
+    });
+
+    it("draws no dots for a replay with no recording", async () => {
+      await show(null);
+      await pick("3D");
+      expect(dots()).toBeUndefined();
+    });
   });
 
   it("disables 3D for a map with no height data", async () => {
