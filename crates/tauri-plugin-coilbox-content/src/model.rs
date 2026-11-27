@@ -625,6 +625,10 @@ pub struct StreamEvent {
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum StreamEventKind {
+    /// A Beyond All Reason `NETMSG_LUAMSG`: every unit's key, in definition id
+    /// order from 1, as that player's game numbered them.
+    #[serde(rename_all = "camelCase")]
+    UnitDefNames { player: u8, names: Vec<String> },
     /// `NETMSG_PLAYERNAME`. A player connected under this name.
     #[serde(rename_all = "camelCase")]
     PlayerName { player: u8, name: String },
@@ -793,6 +797,11 @@ pub struct DemoBuildOrders {
     /// True when the stream walk stopped before the end, so orders after that
     /// point are missing. The ones before it are good.
     pub incomplete: bool,
+    /// The recorded game's unit keys in definition id order from 1, from the
+    /// list the replay itself carries. Only Beyond All Reason sends one, so
+    /// this is empty for other games.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub unit_names: Vec<String>,
 }
 
 /// What sent an order, without the ids [`CommandOrigin`] carries. The stream
