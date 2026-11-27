@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { drawHeatField, HEAT_EDGE_CLASS } from "@/lib/heatCanvas";
 import { HEAT_KIND_OF_LAYER } from "@/lib/heatRamp";
 import type { DemoInfo } from "../../bindings";
+import { otherBuild } from "../../replayBuildOrders";
 import {
   type BuildMark,
   CATEGORY_LABEL,
@@ -249,8 +250,8 @@ export function ReplayMapHeat({
   const noStarts = on.starts && (info.startPositions?.length ?? 0) === 0;
   const [marksW, marksH] = [MARKS_WIDTH, Math.round(MARKS_WIDTH / ratio)];
   const recordedGame = units.recorded;
-  const differentBuildName =
-    units.source?.kind === "differentBuild" ? units.source.game.name : "";
+  const differentBuild = otherBuild(units.source);
+  const differentBuildName = differentBuild?.name ?? "";
 
   return (
     <ReplayMapLayout
@@ -365,7 +366,8 @@ export function ReplayMapHeat({
                       </p>
                     ) : (
                       <p className="text-xs text-muted-foreground">
-                        {units.source?.kind === "notInstalled"
+                        {units.source?.kind === "notInstalled" ||
+                        units.source?.kind === "replay"
                           ? units.recorded
                             ? t`${recordedGame} is not installed, so nothing says what each building is for and every mark is the same shape.`
                             : t`This replay's game is not installed, so nothing says what each building is for and every mark is the same shape.`
@@ -375,7 +377,7 @@ export function ReplayMapHeat({
                     {categorised && (
                       <StoredListNote source={units.source} subject="Shapes" />
                     )}
-                    {categorised && units.source?.kind === "differentBuild" && (
+                    {categorised && differentBuild && (
                       <p className="text-xs text-amber-600 dark:text-amber-400">
                         <Trans>
                           This replay was played on {recordedGame}, which is not

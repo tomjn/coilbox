@@ -64,6 +64,11 @@ export type UnitSource =
    *  its installed game. `pictures` is an installed game of the same family to
    *  ask for build pictures by unit key, or null when none is installed. */
   | { kind: "stored"; list: StoredUnitList; pictures: GameItem | null }
+  /** That build is not installed, no list was kept, and the replay carries the
+   *  names of its own units (#5491). The names are the match's. `game` is
+   *  another installed version, which is where costs, kinds and pictures come
+   *  from by unit key, or null when none is installed. */
+  | { kind: "replay"; names: readonly string[]; game: GameItem | null }
   /** That build is not installed, no list was kept, and another version of
    *  the game is installed. Its ids can differ, so a name read from it may be
    *  the wrong unit. */
@@ -84,18 +89,21 @@ export function isLooseFolder(game: GameItem): boolean {
 /**
  * Pick where to read a replay's unit names from. `games` is the live unitsync
  * scan, the same list the replay page's missing-game notice reads. `stored` is
- * the list kept for this replay, if any.
+ * the list kept for this replay, if any, and `carried` the unit names the
+ * replay itself holds, which count in the ids of its build orders only.
  *
  * In order: the engine's own list, which is the numbering the match used. Then
  * a packaged archive installed under the replay's exact name. Then a kept list,
  * which also stands in for an exact match that is a loose folder, because the
  * list is what the folder held when the replay was read and the folder is
- * whatever it holds now. Then another installed version, with a warning.
+ * whatever it holds now. Then the replay's own names. Then another installed
+ * version, with a warning.
  */
 export function pickUnitSource(
   recorded: string,
   games: GameItem[],
   stored?: StoredUnitList | null,
+  carried?: readonly string[],
 ): UnitSource {
   const exact = games.find((g) => gameNamesMatch(g.name, recorded));
   // The highest name of the family, which for a game that numbers its
@@ -111,6 +119,9 @@ export function pickUnitSource(
     return { kind: "stored", list: stored, pictures: exact ?? other ?? null };
   }
   if (exact) return { kind: "installed", game: exact };
+  if (carried?.length) {
+    return { kind: "replay", names: carried, game: other ?? null };
+  }
   return other
     ? { kind: "differentBuild", game: other }
     : { kind: "notInstalled" };
@@ -141,7 +152,13 @@ export function closestInstalledGame(
 /** The installed game a source reads its units from through unitsync, or null
  *  for a source that has no need to. */
 export function liveGame(source: UnitSource | null): GameItem | null {
-  return source?.kind === "installed" || source?.kind === "differentBuild"
+  return source?.kind === "installed" ? source.game : otherBuild(source);
+}
+
+/** The installed version other than the replay's that a source reads costs and
+ *  kinds from, or null when it reads them from no such thing. */
+export function otherBuild(source: UnitSource | null): GameItem | null {
+  return source?.kind === "differentBuild" || source?.kind === "replay"
     ? source.game
     : null;
 }

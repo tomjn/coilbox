@@ -3092,6 +3092,14 @@ msgstr "Gra {game} nie jest zainstalowana, więc nie da się nazwać jednostek. 
 msgid "{game} is not installed, so the units cannot be named. Each order shows the unit definition id the replay recorded."
 msgstr "Gra {game} nie jest zainstalowana, więc nie da się nazwać jednostek. Każdy rozkaz pokazuje identyfikator definicji jednostki zapisany w powtórce."
 
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "{game} is not installed. Unit names come from the list this replay carries, which holds no costs."
+msgstr ""
+
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "{game} is not installed. Unit names come from the list this replay carries. Costs come from {otherName}, a different build, and may be wrong."
+msgstr ""
+
 #: src/campaign/missionNeeds.ts
 #, fuzzy
 msgid "{game} is the exact version this mission was made for, and it could not be downloaded. It may no longer be published, or the download failed ({failure}). Another version will not run this mission."
@@ -8789,6 +8797,10 @@ msgstr "W meczu może grać od {min} do {max} graczy."
 #, fuzzy
 msgid "A BeamLaser plays it once per sim frame."
 msgstr "BeamLaser odtwarza go raz na klatkę symulacji."
+
+#: src/content/pages/components/UnitListNotes.tsx
+msgid "A Beyond All Reason replay also carries the names of its units. Its build orders are named from those when its version is not installed and no list was kept. They hold no costs."
+msgstr ""
 
 #: src/hub/pages/components/MapPicturesControl.tsx
 #, fuzzy

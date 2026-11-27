@@ -21,6 +21,7 @@ import {
   type BuildOrderSeat,
   buildOrderSeats,
   buildOrderTime,
+  otherBuild,
   resolveBuildUnit,
   slotNote,
   type UnitSource,
@@ -70,10 +71,13 @@ function SourceNote({
   recorded,
   source,
   unitsFailed,
+  described,
 }: {
   recorded: string;
   source: UnitSource | null;
   unitsFailed: boolean;
+  /** The units say what they cost, and not their names alone. */
+  described: boolean;
 }) {
   const { t } = useLingui();
   if (!source) return null;
@@ -89,6 +93,26 @@ function SourceNote({
     );
   }
   if (source.kind === "stored") return <StoredListNote source={source} />;
+  if (source.kind === "replay") {
+    const game = recorded || t`This replay's game`;
+    const otherName = source.game?.name;
+    return described && otherName ? (
+      <p className="text-xs text-amber-600 dark:text-amber-400">
+        <Trans>
+          {game} is not installed. Unit names come from the list this replay
+          carries. Costs come from {otherName}, a different build, and may be
+          wrong.
+        </Trans>
+      </p>
+    ) : (
+      <p className="text-xs text-muted-foreground">
+        <Trans>
+          {game} is not installed. Unit names come from the list this replay
+          carries, which holds no costs.
+        </Trans>
+      </p>
+    );
+  }
   const gameName = source.game.name;
   if (unitsFailed) {
     return (
@@ -135,6 +159,7 @@ function unitLabel(
 function SeatOpening({
   seat,
   units,
+  described,
   pics,
   noPictures,
   cutMinutes,
@@ -142,6 +167,7 @@ function SeatOpening({
 }: {
   seat: BuildOrderSeat;
   units: UnitDatasetEntry[] | null;
+  described: UnitDatasetEntry[] | null;
   pics: UnitBuildpicsResult | null;
   /** No installed game can be asked for a picture, so none is on its way. */
   noPictures: boolean;
@@ -154,7 +180,7 @@ function SeatOpening({
   const entries = collapseOrders(inStretch);
   const left = entries.length - shown;
   // Costs need the game's definitions. Without them there is nothing to add.
-  const cost = units ? orderedCost(inStretch, units) : null;
+  const cost = described ? orderedCost(inStretch, described) : null;
   const moreCount = Math.min(PAGE, left);
   const entryCount = entries.length;
   const metal = cost ? formatNumber(cost.metal) : "";
@@ -257,6 +283,7 @@ function SeatLists({
   seat,
   showName,
   units,
+  described,
   pics,
   noPictures,
   defaultOpen,
@@ -267,6 +294,7 @@ function SeatLists({
   /** Said when a team is shared and the entry holds more than one seat. */
   showName: boolean;
   units: UnitDatasetEntry[] | null;
+  described: UnitDatasetEntry[] | null;
   pics: UnitBuildpicsResult | null;
   noPictures: boolean;
   defaultOpen: boolean;
@@ -284,6 +312,7 @@ function SeatLists({
       <SeatOpening
         seat={seat}
         units={units}
+        described={described}
         pics={pics}
         noPictures={noPictures}
         cutMinutes={cutMinutes}
@@ -383,6 +412,7 @@ function BuildOrderEntryView({
   entry: BuildOrderEntry;
   defaultOpen: boolean;
   units: UnitDatasetEntry[] | null;
+  described: UnitDatasetEntry[] | null;
   pics: UnitBuildpicsResult | null;
   noPictures: boolean;
   cutMinutes: number | null;
@@ -462,9 +492,15 @@ export function ReplayBuildOrders({
     picturesArchive,
     status,
     units,
+    described,
     links,
     matchListVersion,
-  } = useReplayUnits(info, result !== null && result.orders.length > 0);
+  } = useReplayUnits(
+    info,
+    result !== null && result.orders.length > 0,
+    "stream",
+    result?.unitNames,
+  );
   // The list just read is kept for this replay, so it can still be named when
   // the game has moved on. Only a list the replay's own orders agree with.
   useKeepUnitList(
@@ -475,9 +511,12 @@ export function ReplayBuildOrders({
     links,
     matchListVersion,
   );
+  // The replay's own names cannot be the wrong list, and what another build
+  // says of a unit is no check on them.
+  const checked = source?.kind === "replay" ? null : units;
   const fit = useMemo(
-    () => (result && units ? orderFit(result.orders, units) : null),
-    [result, units],
+    () => (result && checked ? orderFit(result.orders, checked) : null),
+    [result, checked],
   );
   const named = result
     ? [
@@ -522,7 +561,7 @@ export function ReplayBuildOrders({
                 </Trans>
               </p>
               <BaseCropsHelp />
-              {units && <OpeningSplitHelp />}
+              {described && <OpeningSplitHelp />}
               <UnitListHelp fit={fit} />
               {result && result.removals > 0 && (
                 <p>
@@ -574,6 +613,7 @@ export function ReplayBuildOrders({
               recorded={recorded}
               source={source}
               unitsFailed={archive !== undefined && units === null}
+              described={described !== null}
             />
           )}
           {fit && <OrderFitNote fit={fit} />}
@@ -587,18 +627,18 @@ export function ReplayBuildOrders({
               autoComplete="off"
             />
           </Field>
-          {units && (
+          {described && (
             <ReplayOpeningSplit
               rows={seats.map((seat) => ({
                 key: seat.key,
                 name: seat.name,
                 split: orderedSplit(
                   ordersUpTo(seat.orders, parseCutMinutes(cut)),
-                  units,
+                  described,
                 ),
               }))}
               cutMinutes={parseCutMinutes(cut)}
-              differentBuild={source?.kind === "differentBuild"}
+              differentBuild={otherBuild(source) !== null}
             />
           )}
           <BasePictureKey />
@@ -618,10 +658,11 @@ export function ReplayBuildOrders({
                 entry={entry}
                 defaultOpen={entries.length === 1}
                 units={units}
+                described={described}
                 pics={pics}
                 noPictures={picturesArchive === undefined}
                 cutMinutes={parseCutMinutes(cut)}
-                differentBuild={source?.kind === "differentBuild"}
+                differentBuild={otherBuild(source) !== null}
               />
             ))}
           </div>

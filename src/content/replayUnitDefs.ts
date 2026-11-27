@@ -100,6 +100,19 @@ export function storedToUnit(def: StoredUnitDef): UnitDatasetEntry {
   } as UnitDatasetEntry;
 }
 
+/**
+ * The units a replay's own list names, in id order (#5491). The list holds keys
+ * only, so a unit takes everything else from the entry of that key in
+ * `installed`, another version of the game, and is a name alone without one.
+ */
+export function namedUnits(
+  names: readonly string[],
+  installed: readonly UnitDatasetEntry[],
+): UnitDatasetEntry[] {
+  const byName = new Map(installed.map((u) => [u.name.toLowerCase(), u]));
+  return names.map((name) => byName.get(name.toLowerCase()) ?? { name });
+}
+
 /** The icon type of each unit in a list that names one, by lowercase name. */
 export function iconTypesByName(
   units: readonly UnitDatasetEntry[] | undefined,

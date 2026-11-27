@@ -133,7 +133,7 @@ Unit numbers in the stream are definition ids. The engine numbers a game's defin
 
 ### Which unit list names the ids
 
-A unit list comes from one of four places. Coilbox takes the first that applies.
+A unit list comes from one of five places. Coilbox takes the first that applies.
 
 1. The engine's own list, when the replay has been analysed, or when you have asked for the list alone. The replay logger writes the engine's unit definitions at the start of a run, so this is the numbering the match really used, with its mod options, its AIs and its map applied. It always names an analysis's events. It names the replay's build orders when the run used the game the replay records, and not when it had to use another version.
 
@@ -149,7 +149,8 @@ A unit list comes from one of four places. Coilbox takes the first that applies.
    The whole call also includes reading the game's short name and writing the scratch game before the engine starts. Beyond All Reason has not been measured through this run, because no replay of an installed build was available. A scripted match of test-30922 on All That Glitters v2.2.3 that stops itself at frame 30, which is not this run's own stop, took 18.8 s and 15.2 s of engine time and wrote 600 definitions.
 2. A packaged archive (`.sdz`, `.sd7`, or a rapid package) installed under the exact name and version the replay records, read through unitsync with the match's own setup. The section says the names were matched by name and version.
 3. A list coilbox kept for this replay. The section says when it was recorded and from which game. A kept list also stands in for an exact match that is a loose folder (`.sdd`), and then the section says so, because a folder can change under the same name and the list is what it held the day the replay was read.
-4. Another installed version of the same game, with a warning that names come from a different build and may be wrong. One unit added or removed moves every id after it.
+4. For build orders only, the names a Beyond All Reason replay carries. The game's widget `luaui/Widgets/log_unitdefids.lua` sends `unitdefs:` and a zlib compressed JSON array of unit keys in id order, once from each player's game, before the first frame. Coilbox takes the first copy, so id n is entry n minus 1. The list holds keys only. Another installed version of the game, if there is one, gives each unit of the same key its full name, costs, kind and picture, with a warning that the costs may be wrong. With none, the page shows keys with no costs and no kinds. The list is read with the build orders and is not kept in the unit list store, so the dossier and the map pages do not use it.
+5. Another installed version of the same game, with a warning that names come from a different build and may be wrong. One unit added or removed moves every id after it.
 
 With none of these, each order shows its id and the section says the game is not installed.
 

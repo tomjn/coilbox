@@ -976,6 +976,9 @@ export interface DemoBuildOrders {
   lastFrame: number;
   /** True when the walk stopped early, so later orders are missing. */
   incomplete: boolean;
+  /** The recorded game's unit keys in definition id order from 1, from the list
+   *  the replay itself carries. Only a Beyond All Reason replay has one. */
+  unitNames?: string[];
 }
 
 /**
