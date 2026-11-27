@@ -44,6 +44,7 @@ pub(crate) mod analysis;
 mod build_orders;
 pub(crate) mod def_sets;
 mod faction_picks;
+pub mod hub_track;
 mod lua_msg;
 pub mod map_grids;
 pub(crate) mod match_setup;

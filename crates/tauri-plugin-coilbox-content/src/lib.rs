@@ -1306,6 +1306,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             demo::track_budget::content_replay_tracks_clear,
             demo::track_view::content_replay_track_header,
             demo::track_view::content_replay_track_window,
+            demo::hub_track::content_replay_hub_track,
+            demo::hub_track::content_replay_hub_track_download,
             demo::def_sets::content_unit_def_set,
             demo::def_sets::content_unit_def_set_store,
             demo::def_sets::content_unit_def_sets_usage,

@@ -10403,6 +10403,10 @@ msgstr "Asking the hub about {done} of {total}"
 msgid "Asking the hub about your maps"
 msgstr "Asking the hub about your maps"
 
+#: src/content/pages/components/HubTrackOffer.tsx
+msgid "Asking the hub…"
+msgstr "Asking the hub…"
+
 #: src/direct/ReachablePorts.tsx
 msgid "Asking your router to open <0/>…"
 msgstr "Asking your router to open <0/>…"
@@ -15488,6 +15492,10 @@ msgstr "Could not reach the hub at {host}."
 msgid "Could not reach the hub at {host}. Check your connection."
 msgstr "Could not reach the hub at {host}. Check your connection."
 
+#: src/i18n/uiError.ts
+msgid "Could not reach the hub. Try again in a moment."
+msgstr "Could not reach the hub. Try again in a moment."
+
 #: src/lego/pages/components/ReferencePicker.tsx
 msgid "Could not reach unitsync to read {object}. Showing the solar collector."
 msgstr "Could not reach unitsync to read {object}. Showing the solar collector."
@@ -17422,6 +17430,10 @@ msgstr "Download the engine this replay needs"
 msgid "Download the event log"
 msgstr "Download the event log"
 
+#: src/content/pages/components/HubTrackOffer.tsx
+msgid "Download the hub's track ({size})"
+msgstr "Download the hub's track ({size})"
+
 #: src/multiplayer/battles/BattleRowMapThumb.tsx
 msgid "Download the map for {battleTitle}"
 msgstr "Download the map for {battleTitle}"
@@ -17478,6 +17490,10 @@ msgstr "Downloading an import"
 #: src/multiplayer/battles/BattleRowMapThumb.tsx
 msgid "Downloading map for {battleTitle}"
 msgstr "Downloading map for {battleTitle}"
+
+#: src/content/pages/components/HubTrackOffer.tsx
+msgid "Downloading the track…"
+msgstr "Downloading the track…"
 
 #: src/campaign/pages/components/MissionNeedsPanel.tsx
 #: src/challenge/SubstitutedMapNote.tsx
@@ -24862,6 +24878,10 @@ msgstr "Longest"
 #: src/content/pages/components/ReplayAwards.tsx
 msgid "Longest time without a kill"
 msgstr "Longest time without a kill"
+
+#: src/content/pages/components/HubTrackOffer.tsx
+msgid "Look for a track on the hub"
+msgstr "Look for a track on the hub"
 
 #: src/play/pages/EngineLogSection.tsx
 msgid "Look for the log again"
@@ -38546,6 +38566,10 @@ msgstr "Someone else calls a vote to kick, ban or move you to spectators, or to 
 msgid "Someone else is sending a track of this match right now. Try again later."
 msgstr "Someone else is sending a track of this match right now. Try again later."
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Someone else may have sent a track of this match to the hub. Looking for one sends the hub the replay's game id, and coilbox asks nothing until you press the button. A downloaded track is played like one recorded here, and does not come with an analysis."
+msgstr "Someone else may have sent a track of this match to the hub. Looking for one sends the hub the replay's game id, and coilbox asks nothing until you press the button. A downloaded track is played like one recorded here, and does not come with an analysis."
+
 #: src/hub/upload/messages.ts
 msgid "Someone else who was in the match is sending it right now. Try again later, and the hub links you to theirs once it is on the hub."
 msgstr "Someone else who was in the match is sending it right now. Try again later, and the hub links you to theirs once it is on the hub."
@@ -40710,6 +40734,10 @@ msgstr "The document and the compiled mission move into {gameName}. Coilbox keep
 msgid "The download failed part way through."
 msgstr "The download failed part way through."
 
+#: src/i18n/uiError.ts
+msgid "The downloaded file was not the track the hub described, so it was thrown away."
+msgstr "The downloaded file was not the track the hub described, so it was thrown away."
+
 #: src/content/unitFieldNotes.ts
 msgid "The drag used once the aircraft is going down. Clamped to 0 up to 1."
 msgstr "The drag used once the aircraft is going down. Clamped to 0 up to 1."
@@ -41484,6 +41512,10 @@ msgstr "The hub did not accept your sign-in. Sign in again and try once more."
 msgid "The hub did not accept your sign-in. Sign in again, then upload it again."
 msgstr "The hub did not accept your sign-in. Sign in again, then upload it again."
 
+#: src/i18n/uiError.ts
+msgid "The hub did not answer with its list of tracks. Try again in a moment."
+msgstr "The hub did not answer with its list of tracks. Try again in a moment."
+
 #: src/hub/upload/messages.ts
 msgid "The hub did not keep it. Its check may have found the replay did not match what Coilbox read from it, and the hub does not say why."
 msgstr "The hub did not keep it. Its check may have found the replay did not match what Coilbox read from it, and the hub does not say why."
@@ -41531,6 +41563,10 @@ msgstr "The hub has no such item. It may have been taken down."
 #: src/downloads/pages/components/HubEngineList.tsx
 msgid "The hub has no test builds for this computer."
 msgstr "The hub has no test builds for this computer."
+
+#: src/content/pages/components/HubTrackOffer.tsx
+msgid "The hub has no track of this match that this version of coilbox can play."
+msgstr "The hub has no track of this match that this version of coilbox can play."
 
 #: src/hub/replayExtras/messages.ts
 msgid "The hub has not passed an analysis of this match yet. Try again once its check has finished."
@@ -41684,6 +41720,10 @@ msgstr "The hub's answer {index} is not a result."
 #: src/hub/replayExtras/messages.ts
 msgid "The hub's check found the analysis does not match the replay."
 msgstr "The hub's check found the analysis does not match the replay."
+
+#: src/i18n/uiError.ts
+msgid "The hub's track is not a playable track of this match, so it was not kept."
+msgstr "The hub's track is not a playable track of this match, so it was not kept."
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 msgid "The in-world height (in map units) that pure black in the heightmap maps to — the map's lowest point. Below 0 is underwater."
@@ -42789,6 +42829,10 @@ msgstr "The Total Annihilation spelling. Read only when metalCost is absent."
 #: src/content/replayTrack/fault.ts
 msgid "the track cannot be read: {message}"
 msgstr "the track cannot be read: {message}"
+
+#: src/i18n/uiError.ts
+msgid "The track could not be downloaded. Try again in a moment."
+msgstr "The track could not be downloaded. Try again in a moment."
 
 #: src/content/replayTrack/fault.ts
 msgid "the track file failed: {message}"

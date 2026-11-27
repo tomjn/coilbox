@@ -108,6 +108,11 @@ vi.mock("../../profile/profile", async (orig) => ({
 }));
 // The dock's metric lane needs the app's theme and the statistics, which
 // `ReplayMetricLane.dom.test.tsx` covers.
+vi.mock("./components/HubTrackOffer", () => ({
+  useHubTrack: () => ({ offered: false, found: false }),
+  HubTrackDownload: () => null,
+  HubTrackLook: () => null,
+}));
 vi.mock("./components/ReplayMetricLane", () => ({
   useMetricLane: () => null,
   MetricLaneLabel: () => null,

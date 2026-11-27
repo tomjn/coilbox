@@ -32,6 +32,7 @@
 //! when the track is stored and by [`mark_watched`], so nothing else is kept.
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use coilbox_track::TrackReader;
@@ -144,11 +145,14 @@ pub fn store<E: std::fmt::Display>(
     std::fs::create_dir_all(dir).map_err(|e| format!("could not create {}: {e}", dir.display()))?;
     // In the same folder, so the rename cannot cross a filesystem. The name
     // does not end the way a stored file does, so a temporary file a crash
-    // left behind is never read as a track.
+    // left behind is never read as a track. Numbered, because a recording and
+    // a download can store the same match at once.
+    static STORES: AtomicU64 = AtomicU64::new(0);
     let temp = dir.join(format!(
-        "{}{EXTENSION}.tmp-{}",
+        "{}{EXTENSION}.tmp-{}-{}",
         valid_game_id(game_id)?,
-        std::process::id()
+        std::process::id(),
+        STORES.fetch_add(1, Ordering::Relaxed)
     ));
     let result = (|| -> Result<u64, String> {
         write(&temp).map_err(|e| format!("could not write the track: {e}"))?;
@@ -174,7 +178,8 @@ pub fn store<E: std::fmt::Display>(
 }
 
 /// Remove the temporary files that a process which died while storing a track
-/// left behind, and return how many. They are named `<id>.cbtrack.tmp-<pid>`
+/// left behind, and return how many. They are named
+/// `<id>.cbtrack.tmp-<pid>-<n>`, or without the number from an earlier version,
 /// and are never read as a track. A file named for this process, or for one
 /// that is still running, is left: it may be a store in progress.
 pub fn sweep_temporaries(dir: &Path) -> usize {
@@ -188,6 +193,7 @@ pub fn sweep_temporaries(dir: &Path) -> usize {
         let Some((id, pid)) = name.split_once(&marker) else {
             continue;
         };
+        let pid = pid.split_once('-').map_or(pid, |(pid, _)| pid);
         let Ok(pid) = pid.parse::<u32>() else {
             continue;
         };
@@ -816,7 +822,7 @@ mod tests {
         assert_eq!(state(dir.path(), ID).unwrap(), None);
     }
 
-    /// A crash while storing leaves `<id>.cbtrack.tmp-<pid>`, and nothing else
+    /// A crash while storing leaves a temporary file, and nothing else
     /// reads or removes it.
     #[test]
     fn a_temporary_file_left_by_a_dead_process_is_swept_and_nothing_else_is() {
@@ -835,14 +841,17 @@ mod tests {
             format!("{ID}{EXTENSION}"),
             temporary(ID, ours),
             temporary("not-an-id", dead),
+            format!("{}-0", temporary(ID, ours)),
             format!("{ID}{EXTENSION}.tmp-soon"),
         ];
         for name in kept.iter().skip(1) {
             std::fs::write(dir.path().join(name), b"half a track").unwrap();
         }
-        std::fs::write(dir.path().join(temporary(OTHER, dead)), b"half a track").unwrap();
+        for gone in [temporary(OTHER, dead), format!("{}-3", temporary(ID, dead))] {
+            std::fs::write(dir.path().join(gone), b"half a track").unwrap();
+        }
 
-        assert_eq!(sweep_temporaries(dir.path()), 1);
+        assert_eq!(sweep_temporaries(dir.path()), 2);
 
         let mut left: Vec<String> = std::fs::read_dir(dir.path())
             .unwrap()

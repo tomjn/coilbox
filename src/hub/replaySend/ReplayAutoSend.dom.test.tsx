@@ -67,6 +67,7 @@ import {
   memorySettingsStorage,
   writeStoredSetting,
 } from "@/lib/storedSetting";
+import { rememberTrackOnHub } from "../replayExtras/onHub";
 import { queueFinishedReplay, readReplayExtrasQueue } from "./queue";
 import ReplayAutoSend from "./ReplayAutoSend";
 import { ReplayAutoSendControl } from "./ReplayAutoSendControl";
@@ -162,6 +163,18 @@ describe("the background sender", () => {
     ]);
     rerender(<ReplayAutoSend />);
     expect(readReplayExtrasQueue().map((one) => one.gameId)).toEqual(["m"]);
+  });
+
+  it("queues nothing for a track the hub is known to hold (#5520)", () => {
+    turn(true);
+    analyses = new Map([["m", analysis("m", 1)]]);
+    const { rerender } = render(<ReplayAutoSend />);
+    rememberTrackOnHub("m", "https://hub.test");
+    tracks = new Map([
+      ["m", { gameId: "m", state: "current", lastWatchedMs: Date.now() }],
+    ]);
+    rerender(<ReplayAutoSend />);
+    expect(readReplayExtrasQueue()).toEqual([]);
   });
 
   it("stops everything while the setting is off", () => {
