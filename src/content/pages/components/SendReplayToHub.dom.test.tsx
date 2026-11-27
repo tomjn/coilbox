@@ -110,11 +110,13 @@ vi.mock("../../useReplayUnits", () => ({
   }),
 }));
 let sidesStatus: "loading" | "ready" | "error";
+let gameInstalled: boolean;
 vi.mock("../../useReplayFactions", () => ({
   useRecordedGameSides: () => ({
     sides:
       sidesStatus === "ready" ? [{ name: "Legion", startUnit: "legcom" }] : [],
     status: sidesStatus,
+    installed: gameInstalled,
     scanned: true,
     scanning: false,
   }),
@@ -199,6 +201,7 @@ beforeEach(() => {
   forgetArchiveUploads();
   unitSource = "installed";
   sidesStatus = "ready";
+  gameInstalled = true;
 });
 
 afterEach(() => cleanup());
@@ -282,6 +285,14 @@ describe("send to hub on a replay's page", () => {
     expect(
       await screen.findByText(/could not read the game's factions/),
     ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+  });
+
+  it("asks for the game when none is installed to name a pick's side", async () => {
+    gameInstalled = false;
+    render(<SendReplayToHub info={PICKED} replayPath={PATH} />);
+    fireEvent.click(screen.getByRole("button", { name: /Send to hub/ }));
+    expect(await screen.findByText(/Install the game it was/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
   });
 

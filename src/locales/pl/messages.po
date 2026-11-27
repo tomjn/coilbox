@@ -17032,7 +17032,7 @@ msgid "Coilbox could not read the file."
 msgstr "Coilbox nie mógł odczytać pliku."
 
 #: src/content/pages/components/SendReplayToHub.tsx
-msgid "Coilbox could not read the game's factions, which the hub checks."
+msgid "Coilbox could not read the game's factions, which the hub checks. Install the game it was played on, then try again."
 msgstr ""
 
 #: src/hub/manualSend/run.ts

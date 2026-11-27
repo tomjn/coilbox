@@ -38,6 +38,8 @@ export function useRecordedGameSides(
   return {
     sides: read.info?.sides ?? NO_SIDES,
     status: read.status,
+    /** Whether a version of the game is installed to read them from. */
+    installed: game !== null,
     scanned: !!scan.data,
     scanning: scan.loading,
   };

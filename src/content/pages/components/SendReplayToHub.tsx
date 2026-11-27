@@ -165,7 +165,11 @@ export function SendReplayToHub({
   const otherBuild = needsUnits && units.source?.kind === "differentBuild";
   const sidesReady =
     !picksUnit || (sides.scanned && sides.status !== "loading");
-  const sidesFailed = picksUnit && sides.status === "error";
+  // With no sides to read, the hub would refuse a picked faction sent as none.
+  const sidesFailed =
+    picksUnit &&
+    sides.scanned &&
+    (!sides.installed || sides.status === "error");
   const made =
     !failed &&
     !sidesFailed &&
@@ -254,7 +258,7 @@ export function SendReplayToHub({
   } else if (sidesFailed) {
     body = (
       <p>
-        {t`Coilbox could not read the game's factions, which the hub checks.`}
+        {t`Coilbox could not read the game's factions, which the hub checks. Install the game it was played on, then try again.`}
       </p>
     );
   } else if (!made) {
