@@ -145,7 +145,10 @@ function useKeptUnitLists(gameId: string | undefined, wanted: boolean) {
  * the engine's own list always answers for.
  */
 export function useReplayUnits(
-  info: DemoInfo,
+  info: Pick<
+    DemoInfo,
+    "gameType" | "remixed" | "sourceGametype" | "gameId" | "matchSetup"
+  >,
   wanted: boolean,
   ids: UnitIds = "stream",
 ) {
