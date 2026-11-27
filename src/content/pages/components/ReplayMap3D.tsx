@@ -10,9 +10,9 @@ import { useReplayMapLayers } from "../../useReplayMapLayers";
 import { EventLayerNotes } from "./ReplayEventLayers";
 import {
   HeatLegends,
-  MAP_VIEW_HEIGHT,
   LayerSwitches,
   LayersHelp,
+  MAP_VIEW_HEIGHT,
   MapHelp,
   ReadNotes,
   ReplayMapLayout,
