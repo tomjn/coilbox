@@ -34,11 +34,13 @@ function headerClasses(): string[] {
   );
 }
 
-/** The header row itself, which is the first className in it. */
-const row = () => headerClasses()[0];
+/** The row of the title and the actions, which is the second className in
+ *  the header. The first is the header, which stacks that row over the facts
+ *  so they can use the page's whole width. */
+const row = () => headerClasses()[1];
 
-/** The title, filename and warning column, which is the next one. */
-const titleColumn = () => headerClasses()[1];
+/** The title column, which is the next one. */
+const titleColumn = () => headerClasses()[2];
 
 /** The action row, the only thing in the header that refuses to shrink. */
 function actions(): string {
