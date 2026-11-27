@@ -3867,6 +3867,14 @@ msgstr "{label} nie został wysłany do huba"
 msgid "{label} was not uploaded"
 msgstr "{label} nie został wysłany"
 
+#: src/hub/upload/messages.ts
+msgid "{label} was refused"
+msgstr ""
+
+#: src/hub/upload/messages.ts
+msgid "{label} was removed from the hub"
+msgstr ""
+
 #: src/lego/pages/components/StatsSection.tsx
 #, fuzzy
 msgid "{label}, {referenceName}"
@@ -9424,6 +9432,10 @@ msgstr "Mirror ma już plik o tej nazwie, którego hub nie wymienił, więc hub 
 #, fuzzy
 msgid "A model holds piece names, the tree they hang in and where each one sits. Everything else the project had was never in the file."
 msgstr "Model zawiera nazwy elementów, drzewo, w którym wiszą, i położenie każdego z nich. Niczego więcej z projektu nigdy nie było w pliku."
+
+#: src/hub/upload/messages.ts
+msgid "A moderator took this match down from the hub, so it cannot be sent again."
+msgstr ""
 
 #: src/lego/moduleFileIo.ts
 #, fuzzy
@@ -48794,6 +48806,10 @@ msgstr "Zajęte"
 msgid "Taken {takenWhen}, {takenSize} by {takenSize} pixels."
 msgstr "Zrobiono {takenWhen}, {takenSize} na {takenSize} pikseli."
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Taken down from the hub"
+msgstr ""
+
 #: src/workshop/pages/components/UnitTextPanel.tsx
 #, fuzzy
 msgid "Taken from {redirect}, which this unit's definition names as its i18nfromunit. Rename {redirect} to change it."
@@ -50230,6 +50246,10 @@ msgstr "Plik używa {imagesUsed} tekstur, a jednostka Spring ma jedną, więc wz
 msgid "The file pickers open in the folders you used last time. Turning this off forgets them."
 msgstr ""
 
+#: src/hub/upload/messages.ts
+msgid "The file that reached the hub was not the one Coilbox described. You can send it again."
+msgstr ""
+
 #: src/lego/moduleFile.ts
 #, fuzzy
 msgid "The file was made by a newer version of coilbox."
@@ -50801,10 +50821,18 @@ msgstr "Hub nie mógł odpowiedzieć."
 msgid "The hub could not finish checking the analysis."
 msgstr ""
 
+#: src/hub/upload/messages.ts
+msgid "The hub could not finish checking the replay. You can send it again."
+msgstr ""
+
 #: src/hub/publish.ts
 #, fuzzy
 msgid "The hub could not publish it."
 msgstr "Hub nie mógł tego opublikować."
+
+#: src/hub/upload/messages.ts
+msgid "The hub could not read the replay file. It may be damaged or too large."
+msgstr ""
 
 #: src/hub/replayExtras/messages.ts
 msgid "The hub did not accept your sign-in. Sign in again and try once more."
@@ -50920,6 +50948,10 @@ msgstr "Hub może się budzić po okresie bezczynności, co trwa kilka sekund. S
 #, fuzzy
 msgid "The hub named no download source for {label}."
 msgstr "Hub nie podał źródła pobierania dla {label}."
+
+#: src/hub/upload/messages.ts
+msgid "The hub no longer has your upload. It may have run out of time, and somebody else may be sending this match. Try again later."
+msgstr ""
 
 #: src/content/pages/components/SendReplayToHub.tsx
 msgid "The hub notes that you sent it, as {name}."
@@ -51505,6 +51537,10 @@ msgstr "Mnożnik otrzymywanych obrażeń, gdy skrypt jednostki ustawił ją w st
 msgid "The name others see"
 msgstr "Nazwa widoczna dla innych"
 
+#: src/hub/upload/messages.ts
+msgid "The name this match was sent under did not play or watch it."
+msgstr ""
+
 #: src/multiplayer/admin/BotAccountsSection.tsx
 #, fuzzy
 msgid "The new account's password is copied, not set"
@@ -51831,6 +51867,14 @@ msgstr "Przeładowanie nie powiodło się"
 msgid "The replay does not say which team {name} was on."
 msgstr ""
 
+#: src/hub/upload/messages.ts
+msgid "The replay file belongs to a different match."
+msgstr ""
+
+#: src/hub/upload/messages.ts
+msgid "The replay has no end of match results. The hub only takes finished matches."
+msgstr ""
+
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
 msgid "The replay itself records what was produced and lost, not what a player owned at any moment."
@@ -51848,6 +51892,10 @@ msgstr ""
 
 #: src/hub/replaySend/runner.ts
 msgid "The replay on {mapName}"
+msgstr ""
+
+#: src/hub/upload/messages.ts
+msgid "The replay stops before the match ended. The hub only takes finished matches."
 msgstr ""
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
@@ -52642,6 +52690,10 @@ msgstr "Nie udało się odczytać jednostek gry tej powtórki, więc nic nie mó
 
 #: src/content/pages/components/ReplayAwards.tsx
 msgid "The units of this replay's game could not be read, so the awards that need a cost are left out."
+msgstr ""
+
+#: src/hub/upload/messages.ts
+msgid "The upload did not finish in time. Send it again."
 msgstr ""
 
 #: src/downloads/pages/components/EngineUpload.tsx
@@ -57935,6 +57987,10 @@ msgstr "Czym są przekaźniki serwera?"
 #, fuzzy
 msgid "What builds it"
 msgstr "Co to buduje"
+
+#: src/hub/upload/messages.ts
+msgid "What Coilbox sent about the match does not agree with the replay file."
+msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy

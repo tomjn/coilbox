@@ -14,7 +14,12 @@ import { startReplayUpload } from "@/hub/archiveUploads";
 import { useHubUrl } from "@/hub/config";
 import { beginReplaySend, endManualSend } from "@/hub/manualSend/grant";
 import { describeSummaryProblem } from "@/hub/replaySend/messages";
-import { replayOnHub, useReplaysOnHub } from "@/hub/replaysOnHub";
+import {
+  replayOnHub,
+  replayRemoved,
+  useReplaysOnHub,
+  useReplaysRemoved,
+} from "@/hub/replaysOnHub";
 import { describeUploadEnd } from "@/hub/upload/messages";
 import {
   rememberUpload,
@@ -45,7 +50,8 @@ const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
  *
  * The transfer belongs to the app, as an archive upload's does. The button
  * says how it is going: sending, waiting for the hub's check, on the hub with a
- * link, or not sent with the hub's reason in the panel.
+ * link, or not sent with the hub's reason in the panel. A replay a moderator
+ * took down cannot be sent again.
  */
 export function SendReplayToHub({
   info,
@@ -61,6 +67,7 @@ export function SendReplayToHub({
   const [lastLogin] = useLastLogin();
   const uploads = useArchiveUploads();
   const held = useReplaysOnHub();
+  const removed = useReplaysRemoved();
   const [open, setOpen] = useState(false);
   const [starting, setStarting] = useState(false);
   const [dismissed, setDismissed] = useState<string | null>(null);
@@ -78,10 +85,13 @@ export function SendReplayToHub({
       : null;
   const listedUrl =
     ending?.kind === "listed" ? (upload?.pageUrl ?? null) : null;
+  const takenDown =
+    (ending?.kind === "stopped" && ending.code === "replay_removed") ||
+    (info.gameId !== undefined && replayRemoved(removed, hubUrl, info.gameId));
   const onHub = ending?.kind === "listed" || known !== undefined;
 
   // The reads the summary is made of, asked for only once the panel is open.
-  const wanted = open && !onHub && !running;
+  const wanted = open && !onHub && !takenDown && !running;
   const stats = useMatchStats(wanted ? replayPath : null);
   const builds = useReplayBuildOrders(replayPath);
   const { load } = builds;
@@ -119,6 +129,15 @@ export function SendReplayToHub({
             ? t`The hub is checking it…`
             : t`Sending to hub…`,
         )}
+      </Button>
+    );
+  }
+
+  if (takenDown) {
+    return (
+      <Button size="sm" variant="outline" className="gap-1.5" disabled>
+        <CoilboxGlyph size={16} />
+        {t`Taken down from the hub`}
       </Button>
     );
   }

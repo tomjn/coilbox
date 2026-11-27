@@ -34,8 +34,11 @@ import {
 } from "../replayExtras/send";
 import {
   readReplaysOnHub,
+  readReplaysRemoved,
   rememberReplayOnHub,
+  rememberReplayRemoved,
   replayOnHub,
+  replayRemoved,
 } from "../replaysOnHub";
 import { describeUploadEnd } from "../upload/messages";
 import {
@@ -145,6 +148,9 @@ function worthAnotherTry(
     "unauthorised",
     "unreachable",
     "uploading",
+    // The upload did not get there in time, so a new one may.
+    "lapsed",
+    "not_sent",
     "no_replay_mirror",
     "not_configured",
     "unavailable",
@@ -187,6 +193,9 @@ async function send(item: QueuedReplay, context: SendContext): Promise<Step> {
       info.durationSec <= 0 ||
       !peopleOnBothSides(info)
     ) {
+      return { kind: "done" };
+    }
+    if (replayRemoved(readReplaysRemoved(), context.hubUrl, gameId)) {
       return { kind: "done" };
     }
     if (context.account !== "in") return { kind: "wait" };
@@ -242,6 +251,9 @@ async function send(item: QueuedReplay, context: SendContext): Promise<Step> {
           url: state.pageUrl,
         });
         return { kind: "done" };
+      }
+      if (outcome.code === "replay_removed") {
+        rememberReplayRemoved(gameId, state.hubUrl);
       }
       const again = worthAnotherTry(outcome);
       // A send from the replay's page has already said why it was refused.

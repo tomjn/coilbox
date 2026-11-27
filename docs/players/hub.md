@@ -195,7 +195,11 @@ Once coilbox has seen a replay on the hub, the replay's page says On the hub fro
 
 If the hub refuses a replay, the button says Not sent. Select it to see why. Where trying again could help, for example when no mirror could take the file or the connection dropped, there is a Send again button.
 
-The hub can also decide not to keep a replay after its check. Coilbox then says the hub did not keep it. The hub does not yet say why.
+The hub also checks each replay after it arrives. If the check refuses it, the box says why, for example that the replay stops before the match ended. There is a Send again button when the file did not arrive as it was sent, or the hub could not finish its check. If the upload ran out of time, the box says that instead.
+
+If a moderator has taken the replay down, the button says Taken down from the hub and cannot be selected. Coilbox does not send that replay to that hub again.
+
+A hub that cannot give a reason only lets coilbox say that it did not keep the replay.
 
 Sometimes coilbox cannot read what the hub needs from the replay, and the box says so in place of Send. The most common reasons are:
 

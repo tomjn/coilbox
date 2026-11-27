@@ -3867,6 +3867,14 @@ msgstr "{label} 未发送到中心"
 msgid "{label} was not uploaded"
 msgstr "{label} 未上传"
 
+#: src/hub/upload/messages.ts
+msgid "{label} was refused"
+msgstr ""
+
+#: src/hub/upload/messages.ts
+msgid "{label} was removed from the hub"
+msgstr ""
+
 #: src/lego/pages/components/StatsSection.tsx
 #, fuzzy
 msgid "{label}, {referenceName}"
@@ -9424,6 +9432,10 @@ msgstr "某个镜像已有同名文件，而中心尚未列出它，因此中心
 #, fuzzy
 msgid "A model holds piece names, the tree they hang in and where each one sits. Everything else the project had was never in the file."
 msgstr "模型保存部件名称、部件的层级树以及每个部件的位置。项目中的其他内容从来不在此文件中。"
+
+#: src/hub/upload/messages.ts
+msgid "A moderator took this match down from the hub, so it cannot be sent again."
+msgstr ""
 
 #: src/lego/moduleFileIo.ts
 #, fuzzy
@@ -48794,6 +48806,10 @@ msgstr "已占用"
 msgid "Taken {takenWhen}, {takenSize} by {takenSize} pixels."
 msgstr "拍摄于 {takenWhen}，{takenSize} × {takenSize} 像素。"
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Taken down from the hub"
+msgstr ""
+
 #: src/workshop/pages/components/UnitTextPanel.tsx
 #, fuzzy
 msgid "Taken from {redirect}, which this unit's definition names as its i18nfromunit. Rename {redirect} to change it."
@@ -50230,6 +50246,10 @@ msgstr "该文件使用 {imagesUsed} 张纹理着色，而 Spring 单位只有�
 msgid "The file pickers open in the folders you used last time. Turning this off forgets them."
 msgstr ""
 
+#: src/hub/upload/messages.ts
+msgid "The file that reached the hub was not the one Coilbox described. You can send it again."
+msgstr ""
+
 #: src/lego/moduleFile.ts
 #, fuzzy
 msgid "The file was made by a newer version of coilbox."
@@ -50801,10 +50821,18 @@ msgstr "中心无法回答。"
 msgid "The hub could not finish checking the analysis."
 msgstr ""
 
+#: src/hub/upload/messages.ts
+msgid "The hub could not finish checking the replay. You can send it again."
+msgstr ""
+
 #: src/hub/publish.ts
 #, fuzzy
 msgid "The hub could not publish it."
 msgstr "中心无法发布它。"
+
+#: src/hub/upload/messages.ts
+msgid "The hub could not read the replay file. It may be damaged or too large."
+msgstr ""
 
 #: src/hub/replayExtras/messages.ts
 msgid "The hub did not accept your sign-in. Sign in again and try once more."
@@ -50920,6 +50948,10 @@ msgstr "中心可能在一段空闲后正在唤醒，这需要几秒钟。请稍
 #, fuzzy
 msgid "The hub named no download source for {label}."
 msgstr "中心没有为 {label} 指定下载来源。"
+
+#: src/hub/upload/messages.ts
+msgid "The hub no longer has your upload. It may have run out of time, and somebody else may be sending this match. Try again later."
+msgstr ""
 
 #: src/content/pages/components/SendReplayToHub.tsx
 msgid "The hub notes that you sent it, as {name}."
@@ -51505,6 +51537,10 @@ msgstr "单位脚本将其置于装甲状态时受到伤害的倍率。0.5 表�
 msgid "The name others see"
 msgstr "其他人看到的名称"
 
+#: src/hub/upload/messages.ts
+msgid "The name this match was sent under did not play or watch it."
+msgstr ""
+
 #: src/multiplayer/admin/BotAccountsSection.tsx
 #, fuzzy
 msgid "The new account's password is copied, not set"
@@ -51831,6 +51867,14 @@ msgstr "重新加载失败"
 msgid "The replay does not say which team {name} was on."
 msgstr ""
 
+#: src/hub/upload/messages.ts
+msgid "The replay file belongs to a different match."
+msgstr ""
+
+#: src/hub/upload/messages.ts
+msgid "The replay has no end of match results. The hub only takes finished matches."
+msgstr ""
+
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
 msgid "The replay itself records what was produced and lost, not what a player owned at any moment."
@@ -51848,6 +51892,10 @@ msgstr ""
 
 #: src/hub/replaySend/runner.ts
 msgid "The replay on {mapName}"
+msgstr ""
+
+#: src/hub/upload/messages.ts
+msgid "The replay stops before the match ended. The hub only takes finished matches."
 msgstr ""
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
@@ -52642,6 +52690,10 @@ msgstr "无法读取此回放所用游戏的单位，所以无从得知哪些已
 
 #: src/content/pages/components/ReplayAwards.tsx
 msgid "The units of this replay's game could not be read, so the awards that need a cost are left out."
+msgstr ""
+
+#: src/hub/upload/messages.ts
+msgid "The upload did not finish in time. Send it again."
 msgstr ""
 
 #: src/downloads/pages/components/EngineUpload.tsx
@@ -57935,6 +57987,10 @@ msgstr "什么是服务器中继？"
 #, fuzzy
 msgid "What builds it"
 msgstr "谁能建造它"
+
+#: src/hub/upload/messages.ts
+msgid "What Coilbox sent about the match does not agree with the replay file."
+msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy

@@ -56,3 +56,53 @@ export function replayOnHub(
   const record = held[gameId];
   return record && base(record.hubUrl) === base(hubUrl) ? record : undefined;
 }
+
+/**
+ * Replays a moderator took down from the hub, by game id. Coilbox does not send
+ * one of these again.
+ */
+export const REPLAYS_REMOVED_KEY = "hub.replaysRemoved";
+
+export type ReplaysRemoved = Record<string, { hubUrl: string }>;
+
+const NONE_REMOVED: ReplaysRemoved = {};
+
+/** Every replay this machine has heard was taken down, outside React. */
+export function readReplaysRemoved(): ReplaysRemoved {
+  return readStoredSettingIfInstalled<ReplaysRemoved>(
+    REPLAYS_REMOVED_KEY,
+    NONE_REMOVED,
+  );
+}
+
+/** Note that this hub has taken this replay down. */
+export function rememberReplayRemoved(gameId: string, hubUrl: string) {
+  writeStoredSetting(REPLAYS_REMOVED_KEY, {
+    ...readReplaysRemoved(),
+    [gameId]: { hubUrl },
+  });
+  const held = readReplaysOnHub();
+  if (replayOnHub(held, hubUrl, gameId)) {
+    const { [gameId]: _, ...rest } = held;
+    writeStoredSetting(REPLAYS_ON_HUB_KEY, rest);
+  }
+}
+
+/** Every replay this machine has heard was taken down. */
+export function useReplaysRemoved(): ReplaysRemoved {
+  const [removed] = useSetting<ReplaysRemoved>(
+    REPLAYS_REMOVED_KEY,
+    NONE_REMOVED,
+  );
+  return removed;
+}
+
+/** Whether this hub has taken this replay down. */
+export function replayRemoved(
+  removed: ReplaysRemoved,
+  hubUrl: string,
+  gameId: string,
+): boolean {
+  const record = removed[gameId];
+  return record !== undefined && base(record.hubUrl) === base(hubUrl);
+}
