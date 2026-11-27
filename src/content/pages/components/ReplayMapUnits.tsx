@@ -637,10 +637,6 @@ function UnitsView({
             />
           </MapHelp>
           <p
-            ref={countsRef}
-            className="min-h-4 text-xs text-muted-foreground tabular-nums"
-          />
-          <p
             data-testid="recorded-unit-name"
             className="min-h-4 text-xs font-medium"
           >
@@ -705,6 +701,10 @@ function UnitsView({
               </p>
             )
           )}
+          <p
+            ref={countsRef}
+            className="min-h-4 text-xs text-muted-foreground tabular-nums"
+          />
           <TeamKey header={header} styles={styles} />
         </>
       }

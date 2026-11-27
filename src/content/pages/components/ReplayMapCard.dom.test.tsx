@@ -585,6 +585,21 @@ describe("a current track", () => {
     expect(headerReads).toEqual([ID]);
   });
 
+  it("puts the count line under the toggles, so its wrapping does not move them", async () => {
+    await show();
+    const counts = screen.getByText("1 unit, 0 projectiles, 0 wrecks");
+    for (const name of ["Icons", "Footprints", "Explosions", "Start boxes"]) {
+      const toggle = screen.getByRole(
+        name === "Icons" ? "radio" : name === "Footprints" ? "radio" : "button",
+        { name },
+      );
+      expect(
+        toggle.compareDocumentPosition(counts) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+  });
+
   it("draws a mark for each live unit as the time moves, and says how many", async () => {
     await show();
     // Frame 0: unit 0 alone.
