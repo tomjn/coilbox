@@ -60,6 +60,8 @@ export interface LobbyServer {
   builtin?: boolean;
   /** Our support for this server is alpha, which the UI badges wherever it lists it. */
   alpha?: boolean;
+  /** Our support for this server is beta, badged like `alpha` but as a softer caution. */
+  beta?: boolean;
   /**
    * A caution shown under the entry in Settings, for something a player would
    * otherwise only discover by hitting it. Built-in entries only.
@@ -217,7 +219,7 @@ export const BUILTIN_SERVERS: LobbyServer[] = [
     tls: false,
     allowSelfSigned: false,
     protocol: "zerok",
-    alpha: true,
+    beta: true,
   },
   // Last on purpose: it is the least likely destination for a Recoil or BAR player,
   // and the one nobody can register a new account on.

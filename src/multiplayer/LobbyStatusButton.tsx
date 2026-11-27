@@ -729,6 +729,11 @@ function AccountList({
                     <Trans>Alpha</Trans>
                   </span>
                 )}
+                {server?.beta && (
+                  <span className="ml-1.5 rounded bg-amber-500/15 px-1 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-400">
+                    <Trans>Beta</Trans>
+                  </span>
+                )}
               </span>
               {opensBrowser && (
                 <span className="text-xs text-muted-foreground">

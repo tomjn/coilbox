@@ -1825,6 +1825,10 @@ msgstr "{base} ({copyNumber})"
 msgid "{base} (alpha)"
 msgstr "{base}（アルファ版）"
 
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "{base} (beta)"
+msgstr ""
+
 #: src/multiplayer/UserBadges.tsx
 #, fuzzy
 msgid "{base}. {detail}"
@@ -13917,6 +13921,11 @@ msgstr "最速勝利のラン"
 #, fuzzy
 msgid "Best-effort by name — a download may not be an exact match. See <0>Content folders settings</0> for the destination folder."
 msgstr "名前によるベストエフォートのため、ダウンロードが完全に一致しない場合があります。保存先フォルダーは<0>コンテンツフォルダーの設定</0>を確認してください。"
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+#: src/multiplayer/LobbyStatusButton.tsx
+msgid "Beta"
+msgstr ""
 
 #: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy

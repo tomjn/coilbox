@@ -1826,6 +1826,10 @@ msgstr "{base} ({copyNumber})"
 msgid "{base} (alpha)"
 msgstr "{base} (alfa)"
 
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "{base} (beta)"
+msgstr ""
+
 #: src/multiplayer/UserBadges.tsx
 #, fuzzy
 msgid "{base}. {detail}"
@@ -13918,6 +13922,11 @@ msgstr "Langste reeks overwinningen"
 #, fuzzy
 msgid "Best-effort by name — a download may not be an exact match. See <0>Content folders settings</0> for the destination folder."
 msgstr "Zo goed mogelijk op naam — een download komt misschien niet exact overeen. Zie <0>Instellingen voor inhoudsmappen</0> voor de doelmap."
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+#: src/multiplayer/LobbyStatusButton.tsx
+msgid "Beta"
+msgstr ""
 
 #: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy

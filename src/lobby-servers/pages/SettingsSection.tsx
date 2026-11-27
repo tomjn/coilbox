@@ -1244,6 +1244,16 @@ function ServerListRow({
             <Trans>Alpha</Trans>
           </span>
         )}
+        {s.beta && (
+          <span
+            className={cn(
+              tag,
+              "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+            )}
+          >
+            <Trans>Beta</Trans>
+          </span>
+        )}
         {s.official ? (
           <span
             className={cn(
