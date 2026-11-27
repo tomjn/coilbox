@@ -32,6 +32,9 @@ vi.mock("three", () => ({
     domElement = document.createElement("canvas");
     number = count++;
     localClippingEnabled = false;
+    clippingPlanes: unknown[] = [];
+    scissorTest = false;
+    stateResets = 0;
     constructor() {
       made();
     }
@@ -41,6 +44,12 @@ vi.mock("three", () => ({
     setPixelRatio() {}
     setSize() {}
     setClearColor() {}
+    setScissorTest(on: boolean) {
+      this.scissorTest = on;
+    }
+    resetState() {
+      this.stateResets++;
+    }
     dispose() {}
     forceContextLoss() {
       lost();
@@ -188,6 +197,40 @@ describe("useCanvas3D", () => {
     view.unmount();
     releaseParkedRenderers();
     expect(lost).toHaveBeenCalledTimes(1);
+  });
+
+  it("hands the next view a renderer with the last view's settings undone", () => {
+    let handed: THREE.WebGLRenderer | undefined;
+    function Dirty() {
+      const hostRef = useRef<HTMLDivElement | null>(null);
+      useCanvas3D(
+        hostRef,
+        ({ renderer }) => {
+          handed = renderer;
+          renderer.localClippingEnabled = true;
+          renderer.clippingPlanes = [{} as THREE.Plane];
+          renderer.setScissorTest(true);
+          return { render: () => {}, resize: () => {}, dispose: () => {} };
+        },
+        [],
+      );
+      return <div ref={hostRef} />;
+    }
+    render(<Dirty />).unmount();
+    const dirty = handed as unknown as { stateResets: number };
+    const resetsBefore = dirty.stateResets;
+    render(<Harness />);
+    const next = handed as unknown as {
+      localClippingEnabled: boolean;
+      clippingPlanes: unknown[];
+      scissorTest: boolean;
+      stateResets: number;
+    };
+    expect(made).toHaveBeenCalledTimes(1);
+    expect(next.localClippingEnabled).toBe(false);
+    expect(next.clippingPlanes).toHaveLength(0);
+    expect(next.scissorTest).toBe(false);
+    expect(next.stateResets).toBe(resetsBefore + 1);
   });
 
   it("makes a renderer for each view that is on screen at once", () => {
