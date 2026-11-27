@@ -11369,6 +11369,10 @@ msgstr "Between two keys a piece moves at a steady speed, as the game moves it."
 msgid "Between two minutes"
 msgstr "Between two minutes"
 
+#: src/downloads/downloadGame.ts
+msgid "Beyond All Reason does not list \"{gameName}\"."
+msgstr "Beyond All Reason does not list \"{gameName}\"."
+
 #: src/conquest/galaxy3d/GalaxyView.tsx
 msgid "binary pair — {primary} + {companion}"
 msgstr "binary pair — {primary} + {companion}"

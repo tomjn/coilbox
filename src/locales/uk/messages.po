@@ -13937,6 +13937,10 @@ msgstr "Між двома ключовими кадрами елемент ру�
 msgid "Between two minutes"
 msgstr "Між двома хвилинами"
 
+#: src/downloads/downloadGame.ts
+msgid "Beyond All Reason does not list \"{gameName}\"."
+msgstr ""
+
 #: src/conquest/galaxy3d/GalaxyView.tsx
 #, fuzzy
 msgid "binary pair — {primary} + {companion}"

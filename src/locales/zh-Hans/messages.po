@@ -13937,6 +13937,10 @@ msgstr "两个关键帧之间，部件以匀速移动，与游戏中的移动方
 msgid "Between two minutes"
 msgstr "两个时间点之间"
 
+#: src/downloads/downloadGame.ts
+msgid "Beyond All Reason does not list \"{gameName}\"."
+msgstr ""
+
 #: src/conquest/galaxy3d/GalaxyView.tsx
 #, fuzzy
 msgid "binary pair — {primary} + {companion}"

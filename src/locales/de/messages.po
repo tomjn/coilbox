@@ -13937,6 +13937,10 @@ msgstr "Zwischen zwei Keyframes bewegt sich ein Teil mit gleichmäßiger Geschwi
 msgid "Between two minutes"
 msgstr "Zwischen zwei Minuten"
 
+#: src/downloads/downloadGame.ts
+msgid "Beyond All Reason does not list \"{gameName}\"."
+msgstr ""
+
 #: src/conquest/galaxy3d/GalaxyView.tsx
 #, fuzzy
 msgid "binary pair — {primary} + {companion}"

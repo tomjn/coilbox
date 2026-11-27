@@ -13938,6 +13938,10 @@ msgstr "Tra due keyframe un pezzo si muove a velocità costante, come lo muove i
 msgid "Between two minutes"
 msgstr "Tra due minuti"
 
+#: src/downloads/downloadGame.ts
+msgid "Beyond All Reason does not list \"{gameName}\"."
+msgstr ""
+
 #: src/conquest/galaxy3d/GalaxyView.tsx
 #, fuzzy
 msgid "binary pair — {primary} + {companion}"
