@@ -107,7 +107,7 @@ impl Rig {
             &env,
             state_for(&self.facts, &self.hub.base),
             &self.path,
-            &self.facts,
+            &Sending::Archive(&self.facts),
         )
         .await;
         (state, reports.into_inner().unwrap())
@@ -125,6 +125,8 @@ fn state_for(facts: &ArchiveFacts, hub_url: &str) -> UploadState {
         sent: 0,
         size: facts.size,
         upload_id: None,
+        page_url: None,
+        held_already: false,
         outcome: None,
     }
 }
@@ -557,7 +559,7 @@ async fn a_sign_in_that_cannot_be_used_stops_before_the_hub_is_asked() {
         &env,
         state_for(&rig.facts, &rig.hub.base),
         &rig.path,
-        &rig.facts,
+        &Sending::Archive(&rig.facts),
     )
     .await;
 
@@ -791,4 +793,176 @@ fn cancel_raises_the_flag_of_the_upload_it_is_given_and_no_other() {
 
     assert!(flag.load(Ordering::Relaxed));
     assert!(!untouched.load(Ordering::Relaxed));
+}
+
+// ------------------------------------------------------------------- replays
+
+const GAME_ID: &str = "9f2c4b1ad07e5386c1f4a92b6e8d0375";
+
+fn replay_request(size: u64) -> ReplayRequest {
+    ReplayRequest {
+        game_id: GAME_ID.into(),
+        sha256: "c".repeat(64),
+        size,
+        name: "Alice".into(),
+        summary: json!({ "v": 1, "players": [{ "name": "Alice" }] }),
+    }
+}
+
+fn listed(url: &str) -> Option<(u16, Value)> {
+    Some((
+        200,
+        json!({ "replay": { "game_id": GAME_ID, "state": "listed", "url": url } }),
+    ))
+}
+
+fn checking() -> Option<(u16, Value)> {
+    Some((
+        200,
+        json!({ "replay": { "game_id": GAME_ID, "state": "checking", "url": null } }),
+    ))
+}
+
+impl Rig {
+    async fn run_replay(&self) -> (UploadState, Vec<UploadState>) {
+        let reports = Mutex::new(Vec::new());
+        let report = |state: &UploadState| reports.lock().unwrap().push(state.clone());
+        let token = || -> TokenFuture { Box::pin(async { Ok("hub-bearer".to_owned()) }) };
+        let env = Env {
+            hub_url: &self.hub.base,
+            token: &token,
+            pacing: self.pacing,
+            cancel: &self.cancel,
+            report: &report,
+        };
+        let request = replay_request(ARCHIVE.len() as u64);
+        let mut state = state_for(&self.facts, &self.hub.base);
+        state.kind = ArchiveKind::Replay;
+        let state = run(&env, state, &self.path, &Sending::Replay(&request)).await;
+        (state, reports.into_inner().unwrap())
+    }
+}
+
+#[tokio::test]
+async fn a_replay_goes_to_the_replay_route_then_waits_for_the_check_to_list_it() {
+    let rig = Rig::new("replay-sent", 1 << 20).with_hub(|hub| {
+        hub.replaying(vec![
+            None,
+            checking(),
+            checking(),
+            listed("https://hub.example/replays/x"),
+        ])
+    });
+
+    let (state, reports) = rig.run_replay().await;
+
+    assert_eq!(state.outcome, Some(Outcome::Listed));
+    assert_eq!(rig.mirror.held(), ARCHIVE);
+    assert_eq!(
+        state.page_url.as_deref(),
+        Some("https://hub.example/replays/x")
+    );
+    assert!(!state.held_already);
+    assert!(rig.hub.reservations().is_empty());
+    assert_eq!(rig.hub.polls(), 0, "a replay has no upload status route");
+    let requests = rig.hub.replay_requests();
+    assert_eq!(requests.len(), 4);
+    assert_eq!(requests[0].0.as_deref(), Some("Bearer hub-bearer"));
+    let sent: Value = serde_json::from_str(&requests[0].1).unwrap();
+    assert_eq!(sent["game_id"], GAME_ID);
+    assert_eq!(sent["size"], ARCHIVE.len());
+    assert_eq!(sent["name"], "Alice");
+    assert_eq!(sent["summary"]["v"], 1);
+    assert!(reports.iter().any(|r| r.phase == Phase::Waiting));
+}
+
+#[tokio::test]
+async fn a_replay_the_hub_lists_already_uploads_nothing_and_links_its_page() {
+    let rig = Rig::new("replay-held", 1 << 20)
+        .with_hub(|hub| hub.replaying(vec![listed("https://hub.example/replays/x")]));
+
+    let (state, _) = rig.run_replay().await;
+
+    assert_eq!(state.outcome, Some(Outcome::Listed));
+    assert!(state.held_already);
+    assert_eq!(
+        state.page_url.as_deref(),
+        Some("https://hub.example/replays/x")
+    );
+    assert!(rig.mirror.posts().is_empty());
+    assert_eq!(rig.hub.replay_requests().len(), 1);
+}
+
+#[tokio::test]
+async fn a_replay_the_hub_is_still_checking_is_waited_for_without_uploading() {
+    let rig = Rig::new("replay-checking", 1 << 20)
+        .with_hub(|hub| hub.replaying(vec![checking(), listed("https://hub.example/replays/x")]));
+
+    let (state, _) = rig.run_replay().await;
+
+    assert_eq!(state.outcome, Some(Outcome::Listed));
+    assert!(state.held_already);
+    assert!(rig.mirror.posts().is_empty());
+}
+
+#[tokio::test]
+async fn a_replay_the_hub_reserves_afresh_after_the_upload_was_not_kept() {
+    let fresh = Some((
+        201,
+        json!({ "upload": {
+            "id": "another", "upload_url": "x", "limits_url": "y", "token": "t",
+        }}),
+    ));
+    let rig = Rig::new("replay-refused", 1 << 20)
+        .with_hub(|hub| hub.replaying(vec![None, checking(), fresh]));
+
+    let (state, _) = rig.run_replay().await;
+
+    assert_eq!(stopped(&state), (Source::Hub, "not_kept".to_owned()));
+}
+
+#[tokio::test]
+async fn a_replay_refused_at_the_start_carries_the_hub_s_reason() {
+    let rig = Rig::new("replay-not-in", 1 << 20).with_hub(|hub| {
+        hub.replaying(vec![Some((
+            422,
+            json!({ "error": "Nobody called \"Bob\" played or watched this match.", "reason": "not_in_replay" }),
+        ))])
+    });
+
+    let (state, _) = rig.run_replay().await;
+
+    assert_eq!(stopped(&state), (Source::Hub, "not_in_replay".to_owned()));
+    let Some(Outcome::Stopped { said, status, .. }) = &state.outcome else {
+        unreachable!()
+    };
+    assert_eq!(said, "Nobody called \"Bob\" played or watched this match.");
+    assert_eq!(*status, Some(422));
+    assert!(rig.mirror.posts().is_empty());
+}
+
+#[tokio::test]
+async fn a_replay_someone_else_is_sending_stops_with_uploading() {
+    let rig = Rig::new("replay-busy", 1 << 20).with_hub(|hub| {
+        hub.replaying(vec![Some((
+            409,
+            json!({ "error": "Someone else is sending this match just now. Try again later.", "reason": "uploading", "reserved_until": 3 }),
+        ))])
+    });
+
+    let (state, _) = rig.run_replay().await;
+
+    assert_eq!(stopped(&state), (Source::Hub, "uploading".to_owned()));
+}
+
+#[test]
+fn a_replay_file_is_hashed_whole() {
+    let path = archive_dir("replay-hash").join("x.sdfz");
+    std::fs::write(&path, b"abc").unwrap();
+    let (sha, size) = hash_file(&path).unwrap();
+    assert_eq!(
+        sha,
+        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    );
+    assert_eq!(size, 3);
 }

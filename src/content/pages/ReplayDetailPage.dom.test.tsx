@@ -123,6 +123,9 @@ vi.mock("../../play/PlayProvider", () => ({
   usePlay: () => ({ running: false, launchReplay: async () => ({}) }),
 }));
 vi.mock("./components/RefightPanel", () => ({ RefightPanel: () => null }));
+vi.mock("./components/SendReplayToHub", () => ({
+  SendReplayToHub: () => null,
+}));
 vi.mock("./components/RemixPanel", () => ({ RemixPanel: () => null }));
 // What the awards say is `ReplayAwards.dom.test.tsx`'s. Here, where they sit.
 vi.mock("./components/ReplayAwards", () => ({

@@ -3847,6 +3847,10 @@ msgstr "{label} του {piece}, καρέ {frame}, {elmos} elmos"
 msgid "{label} volume"
 msgstr "Ένταση {label}"
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "{label} was not sent"
+msgstr ""
+
 #: src/hub/manualSend/run.ts
 #, fuzzy
 msgid "{label} was not sent to the hub"
@@ -12184,6 +12188,10 @@ msgstr "Ένα άλλο παράθυρο ερώτησης είναι ακόμη 
 msgid "Another unit already has this name"
 msgstr "Μια άλλη μονάδα έχει ήδη αυτό το όνομα"
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Another version of the game is installed, so Coilbox cannot say which unit each build order was for. Install the version it was played on, then try again."
+msgstr ""
+
 #: src/scenario/pages/components/useMapKeyboard.ts
 #, fuzzy
 msgid "Answered the question at {spot}."
@@ -15195,6 +15203,7 @@ msgstr "Δεν μπορεί να βλάψει τη δική του μονάδα"
 #: src/content/pages/components/ReplaySetsManager.tsx
 #: src/content/pages/components/ReplayTracksStorage.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
+#: src/content/pages/components/SendReplayToHub.tsx
 #: src/content/pages/FoldersSection.tsx
 #: src/deeplink/ConfirmDialog.tsx
 #: src/direct/HostRoomForm.tsx
@@ -16639,6 +16648,7 @@ msgstr "Κόστος αορατότητας εν κινήσει"
 #: src/content/pages/components/ReclaimCachesButton.tsx
 #: src/content/pages/components/ReclaimSpaceButton.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
+#: src/content/pages/components/SendReplayToHub.tsx
 #: src/deeplink/ConfirmDialog.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 #: src/hub/upload/UploadToHubButton.tsx
@@ -16882,6 +16892,10 @@ msgstr "Το Coilbox δεν μπορεί να διαβάσει το skybox αυ�
 msgid "Coilbox cannot read this unit's build pic. The game ships one, in a format the decoder does not handle."
 msgstr "Το Coilbox δεν μπορεί να διαβάσει την εικόνα κατασκευής αυτής της μονάδας. Το παιχνίδι περιέχει μία, σε μορφή που ο αποκωδικοποιητής δεν υποστηρίζει."
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Coilbox cannot say what every unit built in this match is or costs. Install the game it was played on, then try again."
+msgstr ""
+
 #. placeholder {0}: unknown.join(", ")
 #: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
@@ -17001,6 +17015,14 @@ msgstr "το coilbox δεν μπόρεσε να διαβάσει"
 #, fuzzy
 msgid "Coilbox could not read {game}: {said}"
 msgstr "Το Coilbox δεν μπόρεσε να διαβάσει το {game}: {said}"
+
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Coilbox could not read every build order in this replay, and the hub checks all of them."
+msgstr ""
+
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Coilbox could not read the build orders in this replay."
+msgstr ""
 
 #: src/hub/assets/pictureSweep.ts
 #, fuzzy
@@ -28397,6 +28419,10 @@ msgstr "Δεν φτιάχτηκε εδώ: Αυτό είναι .3do, η παλα�
 msgid "It was not made here: this is one of the formats the engine reads through Assimp, and coilbox has never written one, so it cannot be a unit coming home as parts. Its nodes have been read as pieces as they stand."
 msgstr "Δεν φτιάχτηκε εδώ: αυτή είναι μία από τις μορφές που διαβάζει η μηχανή μέσω Assimp, και το coilbox δεν έχει γράψει ποτέ τέτοια, οπότε δεν μπορεί να είναι μονάδα που επιστρέφει ως εξαρτήματα. Οι κόμβοι της διαβάστηκαν ως τμήματα όπως είναι."
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "It will be public. Anyone can download it and see the players, the build orders and the totals."
+msgstr ""
+
 #: src/hub/games/factsSweep.ts
 #, fuzzy
 msgid "It would not take {factionsSaid}."
@@ -35903,6 +35929,10 @@ msgstr ""
 msgid "not sent"
 msgstr "δεν στάλθηκε"
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Not sent"
+msgstr ""
+
 #: src/multiplayer/admin/AdminRequestStatus.tsx
 #, fuzzy
 msgid "Not sent to the server"
@@ -36546,6 +36576,10 @@ msgstr "Δεν καταγράφηκε τίποτα για αυτή την επα
 msgid "Nothing was recorded."
 msgstr "Δεν καταγράφηκε τίποτα."
 
+#: src/hub/upload/messages.ts
+msgid "Nothing was uploaded. The hub has you down as having sent it too."
+msgstr ""
+
 #: src/direct/hostingRoute.ts
 #, fuzzy
 msgid "Nothing would open the ports and this server has no relay, so only players who can already reach this machine can join."
@@ -36943,11 +36977,16 @@ msgstr "κατά μέσο όρο {share} των {many} ενός αγώνα σε 
 msgid "on ground too steep for it, in amber"
 msgstr "σε έδαφος υπερβολικά απότομο για αυτό, σε πορτοκαλί"
 
+#: src/content/pages/ReplaysPage.tsx
+msgid "On hub"
+msgstr ""
+
 #: src/lego/banking.ts
 #, fuzzy
 msgid "on or off"
 msgstr "ενεργό ή ανενεργό"
 
+#: src/content/pages/components/SendReplayToHub.tsx
 #: src/hub/pages/components/MapArchivesControl.tsx
 #, fuzzy
 msgid "On the hub"
@@ -41098,6 +41137,10 @@ msgstr "Ανάγνωση της λίστας επαναλήψεων..."
 msgid "Reading the replay to see how the mission went."
 msgstr "Ανάγνωση της επανάληψης για να φανεί πώς πήγε η αποστολή."
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Reading the replay…"
+msgstr ""
+
 #: src/play/PresetChanges.tsx
 #, fuzzy
 msgid "Reading the slots…"
@@ -45048,6 +45091,7 @@ msgstr "Έκρηξη αυτοκαταστροφής"
 msgid "Self-destructs"
 msgstr "Αυτοκαταστρέφεται"
 
+#: src/content/pages/components/SendReplayToHub.tsx
 #: src/hub/pages/components/SendButton.tsx
 #: src/multiplayer/admin/AnnouncementsSection.tsx
 #: src/multiplayer/battle/BonusButton.tsx
@@ -45072,6 +45116,10 @@ msgstr "Αποστολή του {unitName} μέσω της διαδρομής mu
 #, fuzzy
 msgid "Send a raw command…"
 msgstr "Αποστολή ακατέργαστης εντολής…"
+
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Send again"
+msgstr ""
 
 #: src/account/pages/SettingsSection.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
@@ -45109,6 +45157,10 @@ msgstr "Αποστολή αυτής της αλλαγής στο mutator"
 msgid "Send this copy to the mutator"
 msgstr "Αποστολή αυτού του αντιγράφου στο mutator"
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Send this replay to the hub?"
+msgstr ""
+
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
 msgid "Send to a game"
@@ -45119,6 +45171,7 @@ msgstr "Αποστολή σε παιχνίδι"
 msgid "Send to every player?"
 msgstr "Αποστολή σε κάθε παίκτη;"
 
+#: src/content/pages/components/SendReplayToHub.tsx
 #: src/hub/manualSend/HubSendControl.tsx
 #: src/hub/upload/UploadToHubButton.tsx
 #, fuzzy
@@ -45187,6 +45240,10 @@ msgstr "Αποστολή εικόνων για το hub. Ανοίξτε για �
 #, fuzzy
 msgid "Sending to hub"
 msgstr "Αποστολή στο hub"
+
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Sending to hub…"
+msgstr ""
 
 #: src/hub/assets/UploadRunBadge.tsx
 #, fuzzy
@@ -47117,6 +47174,10 @@ msgstr "Ορισμένοι διακομιστές στέλνουν κωδικό 
 #, fuzzy
 msgid "Someone else calls a vote to kick, ban or move you to spectators, or to make you boss."
 msgstr "Κάποιος άλλος ξεκινά ψηφοφορία για να σας αποβάλει, να σας αποκλείσει ή να σας μεταφέρει στους θεατές, ή για να σας κάνει boss."
+
+#: src/hub/upload/messages.ts
+msgid "Someone else who was in the match is sending it right now. Try again later, and the hub links you to theirs once it is on the hub."
+msgstr ""
 
 #: src/sound/events.ts
 #, fuzzy
@@ -50700,6 +50761,10 @@ msgid "The hub did not accept your sign-in. Sign in again, then upload it again.
 msgstr "Το hub δεν δέχτηκε τη σύνδεσή σας. Συνδεθείτε ξανά και μετά ανεβάστε το ξανά."
 
 #: src/hub/upload/messages.ts
+msgid "The hub did not keep it. Its check may have found the replay did not match what Coilbox read from it, and the hub does not say why."
+msgstr ""
+
+#: src/hub/upload/messages.ts
 #, fuzzy
 msgid "The hub does not know this game yet. Send it to the hub first, then upload the file."
 msgstr "Το hub δεν γνωρίζει ακόμη αυτό το παιχνίδι. Στείλτε το πρώτα στο hub και μετά ανεβάστε το αρχείο."
@@ -50713,6 +50778,10 @@ msgstr "Το hub δεν γνωρίζει ακόμη αυτόν τον χάρτη
 #, fuzzy
 msgid "The hub features no games."
 msgstr "Το hub δεν προβάλλει κανένα παιχνίδι."
+
+#: src/hub/upload/messages.ts
+msgid "The hub found nobody in the replay under the name it was sent with."
+msgstr ""
 
 #: src/hub/api.ts
 #, fuzzy
@@ -50748,6 +50817,10 @@ msgstr "Το hub δεν έχει ακόμη τίποτα για αυτό το π
 msgid "The hub has nothing on it yet. Anything you share will show up here."
 msgstr "Το hub δεν έχει ακόμη τίποτα. Ό,τι κοινοποιήσετε θα εμφανιστεί εδώ."
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "The hub is checking it…"
+msgstr ""
+
 #: src/hub/upload/UploadToHubButton.tsx
 #, fuzzy
 msgid "The hub keeps the name of your account, privately."
@@ -50768,6 +50841,10 @@ msgstr "Το hub ίσως ξυπνά μετά από ένα διάστημα α�
 #, fuzzy
 msgid "The hub named no download source for {label}."
 msgstr "Το hub δεν όρισε πηγή λήψης για {label}."
+
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "The hub notes that you sent it, as {name}."
+msgstr ""
 
 #: src/hub/maps/pictureSweep.ts
 #, fuzzy
@@ -51615,6 +51692,10 @@ msgstr "Το καταγεγραμμένο ίχνος είναι παρωχημέ
 msgid "The recording could not be made into a track."
 msgstr "Δεν ήταν δυνατή η μετατροπή της εγγραφής σε ίχνος."
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "The recording stops before the end of the match, and the hub only takes a whole match."
+msgstr ""
+
 #: src/multiplayer/admin/ServerAddressSection.tsx
 #, fuzzy
 msgid "The refresh failed"
@@ -51650,6 +51731,11 @@ msgstr "η αρχειοθήκη έκδοσης για τη ζητούμενη έ
 msgid "The reload failed"
 msgstr "Η επαναφόρτωση απέτυχε"
 
+#. placeholder {0}: problem.name
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "The replay does not say which team {0} was on."
+msgstr ""
+
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
 msgid "The replay itself records what was produced and lost, not what a player owned at any moment."
@@ -51659,6 +51745,11 @@ msgstr "Η ίδια η επανάληψη καταγράφει τι παρήχθ
 #, fuzzy
 msgid "The replay named no period, so the engine's default is used."
 msgstr "Η επανάληψη δεν όρισε διάστημα, οπότε χρησιμοποιείται η προεπιλογή της μηχανής."
+
+#. placeholder {0}: info.mapName
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "The replay on {0}"
+msgstr ""
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy

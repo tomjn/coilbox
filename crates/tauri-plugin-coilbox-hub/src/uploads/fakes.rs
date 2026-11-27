@@ -132,6 +132,11 @@ struct HubState {
     last_state: String,
     polls: usize,
     poll_status: Option<u16>,
+    /// Answers to `POST /api/v1/replays/uploads` in turn. The last repeats. A
+    /// `None` is the hub's own upload answer, 201 the first time and 200 after.
+    replay_answers: VecDeque<Option<(u16, Value)>>,
+    last_replay_answer: Option<(u16, Value)>,
+    replay_requests: Vec<(Option<String>, String)>,
 }
 
 pub struct FakeHub {
@@ -175,6 +180,18 @@ impl FakeHub {
         self
     }
 
+    /// What the replay route answers in turn, the last for ever after. `None`
+    /// is an upload slot on the mirror.
+    pub fn replaying(self, answers: Vec<Option<(u16, Value)>>) -> Self {
+        self.state.lock().unwrap().replay_answers = answers.into();
+        self
+    }
+
+    /// The authorization header and the body of each replay request.
+    pub fn replay_requests(&self) -> Vec<(Option<String>, String)> {
+        self.state.lock().unwrap().replay_requests.clone()
+    }
+
     /// The authorization header and the body of each reservation.
     pub fn reservations(&self) -> Vec<(Option<String>, String)> {
         self.state.lock().unwrap().reservations.clone()
@@ -208,6 +225,35 @@ fn hub_answer(state: &Mutex<HubState>, request: &Request) -> Reply {
                 "token": format!("token-{count}"),
                 "start_by": 1,
                 "reserved_until": "2026-11-18T00:00:00Z",
+            }}),
+        );
+    }
+    if request.method == "POST" && request.path == "/api/v1/replays/uploads" {
+        state.replay_requests.push((
+            request.headers.get("authorization").cloned(),
+            String::from_utf8_lossy(&request.body).into_owned(),
+        ));
+        if let Some(next) = state.replay_answers.pop_front() {
+            state.last_replay_answer = next;
+        }
+        if let Some((status, body)) = state.last_replay_answer.clone() {
+            return Reply::Json(status, body);
+        }
+        let count = state.replay_requests.len();
+        let mirror = state.mirror.clone();
+        return Reply::Json(
+            if count == 1 { 201 } else { 200 },
+            json!({ "upload": {
+                "id": UPLOAD_ID,
+                "game_id": "9f2c4b1ad07e5386c1f4a92b6e8d0375",
+                "state": "uploading",
+                "mirror": "jj",
+                "filename": "9f2c4b1ad07e5386c1f4a92b6e8d0375.sdfz",
+                "upload_url": format!("{mirror}/upload.php"),
+                "limits_url": format!("{mirror}/limits.php"),
+                "token": format!("token-{count}"),
+                "start_by": 1,
+                "reserved_until": 2,
             }}),
         );
     }

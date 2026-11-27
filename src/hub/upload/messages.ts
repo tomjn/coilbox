@@ -35,7 +35,19 @@ export function describeUploadEnd(
   outcome: ArchiveUploadOutcome,
   label: string,
   links: UploadLinks,
+  heldAlready = false,
 ): UploadEnding {
+  if (outcome.kind === "listed" && heldAlready) {
+    return {
+      level: "info",
+      title: t`The hub already has ${label}`,
+      body: t`Nothing was uploaded. The hub has you down as having sent it too.`,
+      link: links.listed
+        ? { url: links.listed, label: t`Show on hub` }
+        : undefined,
+      retry: false,
+    };
+  }
   if (outcome.kind === "listed") {
     return {
       level: "success",
@@ -105,7 +117,29 @@ export function describeUploadEnd(
         retry: false,
         sendFirst: true,
       };
+    case "not_in_replay":
+      return {
+        level: "error",
+        title: notUploaded,
+        body: t`The hub found nobody in the replay under the name it was sent with.`,
+        retry: false,
+      };
+    case "uploading":
+      return {
+        level: "warning",
+        title: notUploaded,
+        body: t`Someone else who was in the match is sending it right now. Try again later, and the hub links you to theirs once it is on the hub.`,
+        retry: true,
+      };
+    case "not_kept":
+      return {
+        level: "error",
+        title: notUploaded,
+        body: t`The hub did not keep it. Its check may have found the replay did not match what Coilbox read from it, and the hub does not say why.`,
+        retry: false,
+      };
     case "no_mirror":
+    case "no_replay_mirror":
     case "unavailable":
     case "not_configured":
     case "uploads_disabled":

@@ -3847,6 +3847,10 @@ msgstr "{label} van {piece}, frame {frame}, {elmos} elmos"
 msgid "{label} volume"
 msgstr "Volume van {label}"
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "{label} was not sent"
+msgstr ""
+
 #: src/hub/manualSend/run.ts
 #, fuzzy
 msgid "{label} was not sent to the hub"
@@ -12184,6 +12188,10 @@ msgstr "Er staat nog een andere vraag open. Beantwoord of sluit die en open dit 
 msgid "Another unit already has this name"
 msgstr "Een andere eenheid heeft deze naam al"
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Another version of the game is installed, so Coilbox cannot say which unit each build order was for. Install the version it was played on, then try again."
+msgstr ""
+
 #: src/scenario/pages/components/useMapKeyboard.ts
 #, fuzzy
 msgid "Answered the question at {spot}."
@@ -15195,6 +15203,7 @@ msgstr "Kan eigen eenheid niet beschadigen"
 #: src/content/pages/components/ReplaySetsManager.tsx
 #: src/content/pages/components/ReplayTracksStorage.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
+#: src/content/pages/components/SendReplayToHub.tsx
 #: src/content/pages/FoldersSection.tsx
 #: src/deeplink/ConfirmDialog.tsx
 #: src/direct/HostRoomForm.tsx
@@ -16639,6 +16648,7 @@ msgstr "Kosten van onzichtbaarheid tijdens bewegen"
 #: src/content/pages/components/ReclaimCachesButton.tsx
 #: src/content/pages/components/ReclaimSpaceButton.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
+#: src/content/pages/components/SendReplayToHub.tsx
 #: src/deeplink/ConfirmDialog.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 #: src/hub/upload/UploadToHubButton.tsx
@@ -16882,6 +16892,10 @@ msgstr "Coilbox kan de skybox van deze kaart niet lezen, dus het voorbeeld teken
 msgid "Coilbox cannot read this unit's build pic. The game ships one, in a format the decoder does not handle."
 msgstr "Coilbox kan de bouwafbeelding van deze eenheid niet lezen. Het spel levert er een mee in een formaat dat de decoder niet ondersteunt."
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Coilbox cannot say what every unit built in this match is or costs. Install the game it was played on, then try again."
+msgstr ""
+
 #. placeholder {0}: unknown.join(", ")
 #: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
@@ -17001,6 +17015,14 @@ msgstr "coilbox kon niet lezen"
 #, fuzzy
 msgid "Coilbox could not read {game}: {said}"
 msgstr "Coilbox kon {game} niet lezen: {said}"
+
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Coilbox could not read every build order in this replay, and the hub checks all of them."
+msgstr ""
+
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Coilbox could not read the build orders in this replay."
+msgstr ""
 
 #: src/hub/assets/pictureSweep.ts
 #, fuzzy
@@ -28397,6 +28419,10 @@ msgstr "Het is hier niet gemaakt: dit is een .3do, het oudere modelformaat. Coil
 msgid "It was not made here: this is one of the formats the engine reads through Assimp, and coilbox has never written one, so it cannot be a unit coming home as parts. Its nodes have been read as pieces as they stand."
 msgstr "Het is hier niet gemaakt: dit is een van de formaten die de engine via Assimp leest, en coilbox heeft er nooit een geschreven, dus het kan geen eenheid zijn die als onderdelen terugkomt. De nodes zijn gelezen als delen, zoals ze zijn."
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "It will be public. Anyone can download it and see the players, the build orders and the totals."
+msgstr ""
+
 #: src/hub/games/factsSweep.ts
 #, fuzzy
 msgid "It would not take {factionsSaid}."
@@ -35903,6 +35929,10 @@ msgstr ""
 msgid "not sent"
 msgstr "niet verzonden"
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Not sent"
+msgstr ""
+
 #: src/multiplayer/admin/AdminRequestStatus.tsx
 #, fuzzy
 msgid "Not sent to the server"
@@ -36546,6 +36576,10 @@ msgstr "Er is niets opgenomen voor deze replay."
 msgid "Nothing was recorded."
 msgstr "Er is niets vastgelegd."
 
+#: src/hub/upload/messages.ts
+msgid "Nothing was uploaded. The hub has you down as having sent it too."
+msgstr ""
+
 #: src/direct/hostingRoute.ts
 #, fuzzy
 msgid "Nothing would open the ports and this server has no relay, so only players who can already reach this machine can join."
@@ -36943,11 +36977,16 @@ msgstr "gemiddeld {share} van de {many} van een wedstrijd binnen {reach} van é�
 msgid "on ground too steep for it, in amber"
 msgstr "op te steile grond, in amber"
 
+#: src/content/pages/ReplaysPage.tsx
+msgid "On hub"
+msgstr ""
+
 #: src/lego/banking.ts
 #, fuzzy
 msgid "on or off"
 msgstr "aan of uit"
 
+#: src/content/pages/components/SendReplayToHub.tsx
 #: src/hub/pages/components/MapArchivesControl.tsx
 #, fuzzy
 msgid "On the hub"
@@ -41098,6 +41137,10 @@ msgstr "De replaylijst lezen..."
 msgid "Reading the replay to see how the mission went."
 msgstr "De replay lezen om te zien hoe de missie ging."
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Reading the replay…"
+msgstr ""
+
 #: src/play/PresetChanges.tsx
 #, fuzzy
 msgid "Reading the slots…"
@@ -45048,6 +45091,7 @@ msgstr "Explosie bij zelfvernietiging"
 msgid "Self-destructs"
 msgstr "Vernietigt zichzelf"
 
+#: src/content/pages/components/SendReplayToHub.tsx
 #: src/hub/pages/components/SendButton.tsx
 #: src/multiplayer/admin/AnnouncementsSection.tsx
 #: src/multiplayer/battle/BonusButton.tsx
@@ -45072,6 +45116,10 @@ msgstr "{unitName} via de mutatorroute versturen"
 #, fuzzy
 msgid "Send a raw command…"
 msgstr "Een ruwe opdracht versturen…"
+
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Send again"
+msgstr ""
 
 #: src/account/pages/SettingsSection.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
@@ -45109,6 +45157,10 @@ msgstr "Deze wijziging naar de mutator versturen"
 msgid "Send this copy to the mutator"
 msgstr "Deze kopie naar de mutator versturen"
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Send this replay to the hub?"
+msgstr ""
+
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
 msgid "Send to a game"
@@ -45119,6 +45171,7 @@ msgstr "Naar een spel versturen"
 msgid "Send to every player?"
 msgstr "Naar elke speler versturen?"
 
+#: src/content/pages/components/SendReplayToHub.tsx
 #: src/hub/manualSend/HubSendControl.tsx
 #: src/hub/upload/UploadToHubButton.tsx
 #, fuzzy
@@ -45187,6 +45240,10 @@ msgstr "Afbeeldingen versturen voor de hub. Open om te stoppen."
 #, fuzzy
 msgid "Sending to hub"
 msgstr "Naar hub versturen"
+
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Sending to hub…"
+msgstr ""
 
 #: src/hub/assets/UploadRunBadge.tsx
 #, fuzzy
@@ -47117,6 +47174,10 @@ msgstr "Sommige servers mailen een verificatiecode om je account te bevestigen."
 #, fuzzy
 msgid "Someone else calls a vote to kick, ban or move you to spectators, or to make you boss."
 msgstr "Iemand anders start een stemming om je te kicken, te bannen of naar de toeschouwers te verplaatsen, of om je baas te maken."
+
+#: src/hub/upload/messages.ts
+msgid "Someone else who was in the match is sending it right now. Try again later, and the hub links you to theirs once it is on the hub."
+msgstr ""
 
 #: src/sound/events.ts
 #, fuzzy
@@ -50700,6 +50761,10 @@ msgid "The hub did not accept your sign-in. Sign in again, then upload it again.
 msgstr "De hub accepteerde je aanmelding niet. Meld je opnieuw aan en upload het dan opnieuw."
 
 #: src/hub/upload/messages.ts
+msgid "The hub did not keep it. Its check may have found the replay did not match what Coilbox read from it, and the hub does not say why."
+msgstr ""
+
+#: src/hub/upload/messages.ts
 #, fuzzy
 msgid "The hub does not know this game yet. Send it to the hub first, then upload the file."
 msgstr "De hub kent dit spel nog niet. Stuur het eerst naar de hub en upload dan het bestand."
@@ -50713,6 +50778,10 @@ msgstr "De hub kent deze kaart nog niet. Stuur hem eerst naar de hub en upload d
 #, fuzzy
 msgid "The hub features no games."
 msgstr "De hub toont geen spellen."
+
+#: src/hub/upload/messages.ts
+msgid "The hub found nobody in the replay under the name it was sent with."
+msgstr ""
 
 #: src/hub/api.ts
 #, fuzzy
@@ -50748,6 +50817,10 @@ msgstr "De hub heeft nog niets voor dit spel. Deze kopie van Coilbox toont allee
 msgid "The hub has nothing on it yet. Anything you share will show up here."
 msgstr "Er staat nog niets op de hub. Alles wat je deelt, verschijnt hier."
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "The hub is checking it…"
+msgstr ""
+
 #: src/hub/upload/UploadToHubButton.tsx
 #, fuzzy
 msgid "The hub keeps the name of your account, privately."
@@ -50768,6 +50841,10 @@ msgstr "De hub wordt misschien wakker na een rustige periode, en dat duurt een p
 #, fuzzy
 msgid "The hub named no download source for {label}."
 msgstr "De hub noemde geen downloadbron voor {label}."
+
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "The hub notes that you sent it, as {name}."
+msgstr ""
 
 #: src/hub/maps/pictureSweep.ts
 #, fuzzy
@@ -51615,6 +51692,10 @@ msgstr "De opgenomen track is verouderd. Opnieuw opnemen en hem dan met terugspo
 msgid "The recording could not be made into a track."
 msgstr "Van de opname kon geen track gemaakt worden."
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "The recording stops before the end of the match, and the hub only takes a whole match."
+msgstr ""
+
 #: src/multiplayer/admin/ServerAddressSection.tsx
 #, fuzzy
 msgid "The refresh failed"
@@ -51650,6 +51731,11 @@ msgstr "het releasearchief voor de gevraagde versie"
 msgid "The reload failed"
 msgstr "Het opnieuw laden is mislukt"
 
+#. placeholder {0}: problem.name
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "The replay does not say which team {0} was on."
+msgstr ""
+
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
 msgid "The replay itself records what was produced and lost, not what a player owned at any moment."
@@ -51659,6 +51745,11 @@ msgstr "De replay zelf legt vast wat er geproduceerd en verloren is, niet wat ee
 #, fuzzy
 msgid "The replay named no period, so the engine's default is used."
 msgstr "De replay noemde geen periode, dus de standaard van de engine wordt gebruikt."
+
+#. placeholder {0}: info.mapName
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "The replay on {0}"
+msgstr ""
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy

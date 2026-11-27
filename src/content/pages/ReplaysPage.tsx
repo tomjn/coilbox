@@ -28,6 +28,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useHubUrl } from "@/hub/config";
+import { replayOnHub, useReplaysOnHub } from "@/hub/replaysOnHub";
 import {
   formatBytes,
   formatDateTime,
@@ -183,6 +185,8 @@ export default function ReplaysPage() {
   const { targets, selected, selectedKey } = useScanTargetSelection();
   const replaysRoot = useReplaysRoot(selected?.rootPath);
   const { replays, loading, error, refresh, ready } = useReplays(replaysRoot);
+  const hubUrl = useHubUrl();
+  const onHub = useReplaysOnHub();
   const { thumbs, loading: thumbsLoading } = useUnitsyncThumbnails(
     selected?.enginePath,
     selected?.rootPath,
@@ -704,6 +708,14 @@ export default function ReplaysPage() {
                           </Badge>
                         )}
                         <OriginBadge origin={replayOrigin(us)} />
+                        {replayOnHub(onHub, hubUrl, r.gameId) && (
+                          <Badge
+                            variant="ghost"
+                            className="shrink-0 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary"
+                          >
+                            {t`On hub`}
+                          </Badge>
+                        )}
                         <ReplayTrackBadge
                           gameId={r.gameId}
                           remixed={r.remixed}

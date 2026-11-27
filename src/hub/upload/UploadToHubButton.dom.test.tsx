@@ -104,6 +104,8 @@ function state(patch: Partial<ArchiveUploadState> = {}): ArchiveUploadState {
     sent: 0,
     size: FACTS.size,
     uploadId: "up-1",
+    pageUrl: null,
+    heldAlready: false,
     outcome: null,
     ...patch,
   };

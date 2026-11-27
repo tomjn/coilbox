@@ -75,6 +75,7 @@ mod tests;
 pub const EVENT: &str = "coilbox-hub://archive-upload";
 
 const UPLOADS_PATH: &str = "/api/v1/uploads";
+const REPLAY_UPLOADS_PATH: &str = "/api/v1/replays/uploads";
 
 /// Largest hub or mirror answer that will be read. All of them are a few short
 /// fields.
@@ -126,6 +127,9 @@ pub enum ArchiveKind {
     /// A `recoil_<version>_<platform>.7z` build only grant holders and
     /// moderators may send. Its facts come from `dl_engine_upload_facts`.
     Engine,
+    /// A match replay, sent to `POST /api/v1/replays/uploads` with its summary
+    /// rather than to the archive route (issue #5493).
+    Replay,
 }
 
 /// One archive's facts, as the hub's `POST /api/v1/uploads` takes them.
@@ -150,6 +154,52 @@ pub struct ArchiveFacts {
     /// What the uploader says about an engine build, 1 to 1,000 characters.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
+}
+
+/// A replay, as the hub's `POST /api/v1/replays/uploads` takes it. The shape is
+/// `hub-php/docs/replay-uploads.md` in coilbox-hub.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ReplayRequest {
+    /// The 16 byte game id from the replay's header, as 32 lower case hex
+    /// characters.
+    pub game_id: String,
+    pub sha256: String,
+    pub size: u64,
+    /// The name the sender was in the battle under.
+    pub name: String,
+    /// What the replay page read out of the file. Sent as the page built it,
+    /// because the hub checks it against the file and this side has nothing
+    /// to add.
+    pub summary: Value,
+}
+
+/// What is being sent, which decides how the hub is asked for a slot.
+pub(crate) enum Sending<'a> {
+    Archive(&'a ArchiveFacts),
+    Replay(&'a ReplayRequest),
+}
+
+impl Sending<'_> {
+    fn size(&self) -> u64 {
+        match self {
+            Self::Archive(facts) => facts.size,
+            Self::Replay(replay) => replay.size,
+        }
+    }
+
+    fn path(&self) -> &'static str {
+        match self {
+            Self::Archive(_) => UPLOADS_PATH,
+            Self::Replay(_) => REPLAY_UPLOADS_PATH,
+        }
+    }
+
+    fn body(&self) -> Result<String, serde_json::Error> {
+        match self {
+            Self::Archive(facts) => serde_json::to_string(facts),
+            Self::Replay(replay) => serde_json::to_string(replay),
+        }
+    }
 }
 
 /// Where an upload has got to.
@@ -243,6 +293,12 @@ pub struct UploadState {
     pub size: u64,
     /// The hub's id for the upload, once it has given one.
     pub upload_id: Option<String>,
+    /// The page the hub shows the upload on, once it says. Only a replay's
+    /// answer carries one.
+    pub page_url: Option<String>,
+    /// The hub held this replay before this send, from this sender or another,
+    /// so nothing was uploaded.
+    pub held_already: bool,
     /// Set when `phase` is `done`.
     pub outcome: Option<Outcome>,
 }
@@ -321,12 +377,12 @@ pub(crate) async fn run(
     env: &Env<'_>,
     mut state: UploadState,
     path: &Path,
-    facts: &ArchiveFacts,
+    sending: &Sending<'_>,
 ) -> UploadState {
     let ended = tokio::select! {
         biased;
         () = watch(env.cancel) => Err(End::Cancelled),
-        ended = drive(env, &mut state, path, facts) => ended,
+        ended = drive(env, &mut state, path, sending) => ended,
     };
     state.outcome = Some(match ended {
         Ok(()) => Outcome::Listed,
@@ -349,13 +405,13 @@ async fn drive(
     env: &Env<'_>,
     state: &mut UploadState,
     path: &Path,
-    facts: &ArchiveFacts,
+    sending: &Sending<'_>,
 ) -> Result<(), End> {
     let client = reqwest::Client::builder()
         .connect_timeout(HTTP_TIMEOUT)
         .build()
         .map_err(|e| Stop::local("unreachable", e.to_string()))?;
-    let size = facts.size;
+    let size = sending.size();
     if size == 0 {
         return Err(Stop::local("unreadable", "The archive file is empty.").into());
     }
@@ -381,7 +437,13 @@ async fn drive(
         }
     }
 
-    let mut reservation = reserve(env, &client, facts).await?;
+    let mut reservation = match reserve(env, &client, sending).await? {
+        Reserved::Slot(reservation) => reservation,
+        Reserved::Held(held) => {
+            state.held_already = true;
+            return replay_held(env, &client, state, sending, held).await;
+        }
+    };
     state.upload_id = Some(reservation.id.clone());
     state.phase = Phase::Sending;
     (env.report)(state);
@@ -408,7 +470,9 @@ async fn drive(
         if env.cancel.load(Ordering::Relaxed) {
             return Err(End::Cancelled);
         }
-        if last_poll.elapsed() >= env.pacing.poll_during {
+        // A replay has no upload id to ask about. Its reservation lasts as long
+        // as the hub says, and the transfer does not keep it alive.
+        if matches!(sending, Sending::Archive(_)) && last_poll.elapsed() >= env.pacing.poll_during {
             last_poll = Instant::now();
             match hub_status(env, &client, &reservation.id).await {
                 HubStatus::Listed => return Ok(()),
@@ -474,7 +538,12 @@ async fn drive(
                 }
                 // The hub knows this upload and answers the same request with
                 // a fresh token for it.
-                reservation = reserve(env, &client, facts).await?;
+                reservation = match reserve(env, &client, sending).await? {
+                    Reserved::Slot(reservation) => reservation,
+                    // The mirror's report reached the hub first, so the file is
+                    // there after all.
+                    Reserved::Held(_) => break,
+                };
             }
             Posted::Retry(stop) => {
                 failures += 1;
@@ -492,6 +561,10 @@ async fn drive(
     state.phase = Phase::Waiting;
     (env.report)(state);
 
+    if let Sending::Replay(_) = sending {
+        return replay_checked(env, &client, state, sending).await;
+    }
+
     loop {
         match hub_status(env, &client, &reservation.id).await {
             HubStatus::Listed => return Ok(()),
@@ -504,20 +577,67 @@ async fn drive(
 
 // ------------------------------------------------------------------- the hub
 
+/// What the hub said to a request for a slot.
+enum Reserved {
+    Slot(Reservation),
+    /// The hub already holds this replay, so there is nothing to send.
+    Held(HeldReplay),
+}
+
+/// The hub's `replay` answer: a match it already holds.
+struct HeldReplay {
+    listed: bool,
+    url: Option<String>,
+}
+
+fn parse_held(body: &Value) -> Option<HeldReplay> {
+    let replay = body.get("replay")?;
+    let listed = match replay.get("state")?.as_str()? {
+        "listed" => true,
+        "checking" => false,
+        _ => return None,
+    };
+    Some(HeldReplay {
+        listed,
+        url: replay.get("url").and_then(Value::as_str).map(str::to_owned),
+    })
+}
+
 /// Ask the hub for a slot, or for a fresh token for the one it already gave.
 /// The hub answers `201` the first time and `200` after that, with the same
-/// body shape.
+/// body shape. A replay's `200` may instead say the hub holds the match.
 async fn reserve(
     env: &Env<'_>,
     client: &reqwest::Client,
-    facts: &ArchiveFacts,
-) -> Result<Reservation, Stop> {
-    let url = api_url(env.hub_url, UPLOADS_PATH, "Sending an archive to the hub")
+    sending: &Sending<'_>,
+) -> Result<Reserved, Stop> {
+    let raw = ask_for_slot(env, client, sending).await?;
+    let url = env.hub_url;
+    if raw.status == 200 || raw.status == 201 {
+        if let Some(reservation) = parse_reservation(&raw.body) {
+            return Ok(Reserved::Slot(reservation));
+        }
+        if let (Sending::Replay(_), Some(held)) = (sending, parse_held(&raw.body)) {
+            return Ok(Reserved::Held(held));
+        }
+        return Err(bad_hub_answer(url));
+    }
+    Err(hub_stop(raw.status, &raw.body, url))
+}
+
+/// The request [`reserve`] makes, answered as it came back.
+async fn ask_for_slot(
+    env: &Env<'_>,
+    client: &reqwest::Client,
+    sending: &Sending<'_>,
+) -> Result<Raw, Stop> {
+    let url = api_url(env.hub_url, sending.path(), "Sending to the hub")
         .map_err(|said| Stop::local("unreachable", said))?;
-    let body =
-        serde_json::to_string(facts).map_err(|e| Stop::local("bad_answer", e.to_string()))?;
+    let body = sending
+        .body()
+        .map_err(|e| Stop::local("bad_answer", e.to_string()))?;
     let token = (env.token)().await?;
-    let raw = send_with_retries(env, Source::Hub, &url, || {
+    send_with_retries(env, Source::Hub, &url, || {
         client
             .post(&url)
             .timeout(REQUEST_TIMEOUT)
@@ -526,12 +646,73 @@ async fn reserve(
             .header(reqwest::header::CONTENT_TYPE, "application/json")
             .body(body.clone())
     })
-    .await?;
+    .await
+}
 
-    if raw.status == 200 || raw.status == 201 {
-        return parse_reservation(&raw.body).ok_or_else(|| bad_hub_answer(&url));
+/// A replay the hub held before anything was sent. Listed is the end, and one
+/// still being checked is waited for as a sent one is.
+async fn replay_held(
+    env: &Env<'_>,
+    client: &reqwest::Client,
+    state: &mut UploadState,
+    sending: &Sending<'_>,
+    held: HeldReplay,
+) -> Result<(), End> {
+    state.page_url = held.url;
+    if held.listed {
+        return Ok(());
     }
-    Err(hub_stop(raw.status, &raw.body, &url))
+    state.phase = Phase::Waiting;
+    (env.report)(state);
+    replay_checked(env, client, state, sending).await
+}
+
+/// Wait for the hub's check of a replay (coilbox-hub #663).
+///
+/// The hub has no status route for a replay, so the same request is made again
+/// and its answer read. `replay` is the match the hub holds, listed or still
+/// being checked. `200` with an upload is this sender's reservation, which
+/// waits for the mirror's report. `201` is a reservation made afresh, which
+/// means the hub no longer had the match: its check refused the file, or the
+/// reservation lapsed before the mirror's report arrived. The hub does not say
+/// which, or why.
+async fn replay_checked(
+    env: &Env<'_>,
+    client: &reqwest::Client,
+    state: &mut UploadState,
+    sending: &Sending<'_>,
+) -> Result<(), End> {
+    loop {
+        tokio::time::sleep(env.pacing.poll_after).await;
+        let raw = match ask_for_slot(env, client, sending).await {
+            Ok(raw) => raw,
+            Err(stop) if stop.code == "unauthorised" => return Err(stop.into()),
+            // A hub that cannot be reached now says nothing about the check.
+            Err(_) => continue,
+        };
+        match raw.status {
+            200 => {
+                if let Some(held) = parse_held(&raw.body) {
+                    if held.listed {
+                        state.page_url = held.url;
+                        return Ok(());
+                    }
+                }
+            }
+            201 => {
+                return Err(Stop {
+                    source: Source::Hub,
+                    code: "not_kept".to_owned(),
+                    status: Some(201),
+                    said: "The hub did not keep this replay. Its check may have refused the file, and the hub does not say why.".to_owned(),
+                    duplicate: None,
+                }
+                .into())
+            }
+            401 | 409 | 422 => return Err(hub_stop(raw.status, &raw.body, env.hub_url).into()),
+            _ => {}
+        }
+    }
 }
 
 fn parse_reservation(body: &Value) -> Option<Reservation> {
@@ -917,37 +1098,135 @@ pub fn begin<R: Runtime>(
         (ArchiveKind::Map, _) => consent.admits_maps([facts.internal_name.as_str()])?,
         (ArchiveKind::Game, shortname) => consent.admits_game(shortname.unwrap_or_default())?,
         (ArchiveKind::Engine, _) => consent.admits_engine(&facts.filename)?,
+        (ArchiveKind::Replay, _) => {
+            return Err("A replay is sent with its summary, not as an archive.".to_owned())
+        }
     }
-    let on_disk = std::fs::metadata(&path)
-        .map_err(|_| format!("There is no archive at {}.", path.display()))?
+    check_size(&path, facts.size, "archive")?;
+    let state = fresh_state(
+        &hub_url,
+        facts.filename.clone(),
+        facts.kind,
+        &facts.sha256,
+        facts.size,
+    )?;
+    start(app, path, Owned::Archive(facts), state)
+}
+
+/// Start sending a replay, unless the same replay is already on its way
+/// (issue #5493).
+///
+/// `request` carries the file's hash and size, which the command worked out
+/// from the file, and the summary the replay page read. `consent` must come
+/// from the grant a press of the replay's send button opened, because the
+/// uploads switch is about pictures and never admits a replay.
+pub fn begin_replay<R: Runtime>(
+    app: AppHandle<R>,
+    hub_url: String,
+    path: PathBuf,
+    request: ReplayRequest,
+    consent: &AssetUploadConsent,
+) -> Result<UploadState, String> {
+    api_url(&hub_url, REPLAY_UPLOADS_PATH, "Sending a replay to the hub")?;
+    consent.admits_replay(&request.game_id)?;
+    check_size(&path, request.size, "replay")?;
+    let filename = path
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_else(|| format!("{}.sdfz", request.game_id));
+    let state = fresh_state(
+        &hub_url,
+        filename,
+        ArchiveKind::Replay,
+        &request.sha256,
+        request.size,
+    )?;
+    start(app, path, Owned::Replay(request), state)
+}
+
+/// The SHA-256 of a file, as 64 lower case hex characters, and its size.
+/// Reads the whole file, so call it off the async runtime.
+pub fn hash_file(path: &Path) -> Result<(String, u64), String> {
+    use sha2::{Digest as _, Sha256};
+    let unreadable = || format!("The file at {} could not be read.", path.display());
+    let mut file = std::fs::File::open(path).map_err(|_| unreadable())?;
+    let mut hasher = Sha256::new();
+    let mut buf = vec![0u8; 64 * 1024];
+    let mut size = 0u64;
+    loop {
+        let n = file.read(&mut buf).map_err(|_| unreadable())?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+        size += n as u64;
+    }
+    let hex = hasher
+        .finalize()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    Ok((hex, size))
+}
+
+/// What [`start`] hands the task, which outlives the command.
+enum Owned {
+    Archive(ArchiveFacts),
+    Replay(ReplayRequest),
+}
+
+fn check_size(path: &Path, size: u64, what: &str) -> Result<(), String> {
+    let on_disk = std::fs::metadata(path)
+        .map_err(|_| format!("There is no {what} at {}.", path.display()))?
         .len();
-    if on_disk != facts.size {
+    if on_disk != size {
         return Err(format!(
-            "The archive is {on_disk} bytes and its details say {}. Read them again.",
-            facts.size
+            "The {what} is {on_disk} bytes and its details say {size}. Read them again."
         ));
     }
+    Ok(())
+}
 
-    let op_id = coilbox_oauth::random_token(16).map_err(|e| e.to_string())?;
-    let cancel = Arc::new(AtomicBool::new(false));
-    let state = UploadState {
-        op_id: op_id.clone(),
-        hub_url: hub_url.clone(),
-        filename: facts.filename.clone(),
-        kind: facts.kind,
-        sha256: facts.sha256.clone(),
+/// A new upload's first state, under a fresh op id.
+fn fresh_state(
+    hub_url: &str,
+    filename: String,
+    kind: ArchiveKind,
+    sha256: &str,
+    size: u64,
+) -> Result<UploadState, String> {
+    Ok(UploadState {
+        op_id: coilbox_oauth::random_token(16).map_err(|e| e.to_string())?,
+        hub_url: hub_url.to_owned(),
+        filename,
+        kind,
+        sha256: sha256.to_owned(),
         phase: Phase::Reserving,
         sent: 0,
-        size: facts.size,
+        size,
         upload_id: None,
+        page_url: None,
+        held_already: false,
         outcome: None,
-    };
+    })
+}
+
+/// Run the transfer on the app's runtime, unless the same file to the same hub
+/// is already on its way.
+fn start<R: Runtime>(
+    app: AppHandle<R>,
+    path: PathBuf,
+    owned: Owned,
+    state: UploadState,
+) -> Result<UploadState, String> {
+    let cancel = Arc::new(AtomicBool::new(false));
     if let Some(running) = claim(&state, &cancel) {
         return Ok(running);
     }
 
+    let hub_url = state.hub_url.clone();
     let announce = app.clone();
-    let report_id = op_id.clone();
+    let report_id = state.op_id.clone();
     let started = state.clone();
     tauri::async_runtime::spawn(async move {
         let token_hub = hub_url.clone();
@@ -975,7 +1254,11 @@ pub fn begin<R: Runtime>(
             cancel: &cancel,
             report: &report,
         };
-        run(&env, started, &path, &facts).await;
+        let sending = match &owned {
+            Owned::Archive(facts) => Sending::Archive(facts),
+            Owned::Replay(request) => Sending::Replay(request),
+        };
+        run(&env, started, &path, &sending).await;
     });
     Ok(state)
 }

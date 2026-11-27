@@ -2,6 +2,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { useSyncExternalStore } from "react";
 import { type NotifyInput, notify } from "@/notify/notify";
 import {
+  type ArchiveKind,
   type ArchiveUploadPhase,
   type ArchiveUploadState,
   listArchiveUploads,
@@ -10,6 +11,7 @@ import {
 import { noteHubChanged } from "../manualSend/run";
 import { gamePageUrl, mapPageUrl } from "../manualSend/status";
 import { fetchMapFacts } from "../maps/lookup";
+import { rememberReplayOnHub } from "../replaysOnHub";
 import { describeUploadEnd, type UploadEnding } from "./messages";
 
 /**
@@ -24,13 +26,15 @@ import { describeUploadEnd, type UploadEnding } from "./messages";
 
 /** What the page that started an upload called it, for the messages. */
 export interface UploadSubject {
-  kind: "map" | "game";
+  kind: "map" | "game" | "replay";
   /** What a person calls it. */
   label: string;
   /** A map's name, which the hub's map page is found by. */
   mapName?: string;
   /** A game's modinfo shortname, which the hub's game page is found by. */
   shortname?: string;
+  /** A replay's game id, which the replay browser's mark is kept by. */
+  gameId?: string;
 }
 
 const RANK: Record<ArchiveUploadPhase, number> = {
@@ -127,7 +131,7 @@ export function useArchiveUploads(): readonly ArchiveUploadState[] {
 export function uploadOf(
   list: readonly ArchiveUploadState[],
   hubUrl: string,
-  kind: "map" | "game",
+  kind: ArchiveKind,
   filename: string | undefined,
 ): ArchiveUploadState | undefined {
   if (!filename) return undefined;
@@ -157,6 +161,7 @@ export async function linksFor(
       ? gamePageUrl(state.hubUrl, subject.shortname)
       : null;
   if (state.outcome?.kind !== "listed") return { listed: null, game };
+  if (state.pageUrl) return { listed: state.pageUrl, game };
   if (game) return { listed: game, game };
   if (subject?.kind === "map" && subject.mapName) {
     try {
@@ -195,9 +200,18 @@ async function announceEnd(state: ArchiveUploadState): Promise<void> {
     noteHubChanged();
     return;
   }
-  const links = await linksFor(state, subjects.get(state.sha256));
+  const subject = subjects.get(state.sha256);
+  if (state.kind === "replay" && outcome.kind === "listed" && subject?.gameId) {
+    rememberReplayOnHub(subject.gameId, {
+      hubUrl: state.hubUrl,
+      url: state.pageUrl,
+    });
+  }
+  const links = await linksFor(state, subject);
   void notify(
-    endingToNotification(describeUploadEnd(outcome, labelOf(state), links)),
+    endingToNotification(
+      describeUploadEnd(outcome, labelOf(state), links, state.heldAlready),
+    ),
   );
   // The hub may list the archive now, so pages ask it again.
   noteHubChanged();

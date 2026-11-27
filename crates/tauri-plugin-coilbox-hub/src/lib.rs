@@ -475,6 +475,57 @@ async fn hub_archive_upload_start<R: Runtime>(
     }
 }
 
+/// `hub_replay_upload_start`: send a replay of a match the user was in to the
+/// hub, as whoever is signed in (issue #5493).
+///
+/// `summary` is what the replay page read out of the file, which the hub checks
+/// against it. The file's hash and size are worked out here, from the file
+/// itself. `name` is the name the user was in the battle under. `grant` must be
+/// the one a press of the replay's send button opened. The upload is followed
+/// as an archive's is, through `hub_archive_upload_list` and its event, with
+/// `kind` `replay`.
+#[tauri::command]
+async fn hub_replay_upload_start<R: Runtime>(
+    app: AppHandle<R>,
+    hub_url: String,
+    path: String,
+    game_id: String,
+    name: String,
+    summary: Value,
+    grant: Option<String>,
+) -> CliResult {
+    let consent = match consent::AssetUploadConsent::check(&app, grant.as_deref()) {
+        Ok(consent) => consent,
+        Err(refused) => return CliResult::err(refused),
+    };
+    if game_id.len() != 32
+        || !game_id
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    {
+        return CliResult::err("This replay has no game id the hub can file it under.");
+    }
+    let file = std::path::PathBuf::from(&path);
+    let read = file.clone();
+    let hashed = tauri::async_runtime::spawn_blocking(move || uploads::hash_file(&read)).await;
+    let (sha256, size) = match hashed {
+        Ok(Ok(hashed)) => hashed,
+        Ok(Err(said)) => return CliResult::err(said),
+        Err(e) => return CliResult::err(e.to_string()),
+    };
+    let request = uploads::ReplayRequest {
+        game_id,
+        sha256,
+        size,
+        name,
+        summary,
+    };
+    match uploads::begin_replay(app, hub_url, file, request, &consent) {
+        Ok(state) => CliResult::ok(json!({ "upload": state })),
+        Err(said) => CliResult::err(said),
+    }
+}
+
 /// `hub_archive_upload_list`: every archive upload this run of the app has
 /// started, finished ones included, so a page opened after one began can find
 /// it by `sha256` and read how far it got.
@@ -511,6 +562,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             hub_manual_send_begin,
             hub_manual_send_end,
             hub_archive_upload_start,
+            hub_replay_upload_start,
             hub_archive_upload_list,
             hub_archive_upload_cancel
         ])
