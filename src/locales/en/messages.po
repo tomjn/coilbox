@@ -7792,6 +7792,10 @@ msgstr "A relay agent from an earlier session is still running as process {pid}.
 msgid "A remix has no analysis of its own. Analyse the original match."
 msgstr "A remix has no analysis of its own. Analyse the original match."
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "A remixed replay cannot be sent to the hub."
+msgstr "A remixed replay cannot be sent to the hub."
+
 #: src/content/pages/components/UnitListNotes.tsx
 msgid "A replay names a unit by a number that only means something in the build of the game it was played on. Coilbox keeps the unit list a replay was read against, so the replay still names its units after the game is updated or removed."
 msgstr "A replay names a unit by a number that only means something in the build of the game it was played on. Coilbox keeps the unit list a replay was read against, so the replay still names its units after the game is updated or removed."
@@ -28973,6 +28977,10 @@ msgstr "None of the {twoSides} matches of two teams has a recorded result, so ne
 msgid "None of the lines on the chart above gave orders of this kind."
 msgstr "None of the lines on the chart above gave orders of this kind."
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "None of the names you are signed in with played in or watched this match."
+msgstr "None of the names you are signed in with played in or watched this match."
+
 #: src/content/pages/StatsPage.tsx
 msgid "None of the replays in this set are in your library."
 msgstr "None of the replays in this set are in your library."
@@ -36833,8 +36841,8 @@ msgid "Send code"
 msgstr "Send code"
 
 #: src/hub/replaySend/ReplayAutoSendControl.tsx
-msgid "Send my finished matches to the hub"
-msgstr "Send my finished matches to the hub"
+msgid "Send my finished multiplayer matches to the hub"
+msgstr "Send my finished multiplayer matches to the hub"
 
 #: src/hub/pages/components/GamePicturesControl.tsx
 msgid "Send pictures of your games"
@@ -38088,6 +38096,10 @@ msgstr "Sign in to publish from here. Or copy the code and finish on the hub's o
 #: src/onboarding/pages/HubPage.tsx
 msgid "Sign in to the hub"
 msgstr "Sign in to the hub"
+
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Sign in to the hub to send this replay."
+msgstr "Sign in to the hub to send this replay."
 
 #: src/hub/pages/components/AccountControl.tsx
 msgid "Sign in with {name}"
@@ -44163,6 +44175,10 @@ msgstr "This replay does not say which engine recorded it."
 msgid "This replay has a recorded track."
 msgstr "This replay has a recorded track."
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "This replay has no game ID, so the hub cannot take it."
+msgstr "This replay has no game ID, so the hub cannot take it."
+
 #: src/content/replayAnalysis.ts
 msgid "This replay has no game id, so there is nothing to file an analysis under."
 msgstr "This replay has no game id, so there is nothing to file an analysis under."
@@ -47504,8 +47520,8 @@ msgid "Wheels turning"
 msgstr "Wheels turning"
 
 #: src/hub/replaySend/ReplayAutoSendControl.tsx
-msgid "When a match ends, Coilbox sends its replay if you played in it or watched it, people were on two or more sides, and it reached game over. Anyone can download it and see the players, the build orders and the totals, and the hub notes that you sent it."
-msgstr "When a match ends, Coilbox sends its replay if you played in it or watched it, people were on two or more sides, and it reached game over. Anyone can download it and see the players, the build orders and the totals, and the hub notes that you sent it."
+msgid "When a match ends, Coilbox sends its replay if you played in it or watched it, people were on two or more sides, and it reached game over. Single player matches and matches against AI alone are not sent. Anyone can download a replay and see the players, the build orders and the totals, and the hub notes that you sent it."
+msgstr "When a match ends, Coilbox sends its replay if you played in it or watched it, people were on two or more sides, and it reached game over. Single player matches and matches against AI alone are not sent. Anyone can download a replay and see the players, the build orders and the totals, and the hub notes that you sent it."
 
 #: src/content/pages/components/ReplayTracksStorage.tsx
 msgid "When a new track is stored and the tracks take more than the limit, the least recently watched are removed until they fit. Tracks that are out of date go first. The new track is never removed, so a track larger than the limit is kept and every other one goes."

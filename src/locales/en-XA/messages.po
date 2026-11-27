@@ -7791,6 +7791,10 @@ msgstr ""
 msgid "A remix has no analysis of its own. Analyse the original match."
 msgstr ""
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "A remixed replay cannot be sent to the hub."
+msgstr ""
+
 #: src/content/pages/components/UnitListNotes.tsx
 msgid "A replay names a unit by a number that only means something in the build of the game it was played on. Coilbox keeps the unit list a replay was read against, so the replay still names its units after the game is updated or removed."
 msgstr ""
@@ -28972,6 +28976,10 @@ msgstr ""
 msgid "None of the lines on the chart above gave orders of this kind."
 msgstr ""
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "None of the names you are signed in with played in or watched this match."
+msgstr ""
+
 #: src/content/pages/StatsPage.tsx
 msgid "None of the replays in this set are in your library."
 msgstr ""
@@ -36832,7 +36840,7 @@ msgid "Send code"
 msgstr ""
 
 #: src/hub/replaySend/ReplayAutoSendControl.tsx
-msgid "Send my finished matches to the hub"
+msgid "Send my finished multiplayer matches to the hub"
 msgstr ""
 
 #: src/hub/pages/components/GamePicturesControl.tsx
@@ -38086,6 +38094,10 @@ msgstr ""
 
 #: src/onboarding/pages/HubPage.tsx
 msgid "Sign in to the hub"
+msgstr ""
+
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Sign in to the hub to send this replay."
 msgstr ""
 
 #: src/hub/pages/components/AccountControl.tsx
@@ -44162,6 +44174,10 @@ msgstr ""
 msgid "This replay has a recorded track."
 msgstr ""
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "This replay has no game ID, so the hub cannot take it."
+msgstr ""
+
 #: src/content/replayAnalysis.ts
 msgid "This replay has no game id, so there is nothing to file an analysis under."
 msgstr ""
@@ -47503,7 +47519,7 @@ msgid "Wheels turning"
 msgstr ""
 
 #: src/hub/replaySend/ReplayAutoSendControl.tsx
-msgid "When a match ends, Coilbox sends its replay if you played in it or watched it, people were on two or more sides, and it reached game over. Anyone can download it and see the players, the build orders and the totals, and the hub notes that you sent it."
+msgid "When a match ends, Coilbox sends its replay if you played in it or watched it, people were on two or more sides, and it reached game over. Single player matches and matches against AI alone are not sent. Anyone can download a replay and see the players, the build orders and the totals, and the hub notes that you sent it."
 msgstr ""
 
 #: src/content/pages/components/ReplayTracksStorage.tsx
