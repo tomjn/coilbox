@@ -3162,6 +3162,14 @@ msgstr "{label} was not sent to the hub"
 msgid "{label} was not uploaded"
 msgstr "{label} was not uploaded"
 
+#: src/hub/upload/messages.ts
+msgid "{label} was refused"
+msgstr "{label} was refused"
+
+#: src/hub/upload/messages.ts
+msgid "{label} was removed from the hub"
+msgstr "{label} was removed from the hub"
+
 #: src/lego/pages/components/StatsSection.tsx
 msgid "{label}, {referenceName}"
 msgstr "{label}, {referenceName}"
@@ -7635,6 +7643,10 @@ msgstr "A mirror already has a file with this name that the hub has not listed, 
 #: src/lego/pages/components/ImportResult.tsx
 msgid "A model holds piece names, the tree they hang in and where each one sits. Everything else the project had was never in the file."
 msgstr "A model holds piece names, the tree they hang in and where each one sits. Everything else the project had was never in the file."
+
+#: src/hub/upload/messages.ts
+msgid "A moderator took this match down from the hub, so it cannot be sent again."
+msgstr "A moderator took this match down from the hub, so it cannot be sent again."
 
 #: src/lego/moduleFileIo.ts
 msgid "A module with this id is already installed: {installedName}."
@@ -39842,6 +39854,10 @@ msgstr "Taken"
 msgid "Taken {takenWhen}, {takenSize} by {takenSize} pixels."
 msgstr "Taken {takenWhen}, {takenSize} by {takenSize} pixels."
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Taken down from the hub"
+msgstr "Taken down from the hub"
+
 #: src/workshop/pages/components/UnitTextPanel.tsx
 msgid "Taken from {redirect}, which this unit's definition names as its i18nfromunit. Rename {redirect} to change it."
 msgstr "Taken from {redirect}, which this unit's definition names as its i18nfromunit. Rename {redirect} to change it."
@@ -41011,6 +41027,10 @@ msgstr "The file paints with {imagesUsed} textures where a Spring unit has one, 
 msgid "The file pickers open in the folders you used last time. Turning this off forgets them."
 msgstr "The file pickers open in the folders you used last time. Turning this off forgets them."
 
+#: src/hub/upload/messages.ts
+msgid "The file that reached the hub was not the one Coilbox described. You can send it again."
+msgstr "The file that reached the hub was not the one Coilbox described. You can send it again."
+
 #: src/lego/moduleFile.ts
 msgid "The file was made by a newer version of coilbox."
 msgstr "The file was made by a newer version of coilbox."
@@ -41472,9 +41492,17 @@ msgstr "The hub could not answer."
 msgid "The hub could not finish checking the analysis."
 msgstr "The hub could not finish checking the analysis."
 
+#: src/hub/upload/messages.ts
+msgid "The hub could not finish checking the replay. You can send it again."
+msgstr "The hub could not finish checking the replay. You can send it again."
+
 #: src/hub/publish.ts
 msgid "The hub could not publish it."
 msgstr "The hub could not publish it."
+
+#: src/hub/upload/messages.ts
+msgid "The hub could not read the replay file. It may be damaged or too large."
+msgstr "The hub could not read the replay file. It may be damaged or too large."
 
 #: src/hub/replayExtras/messages.ts
 msgid "The hub did not accept your sign-in. Sign in again and try once more."
@@ -41584,6 +41612,10 @@ msgstr "The hub may be waking up after a quiet spell, which takes a few seconds.
 #: src/hub/games/download.ts
 msgid "The hub named no download source for {label}."
 msgstr "The hub named no download source for {label}."
+
+#: src/hub/upload/messages.ts
+msgid "The hub no longer has your upload. It may have run out of time, and somebody else may be sending this match. Try again later."
+msgstr "The hub no longer has your upload. It may have run out of time, and somebody else may be sending this match. Try again later."
 
 #: src/content/pages/components/SendReplayToHub.tsx
 msgid "The hub notes that you sent it, as {name}."
@@ -42065,6 +42097,10 @@ msgstr "The multiplier on incoming damage while the unit's script has put it in 
 msgid "The name others see"
 msgstr "The name others see"
 
+#: src/hub/upload/messages.ts
+msgid "The name this match was sent under did not play or watch it."
+msgstr "The name this match was sent under did not play or watch it."
+
 #: src/multiplayer/admin/BotAccountsSection.tsx
 msgid "The new account's password is copied, not set"
 msgstr "The new account's password is copied, not set"
@@ -42328,6 +42364,14 @@ msgstr "The reload failed"
 msgid "The replay does not say which team {name} was on."
 msgstr "The replay does not say which team {name} was on."
 
+#: src/hub/upload/messages.ts
+msgid "The replay file belongs to a different match."
+msgstr "The replay file belongs to a different match."
+
+#: src/hub/upload/messages.ts
+msgid "The replay has no end of match results. The hub only takes finished matches."
+msgstr "The replay has no end of match results. The hub only takes finished matches."
+
 #: src/content/pages/components/LivingValueChart.tsx
 msgid "The replay itself records what was produced and lost, not what a player owned at any moment."
 msgstr "The replay itself records what was produced and lost, not what a player owned at any moment."
@@ -42344,6 +42388,10 @@ msgstr "The replay on {0}"
 #: src/hub/replaySend/runner.ts
 msgid "The replay on {mapName}"
 msgstr "The replay on {mapName}"
+
+#: src/hub/upload/messages.ts
+msgid "The replay stops before the match ended. The hub only takes finished matches."
+msgstr "The replay stops before the match ended. The hub only takes finished matches."
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
 msgid "The replays could not be read: {error}"
@@ -42990,6 +43038,10 @@ msgstr "The units of this replay's game could not be read, so nothing says which
 #: src/content/pages/components/ReplayAwards.tsx
 msgid "The units of this replay's game could not be read, so the awards that need a cost are left out."
 msgstr "The units of this replay's game could not be read, so the awards that need a cost are left out."
+
+#: src/hub/upload/messages.ts
+msgid "The upload did not finish in time. Send it again."
+msgstr "The upload did not finish in time. Send it again."
 
 #: src/downloads/pages/components/EngineUpload.tsx
 msgid "The upload of {filename} stopped."
@@ -47286,6 +47338,10 @@ msgstr "What are server relays?"
 #: src/content/pages/GameUnitPage.tsx
 msgid "What builds it"
 msgstr "What builds it"
+
+#: src/hub/upload/messages.ts
+msgid "What Coilbox sent about the match does not agree with the replay file."
+msgstr "What Coilbox sent about the match does not agree with the replay file."
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 msgid "What disagreed:"

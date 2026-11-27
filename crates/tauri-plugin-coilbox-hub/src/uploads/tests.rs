@@ -919,6 +919,151 @@ async fn a_replay_the_hub_reserves_afresh_after_the_upload_was_not_kept() {
     let (state, _) = rig.run_replay().await;
 
     assert_eq!(stopped(&state), (Source::Hub, "not_kept".to_owned()));
+    assert!(
+        !rig.hub.status_requests().is_empty(),
+        "the status route is tried before the old way"
+    );
+}
+
+/// A `200` from the status route.
+fn status(state: &str, url: Option<&str>, refusal: Value) -> (u16, Value) {
+    (
+        200,
+        json!({ "replay": {
+            "game_id": GAME_ID,
+            "state": state,
+            "url": url,
+            "reserved_until": null,
+            "refusal": refusal,
+        }}),
+    )
+}
+
+#[tokio::test]
+async fn a_replay_s_check_is_followed_on_the_status_route_without_asking_again() {
+    let rig = Rig::new("replay-status-listed", 1 << 20).with_hub(|hub| {
+        hub.replaying(vec![None]).replay_status(vec![
+            status("uploading", None, Value::Null),
+            status("checking", None, Value::Null),
+            status("listed", Some("https://hub.example/replays/x"), Value::Null),
+        ])
+    });
+
+    let (state, _) = rig.run_replay().await;
+
+    assert_eq!(state.outcome, Some(Outcome::Listed));
+    assert_eq!(
+        state.page_url.as_deref(),
+        Some("https://hub.example/replays/x")
+    );
+    assert_eq!(rig.hub.replay_requests().len(), 1);
+    let asked = rig.hub.status_requests();
+    assert_eq!(asked.len(), 3);
+    assert_eq!(asked[0].as_deref(), Some("Bearer hub-bearer"));
+}
+
+#[tokio::test]
+async fn a_replay_the_check_refuses_ends_with_the_hub_s_reason() {
+    let rig = Rig::new("replay-status-refused", 1 << 20).with_hub(|hub| {
+        hub.replaying(vec![None]).replay_status(vec![status(
+            "refused",
+            None,
+            json!({
+                "reason": "summary_mismatch",
+                "message": "What was sent does not agree with the file.",
+                "refused_at": 1,
+            }),
+        )])
+    });
+
+    let (state, _) = rig.run_replay().await;
+
+    assert_eq!(
+        stopped(&state),
+        (Source::Hub, "refused_summary_mismatch".to_owned())
+    );
+    let Some(Outcome::Stopped { said, .. }) = &state.outcome else {
+        unreachable!()
+    };
+    assert_eq!(said, "What was sent does not agree with the file.");
+    assert_eq!(rig.hub.replay_requests().len(), 1);
+}
+
+#[tokio::test]
+async fn a_replay_the_hub_was_already_checking_can_end_refused() {
+    let rig = Rig::new("replay-status-held", 1 << 20).with_hub(|hub| {
+        hub.replaying(vec![checking()]).replay_status(vec![status(
+            "refused",
+            None,
+            json!({ "reason": "a_newer_reason", "message": "Why.", "refused_at": 1 }),
+        )])
+    });
+
+    let (state, _) = rig.run_replay().await;
+
+    assert_eq!(
+        stopped(&state),
+        (Source::Hub, "refused_a_newer_reason".to_owned())
+    );
+    assert!(rig.mirror.posts().is_empty());
+    assert_eq!(rig.hub.replay_requests().len(), 1);
+}
+
+#[tokio::test]
+async fn each_other_end_the_status_route_reports_has_its_own_code() {
+    let not_sent = (404, json!({ "error": "No record.", "reason": "not_sent" }));
+    for (tag, answer, code) in [
+        ("lapsed", status("lapsed", None, Value::Null), "lapsed"),
+        (
+            "removed",
+            status("removed", None, Value::Null),
+            "replay_removed",
+        ),
+        (
+            "unknown",
+            status("a_newer_state", None, Value::Null),
+            "not_kept",
+        ),
+        ("not-sent", not_sent, "not_sent"),
+        ("signed-out", (401, json!({})), "unauthorised"),
+    ] {
+        let rig = Rig::new(&format!("replay-status-{tag}"), 1 << 20)
+            .with_hub(|hub| hub.replaying(vec![None]).replay_status(vec![answer]));
+
+        let (state, _) = rig.run_replay().await;
+
+        assert_eq!(stopped(&state), (Source::Hub, code.to_owned()), "{tag}");
+        assert_eq!(rig.hub.replay_requests().len(), 1, "{tag}");
+    }
+}
+
+#[tokio::test]
+async fn a_hub_in_trouble_is_asked_for_the_status_again() {
+    let rig = Rig::new("replay-status-503", 1 << 20).with_hub(|hub| {
+        hub.replaying(vec![None]).replay_status(vec![
+            (503, json!({})),
+            (429, json!({})),
+            status("listed", None, Value::Null),
+        ])
+    });
+
+    let (state, _) = rig.run_replay().await;
+
+    assert_eq!(state.outcome, Some(Outcome::Listed));
+    assert_eq!(rig.hub.replay_requests().len(), 1);
+}
+
+#[tokio::test]
+async fn a_status_answer_that_cannot_be_read_falls_back_to_asking_again() {
+    let rig = Rig::new("replay-status-unread", 1 << 20).with_hub(|hub| {
+        hub.replaying(vec![None, listed("https://hub.example/replays/x")])
+            .replay_status(vec![(200, json!({ "something": "else" }))])
+    });
+
+    let (state, _) = rig.run_replay().await;
+
+    assert_eq!(state.outcome, Some(Outcome::Listed));
+    assert_eq!(rig.hub.replay_requests().len(), 2);
 }
 
 #[tokio::test]
@@ -939,6 +1084,39 @@ async fn a_replay_refused_at_the_start_carries_the_hub_s_reason() {
     assert_eq!(said, "Nobody called \"Bob\" played or watched this match.");
     assert_eq!(*status, Some(422));
     assert!(rig.mirror.posts().is_empty());
+}
+
+fn gone() -> Option<(u16, Value)> {
+    Some((
+        410,
+        json!({ "error": "A moderator took this match down.", "reason": "removed" }),
+    ))
+}
+
+#[tokio::test]
+async fn a_replay_a_moderator_removed_uploads_nothing() {
+    let rig = Rig::new("replay-gone", 1 << 20).with_hub(|hub| hub.replaying(vec![gone()]));
+
+    let (state, _) = rig.run_replay().await;
+
+    assert_eq!(stopped(&state), (Source::Hub, "replay_removed".to_owned()));
+    let Some(Outcome::Stopped { said, status, .. }) = &state.outcome else {
+        unreachable!()
+    };
+    assert_eq!(said, "A moderator took this match down.");
+    assert_eq!(*status, Some(410));
+    assert!(rig.mirror.posts().is_empty());
+    assert_eq!(rig.hub.replay_requests().len(), 1);
+}
+
+#[tokio::test]
+async fn a_replay_removed_while_it_is_asked_about_again_stops_waiting() {
+    let rig =
+        Rig::new("replay-gone-later", 1 << 20).with_hub(|hub| hub.replaying(vec![None, gone()]));
+
+    let (state, _) = rig.run_replay().await;
+
+    assert_eq!(stopped(&state), (Source::Hub, "replay_removed".to_owned()));
 }
 
 #[tokio::test]
@@ -1043,6 +1221,10 @@ async fn a_track_goes_to_its_replay_s_route_then_waits_for_the_check_to_list_it(
         json!({ "format_version": 1, "sha256": "d".repeat(64), "size": ARCHIVE.len() })
     );
     assert!(rig.hub.replay_requests().is_empty());
+    assert!(
+        rig.hub.status_requests().is_empty(),
+        "the status route is a replay's alone"
+    );
 }
 
 #[tokio::test]

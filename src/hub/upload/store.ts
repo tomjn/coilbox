@@ -13,7 +13,7 @@ import { gamePageUrl, mapPageUrl } from "../manualSend/status";
 import { fetchMapFacts } from "../maps/lookup";
 import { describeTrackEnd } from "../replayExtras/messages";
 import { rememberTrackOnHub } from "../replayExtras/onHub";
-import { rememberReplayOnHub } from "../replaysOnHub";
+import { rememberReplayOnHub, rememberReplayRemoved } from "../replaysOnHub";
 import { describeUploadEnd, type UploadEnding } from "./messages";
 
 /**
@@ -242,6 +242,13 @@ async function announceEnd(state: ArchiveUploadState): Promise<void> {
       hubUrl: state.hubUrl,
       url: state.pageUrl,
     });
+  }
+  if (
+    outcome.kind === "stopped" &&
+    outcome.code === "replay_removed" &&
+    subject?.gameId
+  ) {
+    rememberReplayRemoved(subject.gameId, state.hubUrl);
   }
   const links = await linksFor(state, subject);
   void notify(
