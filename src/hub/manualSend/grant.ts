@@ -62,6 +62,26 @@ export async function beginReplaySend(gameId: string): Promise<string> {
   return grant;
 }
 
+const hubReplayExtraSendBegin = defineCommand<
+  { subject: { kind: "analysis" | "track"; game_id: string } },
+  { grant: string }
+>("coilbox-hub", "hub_manual_send_begin");
+
+/**
+ * Open a grant for sending one match's analysis or track (issue #5495), named
+ * by the replay's game id. A grant for the replay itself does not cover
+ * either.
+ */
+export async function beginReplayExtraSend(
+  kind: "analysis" | "track",
+  gameId: string,
+): Promise<string> {
+  const { grant } = await hubReplayExtraSendBegin({
+    subject: { kind, game_id: gameId },
+  });
+  return grant;
+}
+
 /** Close a grant, however its send ended. */
 export async function endManualSend(grant: string): Promise<void> {
   await hubManualSendEnd({ grant });

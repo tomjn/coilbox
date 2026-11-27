@@ -46,7 +46,7 @@ export interface EngineArchiveFacts extends Omit<ArchiveFacts, "kind"> {
   note: string;
 }
 
-export type ArchiveKind = "map" | "game" | "engine" | "replay";
+export type ArchiveKind = "map" | "game" | "engine" | "replay" | "track";
 
 /** Where an upload has got to. `waiting` is the mirror holding every byte and
  *  the hub not having listed the archive yet. */
@@ -172,6 +172,101 @@ export async function startReplayUpload(
     ...(grant ? { grant } : {}),
   });
   return upload;
+}
+
+const hubReplayTrackUploadStart = defineCommand<
+  {
+    hubUrl: string;
+    gameId: string;
+    path: string;
+    formatVersion: number;
+    grant?: string;
+  },
+  { upload: ArchiveUploadState }
+>("coilbox-hub", "hub_replay_track_upload_start");
+
+/**
+ * Start sending a match's recorded track (issue #5495), and answer as soon as
+ * it is running. It is followed like an archive upload, with `kind` `track`
+ * and the file name `<game id>.cbtrack`. `path` and `formatVersion` are what
+ * `contentReplayTrackUploadFacts` answers.
+ */
+export async function startTrackUpload(
+  hubUrl: string,
+  gameId: string,
+  path: string,
+  formatVersion: number,
+  grant?: string,
+): Promise<ArchiveUploadState> {
+  const { upload } = await hubReplayTrackUploadStart({
+    hubUrl,
+    gameId,
+    path,
+    formatVersion,
+    ...(grant ? { grant } : {}),
+  });
+  return upload;
+}
+
+/** What the hub's check has made of an analysis. `kept`, `agreed` and `older`
+ *  all passed. */
+export type AnalysisCheck =
+  | "checking"
+  | "kept"
+  | "agreed"
+  | "older"
+  | "refused";
+
+/** What the hub said to a sent analysis, as `hub_replay_analysis_send`
+ *  answers. `again` is the hub answering with this person's earlier send of
+ *  the same log. */
+export type AnalysisAnswer =
+  | {
+      kind: "sent";
+      id: number | null;
+      state: AnalysisCheck;
+      reason: string | null;
+      again: boolean;
+    }
+  | {
+      kind: "stopped";
+      source: "hub" | "mirror" | "local";
+      code: string;
+      status: number | null;
+      said: string;
+    };
+
+const hubReplayAnalysisSend = defineCommand<
+  {
+    hubUrl: string;
+    gameId: string;
+    loggerVersion: number;
+    events: string;
+    grant?: string;
+  },
+  { answer: AnalysisAnswer }
+>("coilbox-hub", "hub_replay_analysis_send");
+
+/**
+ * Send a match's analysis to the hub (issue #5495). Never rejects for what the
+ * hub said, only when the send could not start. Sending the same log again
+ * answers with the first send's check, which is how its end is learned.
+ */
+export async function sendReplayAnalysis(
+  hubUrl: string,
+  gameId: string,
+  loggerVersion: number,
+  events: string,
+  grant?: string,
+): Promise<AnalysisAnswer> {
+  const { answer } = await hubReplayAnalysisSend({
+    hubUrl,
+    gameId,
+    loggerVersion,
+    events,
+    ...(grant ? { grant } : {}),
+  });
+  return answer;
 }
 
 const hubArchiveUploadList = defineCommand<

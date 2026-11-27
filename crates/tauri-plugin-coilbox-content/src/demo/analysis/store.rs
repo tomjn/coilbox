@@ -494,6 +494,31 @@ pub fn read_events(
     Ok(page)
 }
 
+/// A reproduced run's log as the hub takes it (issue #5495): the logger's
+/// version and its lines, each ending in a newline, without the provenance line
+/// this store puts first. None when nothing is stored or the run diverged,
+/// because a run that diverged is never sent.
+///
+/// The engine's unit definitions are not in it. They are kept once in
+/// `def_sets` rather than in each file, and the hub's check reads none of them.
+pub fn log_for_hub(dir: &Path, game_id: &str) -> Result<Option<(u32, String)>, String> {
+    let path = file_path(dir, game_id)?;
+    let Some(stored) = read_stored(&path) else {
+        return Ok(None);
+    };
+    if stored.provenance.outcome != StoredOutcome::Reproduced {
+        return Ok(None);
+    }
+    let lines = lines_of(&path).map_err(|e| format!("could not read the stored analysis: {e}"))?;
+    let mut events = String::new();
+    for line in lines.skip(1) {
+        let line = line.map_err(|e| format!("could not read the stored analysis: {e}"))?;
+        events.push_str(&line);
+        events.push('\n');
+    }
+    Ok(Some((stored.provenance.logger_version, events)))
+}
+
 /// Delete what is stored for a match. Answers whether there was anything.
 pub fn delete(dir: &Path, game_id: &str) -> Result<bool, String> {
     match std::fs::remove_file(file_path(dir, game_id)?) {
@@ -570,6 +595,27 @@ pub(crate) async fn content_replay_analysis_events<R: Runtime>(
         Ok(Ok(page)) => CliResult::ok(json!({ "events": page.events, "total": page.total })),
         Ok(Err(e)) => CliResult::err(e),
         Err(e) => CliResult::err(format!("replay analysis events task failed: {e}")),
+    }
+}
+
+/// `content_replay_analysis_log`: a reproduced run's log, to send to the hub.
+/// Answers `log` with `loggerVersion` and `events`, the logger's lines as one
+/// string, or null when nothing is stored or the run diverged.
+#[tauri::command]
+pub(crate) async fn content_replay_analysis_log<R: Runtime>(
+    app: AppHandle<R>,
+    game_id: String,
+) -> CliResult {
+    let dir = match app_store_dir(&app) {
+        Ok(dir) => dir,
+        Err(e) => return CliResult::err(e),
+    };
+    match tauri::async_runtime::spawn_blocking(move || log_for_hub(&dir, &game_id)).await {
+        Ok(Ok(log)) => CliResult::ok(json!({
+            "log": log.map(|(version, events)| json!({ "loggerVersion": version, "events": events })),
+        })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("replay analysis log task failed: {e}")),
     }
 }
 
@@ -660,6 +706,34 @@ pub(super) mod tests {
             .collect();
         names.sort();
         names
+    }
+
+    #[test]
+    fn the_log_for_the_hub_is_the_logger_s_lines_without_the_provenance() {
+        let dir = tempfile::tempdir().unwrap();
+        store(dir.path(), ID, AnalysisStatus::Reproduced);
+
+        let (version, events) = log_for_hub(dir.path(), ID).unwrap().expect("a log");
+
+        assert_eq!(version, LOGGER_VERSION);
+        assert!(events.ends_with('\n'));
+        assert!(!events.contains("\"kind\":\"analysis\""));
+        let expected: Vec<String> = parse_log(FIXTURE)
+            .raw
+            .into_iter()
+            .filter(|line| kind_of(line).as_deref() != Some("unit_def"))
+            .collect();
+        let sent: Vec<&str> = events.lines().collect();
+        assert_eq!(sent, expected);
+    }
+
+    #[test]
+    fn a_diverged_run_or_none_has_no_log_for_the_hub() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(log_for_hub(dir.path(), ID).unwrap(), None);
+        store(dir.path(), ID, AnalysisStatus::Diverged);
+        assert_eq!(log_for_hub(dir.path(), ID).unwrap(), None);
+        assert!(log_for_hub(dir.path(), "../x").is_err());
     }
 
     #[test]

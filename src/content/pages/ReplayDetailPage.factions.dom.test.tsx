@@ -156,6 +156,9 @@ vi.mock("./components/RefightPanel", () => ({ RefightPanel: () => null }));
 vi.mock("./components/SendReplayToHub", () => ({
   SendReplayToHub: () => null,
 }));
+vi.mock("./components/SendReplayExtrasToHub", () => ({
+  SendReplayExtrasToHub: () => null,
+}));
 vi.mock("./components/RemixPanel", () => ({ RemixPanel: () => null }));
 vi.mock("./components/ReplayBuildOrders", () => ({
   ReplayBuildOrders: () => null,
