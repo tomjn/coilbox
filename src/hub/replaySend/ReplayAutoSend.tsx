@@ -38,9 +38,14 @@ export default function ReplayAutoSend() {
 }
 
 /**
- * Queues a match's analysis and track when an analysis run of it finishes, or
- * a track of it is recorded, while the switch is on (issue #5495). A run that
- * finished before the switch went on is not sent by itself.
+ * Queues a match's analysis and track when an analysis run of it finishes while
+ * the switch is on (issue #5495). A run that finished before the switch went on
+ * is not sent by itself.
+ *
+ * A run records the track too, and writes the analysis first, so the track can
+ * be read after the match has been sent without it. That queues the match
+ * again. The analysis's time says whether the recording is new: a track's own
+ * time moves when it is watched (issue #5523).
  */
 function FinishedRuns() {
   const [since] = useState(Date.now);
@@ -49,23 +54,22 @@ function FinishedRuns() {
   const tracks = useStoredTracks();
   const seen = useRef(new Set<string>());
   useEffect(() => {
-    const queue = (gameId: string, at: number) => {
-      const analysis = analyses.get(gameId);
-      if (at < since || analysis?.outcome !== "reproduced") return;
-      const key = `${gameId}:${at}`;
-      if (seen.current.has(key)) return;
-      seen.current.add(key);
-      queueReplayExtras({ gameId, mapName: analysis.map });
-    };
-    for (const analysis of analyses.values()) {
-      queue(analysis.gameId, analysis.analysedAtMs);
-    }
-    // A track the hub is known to hold has nothing to be sent, which is every
-    // track downloaded from it (issue #5520).
     const held = readReplayExtras();
-    for (const track of tracks.values()) {
-      if (replayExtrasOn(held, hubUrl, track.gameId)?.track) continue;
-      if (track.state === "current") queue(track.gameId, track.lastWatchedMs);
+    for (const analysis of analyses.values()) {
+      const { gameId, analysedAtMs, outcome, map } = analysis;
+      if (analysedAtMs < since || outcome !== "reproduced") continue;
+      const keys = [`${gameId}:${analysedAtMs}`];
+      // A track the hub is known to hold has nothing to be sent, which is
+      // every track downloaded from it (issue #5520).
+      if (
+        tracks.get(gameId)?.state === "current" &&
+        !replayExtrasOn(held, hubUrl, gameId)?.track
+      ) {
+        keys.push(`${gameId}:${analysedAtMs}:track`);
+      }
+      if (keys.every((key) => seen.current.has(key))) continue;
+      for (const key of keys) seen.current.add(key);
+      queueReplayExtras({ gameId, mapName: map });
     }
   }, [analyses, tracks, since, hubUrl]);
   return null;
