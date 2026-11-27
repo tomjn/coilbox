@@ -14690,11 +14690,6 @@ msgstr "建筑 {place}"
 msgid "Building <0>{baseName} (compat {version})</0>"
 msgstr "正在构建 <0>{baseName}（兼容 {version}）</0>"
 
-#: src/mapconv/pages/components/MapPreview3D.tsx
-#, fuzzy
-msgid "Building 3D preview…"
-msgstr "正在生成 3D 预览…"
-
 #: src/content/mapAggregate.ts
 #: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
@@ -30091,6 +30086,10 @@ msgstr "装载和卸载运输单位"
 msgid "Loading channels…"
 msgstr "正在加载频道…"
 
+#: src/mapconv/pages/components/MapPreview3D.tsx
+msgid "Loading colour…"
+msgstr ""
+
 #: src/campaign/pages/MissionBriefingPage.tsx
 #, fuzzy
 msgid "Loading content…"
@@ -30145,6 +30144,10 @@ msgstr "正在加载报告…"
 #, fuzzy
 msgid "Loading sides…"
 msgstr "正在加载阵营…"
+
+#: src/mapconv/pages/components/MapPreview3D.tsx
+msgid "Loading terrain…"
+msgstr ""
 
 #: src/downloads/pages/components/HubEngineList.tsx
 msgid "Loading test builds…"

@@ -11973,10 +11973,6 @@ msgstr ""
 msgid "Building <0>{baseName} (compat {version})</0>"
 msgstr ""
 
-#: src/mapconv/pages/components/MapPreview3D.tsx
-msgid "Building 3D preview…"
-msgstr ""
-
 #: src/content/mapAggregate.ts
 #: src/content/pages/components/ReplayMapRail.tsx
 msgid "Building density"
@@ -24566,6 +24562,10 @@ msgstr ""
 msgid "Loading channels…"
 msgstr ""
 
+#: src/mapconv/pages/components/MapPreview3D.tsx
+msgid "Loading colour…"
+msgstr ""
+
 #: src/campaign/pages/MissionBriefingPage.tsx
 msgid "Loading content…"
 msgstr ""
@@ -24609,6 +24609,10 @@ msgstr ""
 
 #: src/content/pages/GameDetailPage.tsx
 msgid "Loading sides…"
+msgstr ""
+
+#: src/mapconv/pages/components/MapPreview3D.tsx
+msgid "Loading terrain…"
 msgstr ""
 
 #: src/downloads/pages/components/HubEngineList.tsx
