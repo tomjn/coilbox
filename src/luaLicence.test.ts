@@ -30,10 +30,14 @@ function luaFiles(dir: string): string[] {
 }
 
 /** Lua the engine loads: everything under `lua/`, plus the probes in
- *  `scripts/` that are mounted into a game for a harness run. */
+ *  `scripts/` that are mounted into a game for a harness run. The Persepolis
+ *  map's Lua under `scripts/town-models` ships in the map under its own GPL
+ *  licence, so it is left out. */
 const FILES = [
   ...luaFiles(join(REPO, "lua")),
-  ...luaFiles(join(REPO, "scripts")),
+  ...luaFiles(join(REPO, "scripts")).filter(
+    (path) => !relative(REPO, path).startsWith(join("scripts", "town-models")),
+  ),
 ];
 
 function declared(path: string): string[] {
