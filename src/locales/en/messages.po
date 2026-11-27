@@ -2535,6 +2535,14 @@ msgstr "{game} is not installed, so the units cannot be named. Each event shows 
 msgid "{game} is not installed, so the units cannot be named. Each order shows the unit definition id the replay recorded."
 msgstr "{game} is not installed, so the units cannot be named. Each order shows the unit definition id the replay recorded."
 
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "{game} is not installed. Unit names come from the list this replay carries, which holds no costs."
+msgstr "{game} is not installed. Unit names come from the list this replay carries, which holds no costs."
+
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "{game} is not installed. Unit names come from the list this replay carries. Costs come from {otherName}, a different build, and may be wrong."
+msgstr "{game} is not installed. Unit names come from the list this replay carries. Costs come from {otherName}, a different build, and may be wrong."
+
 #: src/campaign/missionNeeds.ts
 msgid "{game} is the exact version this mission was made for, and it could not be downloaded. It may no longer be published, or the download failed ({failure}). Another version will not run this mission."
 msgstr "{game} is the exact version this mission was made for, and it could not be downloaded. It may no longer be published, or the download failed ({failure}). Another version will not run this mission."
@@ -7117,6 +7125,10 @@ msgstr "A battle seats between {min} and {max} players."
 #: src/content/unitFieldNotes.ts
 msgid "A BeamLaser plays it once per sim frame."
 msgstr "A BeamLaser plays it once per sim frame."
+
+#: src/content/pages/components/UnitListNotes.tsx
+msgid "A Beyond All Reason replay also carries the names of its units. Its build orders are named from those when its version is not installed and no list was kept. They hold no costs."
+msgstr "A Beyond All Reason replay also carries the names of its units. Its build orders are named from those when its version is not installed and no list was kept. They hold no costs."
 
 #: src/hub/pages/components/MapPicturesControl.tsx
 msgid "A big collection takes several goes. Every picture spends part of an hourly allowance the whole community shares, so one press covers what is left of this hour and picks up where it stopped the next time you press it."

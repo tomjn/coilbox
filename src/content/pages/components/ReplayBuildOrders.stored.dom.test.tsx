@@ -213,8 +213,9 @@ async function open(
   gameType: string,
   gameId: string | undefined,
   matchSetup?: MatchSetup,
+  read: DemoBuildOrders = FITTING,
 ) {
-  ORDERS = FITTING;
+  ORDERS = read;
   const info = { gameType, gameId, remixed: false, ais: [], matchSetup };
   render(
     <SeriesEmphasisProvider>
@@ -304,6 +305,61 @@ describe("build orders read against a kept unit list", () => {
       ),
     ).toBeTruthy();
     expect(ASKED.every((archive) => archive === undefined)).toBe(true);
+  });
+});
+
+describe("build orders named from the replay's own unit list", () => {
+  const CARRIED: DemoBuildOrders = {
+    ...FITTING,
+    unitNames: ["condenser", "f1landfac", "fedengineer"],
+  };
+
+  it("names the units with no game installed, and shows no costs", async () => {
+    await open("SplinterFaction 0.1.84", freshId(), undefined, CARRIED);
+
+    expect((await screen.findAllByText("f1landfac")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("fedengineer").length).toBeGreaterThan(0);
+    expect(
+      screen.getByText(
+        /Unit names come from the list this replay\s+carries, which holds no costs/,
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Ordered cost/)).toBeNull();
+    expect(screen.queryByText(/Cost by kind of unit/)).toBeNull();
+    expect(screen.queryByText(/not fit this unit list/)).toBeNull();
+    expect(ASKED.every((archive) => archive === undefined)).toBe(true);
+    expect(HANDED).toEqual([]);
+  });
+
+  it("takes costs from another build by unit key, and says so", async () => {
+    GAMES = [game("SplinterFaction 0.1.89", "SplinterFaction_0.1.89.sdz")];
+    // Another order, so an id read against this list would name the wrong unit.
+    DATASET = {
+      units: [UNITS[2] as UnitDatasetEntry, UNITS[1] as UnitDatasetEntry],
+    };
+
+    await open("SplinterFaction 0.1.84", freshId(), undefined, CARRIED);
+
+    expect((await screen.findAllByText("Land Factory")).length).toBeGreaterThan(
+      0,
+    );
+    expect(screen.getAllByText("Engineer").length).toBeGreaterThan(0);
+    expect(screen.getByText(/1,100 metal and 5,500\s+energy/)).toBeTruthy();
+    expect(
+      screen.getByText(/Costs come from SplinterFaction 0\.1\.89, a different/),
+    ).toBeTruthy();
+    expect(screen.queryByText(/not fit this unit list/)).toBeNull();
+    expect(HANDED).toEqual([]);
+  });
+
+  it("keeps the names when the other build cannot be read", async () => {
+    GAMES = [game("SplinterFaction 0.1.89", "SplinterFaction_0.1.89.sdz")];
+
+    await open("SplinterFaction 0.1.84", freshId(), undefined, CARRIED);
+
+    expect((await screen.findAllByText("f1landfac")).length).toBeGreaterThan(0);
+    expect(screen.getByText(/which holds no costs/)).toBeTruthy();
+    expect(screen.queryByText(/Ordered cost/)).toBeNull();
   });
 });
 

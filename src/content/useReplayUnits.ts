@@ -26,6 +26,7 @@ import {
 import {
   iconTypesByName,
   misfits,
+  namedUnits,
   orderFit,
   storedListFor,
   type UnitIds,
@@ -143,6 +144,9 @@ function useKeptUnitLists(gameId: string | undefined, wanted: boolean) {
  * `ids` says which ids the caller names. A build order's are the recorded
  * game's. An analysis event's are those of the game the analysis ran on, which
  * the engine's own list always answers for.
+ *
+ * `carried` is the unit names the replay itself holds, from its build order
+ * read. They count in the stream's ids, so they are ignored for `events`.
  */
 export function useReplayUnits(
   info: Pick<
@@ -151,6 +155,7 @@ export function useReplayUnits(
   >,
   wanted: boolean,
   ids: UnitIds = "stream",
+  carried?: readonly string[],
 ) {
   const { selected } = useScanTargetSelection();
   const scan = useUnitsyncScan(selected?.enginePath, selected?.rootPath);
@@ -162,6 +167,7 @@ export function useReplayUnits(
           recorded,
           scan.data.games,
           storedListFor(lists.sets, ids),
+          ids === "stream" ? carried : undefined,
         )
       : null;
   // A stored list needs no read of the game. A live one does.
@@ -176,12 +182,17 @@ export function useReplayUnits(
     archive,
     source?.kind === "installed" ? info.matchSetup : undefined,
   );
+  const read = archive && dataset ? dataset.units : null;
+  // The replay's names wait for the other build's read, so a row does not change
+  // from a key to a name under the reader. A read that fails leaves the keys.
+  const names = source?.kind === "replay" ? source.names : null;
+  const reading = archive !== undefined && status === "loading";
+  const named = useMemo(
+    () => (names && !reading ? namedUnits(names, read ?? []) : null),
+    [names, reading, read],
+  );
   const units: UnitDatasetEntry[] | null =
-    source?.kind === "stored"
-      ? source.list.units
-      : archive && dataset
-        ? dataset.units
-        : null;
+    source?.kind === "stored" ? source.list.units : names ? named : read;
   return {
     selected,
     recorded,
@@ -191,9 +202,15 @@ export function useReplayUnits(
     archive,
     /** The installed game's archive to ask for build pictures, by unit key. */
     picturesArchive: pictureGame(source)?.primaryArchive.name,
-    status: source?.kind === "stored" ? ("ready" as const) : status,
+    status:
+      source?.kind === "stored" || (names && !archive)
+        ? ("ready" as const)
+        : status,
     /** The units in id order, or null when they cannot be read. */
     units,
+    /** `units` when they say what each unit is and costs, and null when there
+     *  is nothing but names to go on. */
+    described: names && !read?.length ? null : units,
     /** Every list the store holds for this replay. */
     links: lists.sets?.links ?? NO_LINKS,
     /** The version of the read of a match that this build makes. */

@@ -130,6 +130,8 @@ export function useReplayMapLayers({
   const units = useReplayUnits(
     info,
     layersShown && result !== null && result.orders.length > 0,
+    "stream",
+    result?.unitNames,
   );
 
   // The chart's colours, asked the way the chart asks them.
@@ -208,8 +210,9 @@ export function useReplayMapLayers({
   );
 
   const built = useMemo(
-    () => (inWindow && sized ? buildMarks(inWindow, world, units.units) : null),
-    [inWindow, sized, world, units.units],
+    () =>
+      inWindow && sized ? buildMarks(inWindow, world, units.described) : null,
+    [inWindow, sized, world, units.described],
   );
   const field = useMemo(
     () =>

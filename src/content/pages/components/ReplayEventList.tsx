@@ -105,6 +105,8 @@ function UnitNote({
     );
   }
   if (source.kind === "stored") return <StoredListNote source={source} />;
+  // An event's ids are never named from the replay's own list of names.
+  if (source.kind === "replay") return null;
   const gameName = source.game.name;
   if (unitsFailed) {
     return (

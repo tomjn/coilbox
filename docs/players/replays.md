@@ -118,7 +118,9 @@ Select Show build orders to read them. Each player then has a row with the numbe
 
 These are orders, not what was built. An order that was cancelled or never carried out is listed like any other.
 
-Naming the units needs the replay's game installed. If you have another version, the names and costs come from that version and the page warns they may be wrong. If you have none, each order shows a unit number.
+Naming the units needs the replay's game installed, or a unit list coilbox kept for the replay. If you have another version, the names and costs come from that version and the page warns they may be wrong. If you have none, each order shows a unit number.
+
+A Beyond All Reason replay carries the names of its own units. When its version is not installed and no list was kept, the build orders are named from those. They are the names the game's files use, such as `armmex`. If you have another version of the game, each unit takes its full name, cost and picture from the unit of the same name there, and the page warns that the costs may be wrong. With no version installed, no costs are shown.
 
 ## Analyse a replay
 

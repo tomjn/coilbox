@@ -180,6 +180,10 @@ pub(super) fn build_orders_from_stream(
     for e in &stream.events {
         seats.observe(&e.kind);
         match &e.kind {
+            // Each player's game sends the same list. The first is enough.
+            StreamEventKind::UnitDefNames { names, .. } if out.unit_names.is_empty() => {
+                out.unit_names = names.clone();
+            }
             StreamEventKind::Select { player, units } => {
                 selected.insert(*player, units.len() as u32);
             }
@@ -356,6 +360,8 @@ fn build_facts(id: i32, options: u8, params: &[f32]) -> BuildFacts {
 mod tests {
     use super::super::stream::fixture::Packets;
     use super::*;
+    use crate::model::StreamEvent;
+    use std::collections::BTreeMap;
 
     const NO_AI: u8 = 255;
 
@@ -777,6 +783,72 @@ mod tests {
                 "options": 0,
             })
         );
+    }
+
+    #[test]
+    fn the_first_unit_list_in_the_stream_comes_out_with_the_orders() {
+        let list = |player: u8, name: &str| StreamEvent {
+            frame: -1,
+            time: 0.0,
+            kind: StreamEventKind::UnitDefNames {
+                player,
+                names: vec![name.to_string()],
+            },
+        };
+        let mut stream = Packets::default().walked();
+        stream.events = vec![list(3, "armcom"), list(4, "corcom")];
+        let got = build_orders_from_stream(&stream, HashMap::new(), HashMap::new());
+        assert_eq!(got.unit_names, vec!["armcom".to_string()]);
+    }
+
+    /// The names a real Beyond All Reason replay gives its own build orders, with
+    /// no game and no unitsync. The counts printed are what shows the ids are
+    /// numbered from 1: off by one, the names are neighbours in the alphabet.
+    ///
+    ///   COILBOX_REAL_DEMO_DIR=/path/to/bar/replays \
+    ///   cargo test -p tauri-plugin-coilbox-content real_replay_unit_names -- --ignored --nocapture
+    #[test]
+    #[ignore = "needs Beyond All Reason replays in COILBOX_REAL_DEMO_DIR"]
+    fn real_replay_unit_names() {
+        let dir = std::env::var("COILBOX_REAL_DEMO_DIR").expect("set COILBOX_REAL_DEMO_DIR");
+        let mut seen = 0;
+        for file in std::fs::read_dir(&dir).unwrap().flatten().map(|e| e.path()) {
+            if file.extension().is_none_or(|e| e != "sdfz") {
+                continue;
+            }
+            let got = demo_build_orders(&file).unwrap();
+            assert!(!got.unit_names.is_empty(), "{}", file.display());
+            seen += 1;
+            let mut placed: BTreeMap<&str, usize> = BTreeMap::new();
+            let mut queued: BTreeMap<&str, usize> = BTreeMap::new();
+            for order in &got.orders {
+                let name = usize::try_from(order.unit_def_id - 1)
+                    .ok()
+                    .and_then(|i| got.unit_names.get(i))
+                    .unwrap_or_else(|| panic!("no name for id {}", order.unit_def_id));
+                let into = if order.position.is_some() {
+                    &mut placed
+                } else {
+                    &mut queued
+                };
+                *into.entry(name).or_default() += 1;
+            }
+            let top = |counts: BTreeMap<&str, usize>| {
+                let mut counts: Vec<_> = counts.into_iter().collect();
+                counts.sort_by_key(|(name, n)| (std::cmp::Reverse(*n), name.to_string()));
+                counts.truncate(8);
+                format!("{counts:?}")
+            };
+            println!(
+                "{}: names={} orders={}\n  placed {}\n  queued {}",
+                file.file_name().unwrap_or_default().to_string_lossy(),
+                got.unit_names.len(),
+                got.orders.len(),
+                top(placed),
+                top(queued),
+            );
+        }
+        assert!(seen > 0, "no replays in {dir}");
     }
 
     impl DemoBuildOrders {

@@ -99,6 +99,56 @@ describe("pickUnitSource", () => {
   });
 });
 
+describe("pickUnitSource with the replay's own unit names", () => {
+  const names = ["armcom", "armmex"];
+  const installed = [
+    game("Beyond All Reason test-1", "one.sdz"),
+    game("Beyond All Reason test-3", "three.sdz"),
+  ];
+
+  it("uses them when no version of the game is installed", () => {
+    expect(pickUnitSource("Beyond All Reason test-2", [], null, names)).toEqual(
+      { kind: "replay", names, game: null },
+    );
+  });
+
+  it("uses them ahead of another build, which is read for the rest", () => {
+    const source = pickUnitSource(
+      "Beyond All Reason test-2",
+      installed,
+      null,
+      names,
+    );
+    expect(source).toEqual({ kind: "replay", names, game: installed[1] });
+    expect(liveGame(source)).toBe(installed[1]);
+    expect(pictureGame(source)).toBe(installed[1]);
+  });
+
+  it("gives way to the exact build and to a kept list", () => {
+    expect(
+      pickUnitSource("Beyond All Reason test-1", installed, null, names).kind,
+    ).toBe("installed");
+    const kept: StoredUnitList = {
+      link: {
+        digest: `sha256:${"a".repeat(64)}`,
+        origin: "archive",
+        game: "Beyond All Reason test-2",
+        takenAtMs: 1_700_000_000_000,
+      },
+      units,
+    };
+    expect(
+      pickUnitSource("Beyond All Reason test-2", [], kept, names).kind,
+    ).toBe("stored");
+  });
+
+  it("takes an empty list as no list", () => {
+    expect(pickUnitSource("Beyond All Reason test-2", [], null, [])).toEqual({
+      kind: "notInstalled",
+    });
+  });
+});
+
 describe("pickUnitSource with a list kept for the replay", () => {
   const installed = [
     game("Metal Factions v2.58", "metal_factions-v2.58.sdz"),

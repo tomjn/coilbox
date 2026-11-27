@@ -103,7 +103,7 @@ export function BasePicturesProvider({
     layersShown,
   );
   const minimapUrl = minimap.url;
-  const unitList = units.units;
+  const unitList = units.described;
   const value = useMemo(() => {
     if (!layersShown || !minimapUrl || !inWindow) return null;
     // Wait for the analysis rather than centre on the recorded start and jump.
