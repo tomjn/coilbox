@@ -219,6 +219,8 @@ export function HeatWindowPlot({
     lane.window?.startSec ?? 0,
     lane.window?.endSec ?? domainSec,
   ];
+  // A box over the whole match has nowhere to slide to.
+  const movable = shown[0] > 0 || shown[1] < domainSec;
   const path = useMemo(
     () => (activity ? activityPath(activity.points, totalSec) : null),
     [activity, totalSec],
@@ -306,7 +308,9 @@ export function HeatWindowPlot({
       )}
       <div
         data-testid="heat-window-box"
-        className="absolute inset-y-0 cursor-grab border-x-2 border-primary bg-primary/10 active:cursor-grabbing"
+        className={`absolute inset-y-0 border-x-2 border-primary bg-primary/10 ${
+          movable ? "cursor-grab active:cursor-grabbing" : ""
+        }`}
         style={{ left, width }}
         {...grab("move")}
       >

@@ -113,6 +113,16 @@ describe("the lane", () => {
     expect(screen.getByRole("group", { name: "Heat window" })).toBeTruthy();
   });
 
+  it("shows a grab cursor only when the box can slide", () => {
+    show();
+    // Over the whole match there is nowhere to slide to.
+    expect(box().className).not.toContain("cursor-grab");
+    drag(end(), 1000, 500);
+    expect(box().className).toContain("cursor-grab");
+    drag(end(), 500, 1000);
+    expect(box().className).not.toContain("cursor-grab");
+  });
+
   it("has nothing for a match with no length", () => {
     show(0);
     expect(screen.queryByTestId("heat-window-lane")).toBeNull();
