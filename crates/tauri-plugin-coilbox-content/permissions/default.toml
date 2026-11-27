@@ -48,6 +48,8 @@ permissions = [
   "allow-content-replay-tracks-clear",
   "allow-content-replay-track-header",
   "allow-content-replay-track-window",
+  "allow-content-replay-hub-track",
+  "allow-content-replay-hub-track-download",
   "allow-content-replay-playback-launch",
   "allow-content-start-boxes",
   "allow-content-unit-def-set",

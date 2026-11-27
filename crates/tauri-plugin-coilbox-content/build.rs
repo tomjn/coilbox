@@ -48,6 +48,8 @@ const COMMANDS: &[&str] = &[
     "content_replay_tracks_clear",
     "content_replay_track_header",
     "content_replay_track_window",
+    "content_replay_hub_track",
+    "content_replay_hub_track_download",
     "content_replay_playback_launch",
     "content_start_boxes",
     "content_unit_def_set",

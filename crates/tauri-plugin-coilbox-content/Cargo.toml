@@ -39,6 +39,8 @@ coilbox-springlua = { path = "../coilbox-springlua" }
 # replay track store (issue #3786).
 coilbox-track = { path = "../coilbox-track" }
 coilbox-track-thin = { path = "../coilbox-track-thin" }
+# The coded errors a failed track download from the hub is reported as (issue #5520).
+coilbox-ui-error = { path = "../coilbox-ui-error" }
 flate2 = "1"
 # Names a stored unit definition list by its content (issue #1176), as the map
 # catalog and the asset vocabulary name theirs.

@@ -5942,6 +5942,7 @@ dependencies = [
  "coilbox-tdf",
  "coilbox-track",
  "coilbox-track-thin",
+ "coilbox-ui-error",
  "filetime",
  "flate2",
  "image 0.25.10",
