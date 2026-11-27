@@ -26,7 +26,7 @@ pub const FORMAT_VERSION: u32 = 1;
 /// stored analysis, so a file from before the change can be told from one made
 /// after it. `the_logger_writes_the_kinds_this_version_stands_for` fails when
 /// the gadget gains a kind and this was not raised with it.
-pub const LOGGER_VERSION: u32 = 7;
+pub const LOGGER_VERSION: u32 = 8;
 
 /// The first [`LOGGER_VERSION`] that wrote `unit_damage` lines. An analysis from
 /// before it has no line for any unit, which is not the same as every unit
@@ -602,7 +602,7 @@ pub(super) mod tests {
         assert_eq!(
             (LOGGER_VERSION, kinds),
             (
-                7,
+                8,
                 vec![
                     "damage",
                     "game_over",
@@ -858,6 +858,30 @@ pub(super) mod tests {
             (defs[3].metal_cost, defs[3].transport_capacity),
             (Some(0.0), Some(8.0))
         );
+    }
+
+    /// What the logger writes in its own test for a game that declares its
+    /// income in `customParams`. An older line has none of the three, which the
+    /// test above covers.
+    #[test]
+    fn income_declared_in_custom_params_is_read_and_kept() {
+        let log = parse_log(include_str!(
+            "../../../../../lua/replay-logger/tests/fixtures/unit_defs_income.jsonl"
+        ));
+
+        assert_eq!(log.malformed, 0);
+        let defs = unit_defs_of(&log.lines).expect("a whole list");
+        assert_eq!(defs[0].income_energy, Some(2.0));
+        assert_eq!(
+            (defs[0].income_metal, defs[0].metal_extractor_mult),
+            (None, None)
+        );
+        assert_eq!(
+            (defs[1].income_metal, defs[1].metal_extractor_mult),
+            (Some(0.5), Some(1.0))
+        );
+        let stored = serde_json::to_string(&defs[0]).unwrap();
+        assert!(stored.contains("\"incomeEnergy\":2.0"), "{stored}");
     }
 
     /// A definition is found by its place in the list.

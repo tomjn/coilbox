@@ -1989,6 +1989,11 @@ export interface StoredUnitDef {
   /** The map icon the engine drew the unit with in the match. Only the engine's
    *  own list has it. */
   iconType?: string;
+  /** Income the game's own Lua pays, from the definition's `customParams`, as
+   *  Zero-K declares it. */
+  incomeEnergy?: number;
+  incomeMetal?: number;
+  metalExtractorMult?: number;
 }
 
 /**

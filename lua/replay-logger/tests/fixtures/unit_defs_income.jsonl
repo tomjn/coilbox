@@ -1,0 +1,4 @@
+{"kind":"header","format":1,"game":"Test Game","gameVersion":"1.0","gameShortName":"TG","map":"Test Map","engine":"2026.01.0 test","mapSizeX":4096,"mapSizeZ":2048,"gaiaTeam":-1,"positionFrames":60,"unitDefs":3,"damageFrames":450,"gridWidth":256,"gridHeight":128}
+{"kind":"unit_def","id":1,"name":"tgsolar","metalCost":70,"energyCost":70,"incomeEnergy":2}
+{"kind":"unit_def","id":2,"name":"tgmoho","metalCost":85,"energyCost":85,"incomeMetal":0.5,"metalExtractorMult":1}
+{"kind":"unit_def","id":3,"name":"tgrock","metalCost":1,"energyCost":1}
