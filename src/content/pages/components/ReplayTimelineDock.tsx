@@ -741,8 +741,10 @@ export function ReplayTimelineDock({
           />
         </div>
         {/* Scrolls when the lanes are opened past the dock's cap. The side
-         * padding is the knob's, which reaches past the lanes. */}
-        <div className="-mx-2 flex min-h-0 gap-2 overflow-y-auto px-2 text-xs">
+         * padding holds what reaches past the lanes: the knob, the Heat
+         * window's ends and the last tick of the axis. The axis ticks are one
+         * line of 12px, so they fit the 15px under the axis border. */}
+        <div className="-mx-4 flex min-h-0 gap-2 overflow-y-auto px-4 text-xs">
           <div className="flex w-24 shrink-0 flex-col text-muted-foreground [&>*]:shrink-0">
             <span className="h-5" />
             {shownLanes.map(({ lane, name }) => (
@@ -882,7 +884,7 @@ export function ReplayTimelineDock({
               {ticks.map((tick) => (
                 <span
                   key={tick}
-                  className="absolute top-0.5 -translate-x-1/2 tabular-nums first:translate-x-0"
+                  className="absolute top-0.5 -translate-x-1/2 text-xs leading-3 tabular-nums first:translate-x-0"
                   style={{
                     left: `${totalSec > 0 ? (tick / totalSec) * 100 : 0}%`,
                   }}
