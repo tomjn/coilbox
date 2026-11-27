@@ -2282,14 +2282,12 @@ msgid "{count, plural, one {# objective} other {# objectives}}"
 msgstr "{count, plural, one {# Ziel} other {# Ziele}}"
 
 #: src/content/pages/components/ReplayMapRail.tsx
-#, fuzzy
-msgid "{count, plural, one {# order within {radius} elmos of one spot in this window} other {# orders within {radius} elmos of one spot in this window}}"
-msgstr "{count, plural, one {# Auftrag im Umkreis von {radius} Elmos um einen Punkt in diesem Zeitfenster} other {# Aufträge im Umkreis von {radius} Elmos um einen Punkt in diesem Zeitfenster}}"
+msgid "{count, plural, one {# order in one spot in this window} other {# orders in one spot in this window}}"
+msgstr ""
 
 #: src/content/pages/components/ReplayMapRail.tsx
-#, fuzzy
-msgid "{count, plural, one {# order within {radius} elmos of one spot} other {# orders within {radius} elmos of one spot}}"
-msgstr "{count, plural, one {# Auftrag im Umkreis von {radius} Elmos um einen Punkt} other {# Aufträge im Umkreis von {radius} Elmos um einen Punkt}}"
+msgid "{count, plural, one {# order in one spot} other {# orders in one spot}}"
+msgstr ""
 
 #: src/lego/unitCheck.ts
 #, fuzzy
@@ -3596,11 +3594,6 @@ msgstr "{infoCount, plural, one {# Hinweis} other {# Hinweise}}"
 msgid "{inProgress} in progress"
 msgstr "{inProgress} laufend"
 
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
-#, fuzzy
-msgid "{inside} of {total} {countNoun}."
-msgstr "{inside} von {total} {countNoun}."
-
 #: src/profile/health.ts
 #, fuzzy
 msgid "{installedCount, plural, one {Filter ({filterDesc}) matched none of the # installed game: {sample}{more}. Adjust it to match one of these.} other {Filter ({filterDesc}) matched none of the # installed games: {sample}{more}. Adjust it to match one of these.}}"
@@ -4677,14 +4670,12 @@ msgid "{metal} metal"
 msgstr "{metal} Metall"
 
 #: src/content/replayEventLayers.ts
-#, fuzzy
-msgid "{metal} metal of units lost within {radius} elmos of one spot"
-msgstr "{metal} Metall an Einheiten verloren im Umkreis von {radius} Elmos um einen Punkt"
+msgid "{metal} metal of units lost in one spot"
+msgstr ""
 
 #: src/content/replayEventLayers.ts
-#, fuzzy
-msgid "{metal} metal of units lost within {radius} elmos of one spot in this window"
-msgstr "{metal} Metall an Einheiten verloren im Umkreis von {radius} Elmos um einen Punkt in diesem Zeitfenster"
+msgid "{metal} metal of units lost in one spot in this window"
+msgstr ""
 
 #: src/direct/ReachablePorts.tsx
 #, fuzzy
@@ -5797,34 +5788,28 @@ msgid "{pathName} · point {pointNumber}"
 msgstr "{pathName} · Punkt {pointNumber}"
 
 #: src/content/replayEventLayers.ts
-#, fuzzy
-msgid "{peak, plural, one {# death within {radius} elmos of one spot in this window} other {# deaths within {radius} elmos of one spot in this window}}"
-msgstr "{peak, plural, one {# Verlust im Umkreis von {radius} Elmos um einen Punkt in diesem Zeitfenster} other {# Verluste im Umkreis von {radius} Elmos um einen Punkt in diesem Zeitfenster}}"
+msgid "{peak, plural, one {# death in one spot in this window} other {# deaths in one spot in this window}}"
+msgstr ""
 
 #: src/content/replayEventLayers.ts
-#, fuzzy
-msgid "{peak, plural, one {# death within {radius} elmos of one spot} other {# deaths within {radius} elmos of one spot}}"
-msgstr "{peak, plural, one {# Verlust im Umkreis von {radius} Elmos um einen Punkt} other {# Verluste im Umkreis von {radius} Elmos um einen Punkt}}"
+msgid "{peak, plural, one {# death in one spot} other {# deaths in one spot}}"
+msgstr ""
 
 #: src/content/replayDamage.ts
-#, fuzzy
-msgid "{peak} damage landed within {radius} elmos of one spot"
-msgstr "{peak} Schaden erlitten im Umkreis von {radius} Elmos um einen Punkt"
+msgid "{peak} damage landed in one spot"
+msgstr ""
 
 #: src/content/replayDamage.ts
-#, fuzzy
-msgid "{peak} damage landed within {radius} elmos of one spot in this window"
-msgstr "{peak} Schaden erlitten im Umkreis von {radius} Elmos um einen Punkt in diesem Zeitfenster"
+msgid "{peak} damage landed in one spot in this window"
+msgstr ""
 
 #: src/content/replayDamage.ts
-#, fuzzy
-msgid "{peak} damage was dealt from within {radius} elmos of one spot"
-msgstr "{peak} Schaden verursacht aus dem Umkreis von {radius} Elmos um einen Punkt"
+msgid "{peak} damage was dealt from one spot"
+msgstr ""
 
 #: src/content/replayDamage.ts
-#, fuzzy
-msgid "{peak} damage was dealt from within {radius} elmos of one spot in this window"
-msgstr "{peak} Schaden verursacht aus dem Umkreis von {radius} Elmos um einen Punkt in diesem Zeitfenster"
+msgid "{peak} damage was dealt from one spot in this window"
+msgstr ""
 
 #: src/workshop/pages/components/InPlaceWrite.tsx
 #, fuzzy
@@ -6923,11 +6908,6 @@ msgstr "{subject} stammen aus der Einheitenliste, die die Engine bei der Analyse
 #, fuzzy
 msgid "{subject} progress"
 msgstr "Fortschritt von {subject}"
-
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
-#, fuzzy
-msgid "{subjectLabel} from {rangeStart} to {rangeEnd}."
-msgstr "{subjectLabel} von {rangeStart} bis {rangeEnd}."
 
 #: src/challenge/ImportChallengeForm.tsx
 #, fuzzy
@@ -14726,11 +14706,6 @@ msgstr "Gebäudedichte"
 #, fuzzy
 msgid "Building mask"
 msgstr "Baumaske"
-
-#: src/content/pages/components/ReplayMapRail.tsx
-#, fuzzy
-msgid "building orders"
-msgstr "Gebäudeaufträge"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -22737,11 +22712,6 @@ msgstr "Ereignis"
 #, fuzzy
 msgid "Event log downloaded."
 msgstr "Ereignisprotokoll heruntergeladen."
-
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
-#, fuzzy
-msgid "Events"
-msgstr "Ereignisse"
 
 #: src/content/pages/components/ReplayEventList.tsx
 #: src/content/pages/components/ReplayPanel.tsx
@@ -33446,11 +33416,6 @@ msgstr "Albtraum"
 msgid "No"
 msgstr "Nein"
 
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
-#, fuzzy
-msgid "No {countNoun}."
-msgstr "Keine {countNoun}."
-
 #: src/lego/pages/components/MovementSection.tsx
 #, fuzzy
 msgid "no {standsIn} class"
@@ -33628,11 +33593,6 @@ msgstr "Keine Baueinheit passt dazu."
 msgid "No buildings"
 msgstr "Keine Gebäude"
 
-#: src/content/pages/components/ReplayMapRail.tsx
-#, fuzzy
-msgid "No buildings were ordered in this replay."
-msgstr "In dieser Wiederholung wurden keine Gebäude in Auftrag gegeben."
-
 #: src/lego/overlap.ts
 #, fuzzy
 msgid "No buried pieces."
@@ -33741,16 +33701,6 @@ msgstr ""
 #, fuzzy
 msgid "No counted game has a figure for {label}."
 msgstr "Keine gezählte Partie hat eine Kennzahl für {label}."
-
-#: src/content/pages/components/ReplayEventLayers.tsx
-#, fuzzy
-msgid "No damage was recorded in this window."
-msgstr "In diesem Zeitfenster wurde kein Schaden aufgezeichnet."
-
-#: src/content/pages/components/ReplayEventLayers.tsx
-#, fuzzy
-msgid "No damage was recorded."
-msgstr "Es wurde kein Schaden aufgezeichnet."
 
 #: src/content/pages/PlayerDossierPage.tsx
 #: src/content/pages/StatsPage.tsx
@@ -34555,11 +34505,6 @@ msgstr "In diesem Abschnitt wurden keine Befehle gegeben."
 msgid "No orders were given."
 msgstr "Es wurden keine Befehle gegeben."
 
-#: src/content/pages/components/ReplayMapRail.tsx
-#, fuzzy
-msgid "No orders with a place on the map were given in this replay."
-msgstr "In dieser Wiederholung wurden keine Befehle mit einem Ort auf der Karte gegeben."
-
 #: src/lego/rerollPart.ts
 #, fuzzy
 msgid "No other module is in the {category} category."
@@ -35273,11 +35218,6 @@ msgstr "Keine zwei Plätze liegen näher beieinander als der Extraktorradius von
 #, fuzzy
 msgid "No unit data available for this game."
 msgstr "Für dieses Spiel sind keine Einheitendaten verfügbar."
-
-#: src/content/pages/components/ReplayEventLayers.tsx
-#, fuzzy
-msgid "No unit died in this analysis."
-msgstr "In dieser Analyse ist keine Einheit gestorben."
 
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
@@ -38056,7 +37996,6 @@ msgid "Ordered cost: {metal} metal and {energy} energy."
 msgstr "Bestellte Kosten: {metal} Metall und {energy} Energie."
 
 #: src/content/mapAggregate.ts
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "orders"
 msgstr "Befehle"
@@ -38076,26 +38015,11 @@ msgstr "Befehle, die ein Widget auf dem Rechner des Spielers an benannte Einheit
 msgid "Orders aimed at a unit are not on it, as the replay holds the unit and not its position."
 msgstr "Befehle auf eine Einheit sind nicht darauf eingezeichnet, weil die Wiederholung die Einheit speichert, nicht ihre Position."
 
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
-#, fuzzy
-msgid "Orders given"
-msgstr "Gegebene Befehle"
-
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
-#, fuzzy
-msgid "Orders given and events"
-msgstr "Gegebene Befehle und Ereignisse"
-
 #. placeholder {0}: rates.periodSec
 #: src/content/pages/components/CommandRateChart.tsx
 #, fuzzy
 msgid "Orders given in each {0} second stretch, shown as a rate per minute."
 msgstr "Befehle pro Abschnitt von {0} Sekunden, als Rate pro Minute gezeigt."
-
-#: src/content/pages/components/ReplayMapRail.tsx
-#, fuzzy
-msgid "orders on the map"
-msgstr "Befehle auf der Karte"
 
 #: src/content/pages/components/CommandRateChart.tsx
 #, fuzzy
@@ -52812,11 +52736,6 @@ msgstr "Der ganze Ordner wird entfernt und gibt {freedBytes} frei. Sie müssten 
 msgid "the whole match"
 msgstr "die ganze Partie"
 
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
-#, fuzzy
-msgid "The whole match, {matchStart} to {matchEnd}."
-msgstr "Die ganze Partie, {matchStart} bis {matchEnd}."
-
 #: src/placement/SurfaceBars.tsx
 #, fuzzy
 msgid "The whole selection swung a quarter turn about its own middle, so it keeps its shape. Press R to turn each thing where it stands instead."
@@ -53080,11 +52999,6 @@ msgstr "Dieses Konto hat in der letzten Stunde 20 Dinge veröffentlicht, die Gre
 #, fuzzy
 msgid "This analysis is from an older logger, so a path may stop where the unit was upgraded."
 msgstr "Diese Analyse stammt von einem älteren Logger, ein Weg endet also eventuell dort, wo die Einheit aufgerüstet wurde."
-
-#: src/content/pages/components/ReplayStartUnitLayer.tsx
-#, fuzzy
-msgid "This analysis recorded no starting unit."
-msgstr "Diese Analyse hat keine Starteinheit aufgezeichnet."
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -53854,12 +53768,6 @@ msgstr ""
 msgid "This match never recorded a game over, usually because it was quit before it ended. There is nothing to check a playback against, so it cannot be analysed."
 msgstr "Diese Partie hat nie ein Spielende aufgezeichnet, meist weil sie vorher verlassen wurde. Es gibt nichts, womit eine Wiedergabe verglichen werden kann, also lässt sie sich nicht analysieren."
 
-#: src/content/pages/components/ReplayMapHeat.tsx
-#: src/content/pages/components/ReplayMapUnits.tsx
-#, fuzzy
-msgid "This match set no start boxes."
-msgstr "Diese Partie hatte keine Startbereiche."
-
 #: src/scenario/wording.ts
 #, fuzzy
 msgid "This mission comes with {gameName}, which plays it itself."
@@ -54268,12 +54176,6 @@ msgstr "Diese Wiederholung ist kürzer als ein Abschnitt von {periodSec} Sekunde
 #, fuzzy
 msgid "This replay needs engine {version}, which is not installed and cannot be downloaded here."
 msgstr "Diese Wiederholung braucht Engine {version}, die nicht installiert ist und hier nicht heruntergeladen werden kann."
-
-#: src/content/pages/components/ReplayMapHeat.tsx
-#: src/content/pages/components/ReplayMapUnits.tsx
-#, fuzzy
-msgid "This replay recorded no start positions."
-msgstr "Diese Wiederholung hat keine Startpositionen aufgezeichnet."
 
 #. placeholder {0}: units.recorded
 #: src/content/pages/components/ReplayEventLayers.tsx

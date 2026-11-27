@@ -2283,14 +2283,12 @@ msgid "{count, plural, one {# objective} other {# objectives}}"
 msgstr "{count, plural, one {# mål} other {# mål}}"
 
 #: src/content/pages/components/ReplayMapRail.tsx
-#, fuzzy
-msgid "{count, plural, one {# order within {radius} elmos of one spot in this window} other {# orders within {radius} elmos of one spot in this window}}"
-msgstr "{count, plural, one {# ordre innenfor {radius} elmo fra ett punkt i dette tidsrommet} other {# ordrer innenfor {radius} elmo fra ett punkt i dette tidsrommet}}"
+msgid "{count, plural, one {# order in one spot in this window} other {# orders in one spot in this window}}"
+msgstr ""
 
 #: src/content/pages/components/ReplayMapRail.tsx
-#, fuzzy
-msgid "{count, plural, one {# order within {radius} elmos of one spot} other {# orders within {radius} elmos of one spot}}"
-msgstr "{count, plural, one {# ordre innenfor {radius} elmo fra ett punkt} other {# ordrer innenfor {radius} elmo fra ett punkt}}"
+msgid "{count, plural, one {# order in one spot} other {# orders in one spot}}"
+msgstr ""
 
 #: src/lego/unitCheck.ts
 #, fuzzy
@@ -3597,11 +3595,6 @@ msgstr "{infoCount, plural, one {# merknad} other {# merknader}}"
 msgid "{inProgress} in progress"
 msgstr "{inProgress} pågår"
 
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
-#, fuzzy
-msgid "{inside} of {total} {countNoun}."
-msgstr "{inside} av {total} {countNoun}."
-
 #: src/profile/health.ts
 #, fuzzy
 msgid "{installedCount, plural, one {Filter ({filterDesc}) matched none of the # installed game: {sample}{more}. Adjust it to match one of these.} other {Filter ({filterDesc}) matched none of the # installed games: {sample}{more}. Adjust it to match one of these.}}"
@@ -4678,14 +4671,12 @@ msgid "{metal} metal"
 msgstr "{metal} metall"
 
 #: src/content/replayEventLayers.ts
-#, fuzzy
-msgid "{metal} metal of units lost within {radius} elmos of one spot"
-msgstr "{metal} metall i enheter tapt innenfor {radius} elmo fra ett punkt"
+msgid "{metal} metal of units lost in one spot"
+msgstr ""
 
 #: src/content/replayEventLayers.ts
-#, fuzzy
-msgid "{metal} metal of units lost within {radius} elmos of one spot in this window"
-msgstr "{metal} metall i enheter tapt innenfor {radius} elmo fra ett punkt i dette tidsrommet"
+msgid "{metal} metal of units lost in one spot in this window"
+msgstr ""
 
 #: src/direct/ReachablePorts.tsx
 #, fuzzy
@@ -5798,34 +5789,28 @@ msgid "{pathName} · point {pointNumber}"
 msgstr "{pathName} · punkt {pointNumber}"
 
 #: src/content/replayEventLayers.ts
-#, fuzzy
-msgid "{peak, plural, one {# death within {radius} elmos of one spot in this window} other {# deaths within {radius} elmos of one spot in this window}}"
-msgstr "{peak, plural, one {# tap innenfor {radius} elmo fra ett punkt i dette tidsrommet} other {# tap innenfor {radius} elmo fra ett punkt i dette tidsrommet}}"
+msgid "{peak, plural, one {# death in one spot in this window} other {# deaths in one spot in this window}}"
+msgstr ""
 
 #: src/content/replayEventLayers.ts
-#, fuzzy
-msgid "{peak, plural, one {# death within {radius} elmos of one spot} other {# deaths within {radius} elmos of one spot}}"
-msgstr "{peak, plural, one {# tap innenfor {radius} elmo fra ett punkt} other {# tap innenfor {radius} elmo fra ett punkt}}"
+msgid "{peak, plural, one {# death in one spot} other {# deaths in one spot}}"
+msgstr ""
 
 #: src/content/replayDamage.ts
-#, fuzzy
-msgid "{peak} damage landed within {radius} elmos of one spot"
-msgstr "{peak} skade traff innenfor {radius} elmo fra ett punkt"
+msgid "{peak} damage landed in one spot"
+msgstr ""
 
 #: src/content/replayDamage.ts
-#, fuzzy
-msgid "{peak} damage landed within {radius} elmos of one spot in this window"
-msgstr "{peak} skade traff innenfor {radius} elmo fra ett punkt i dette tidsrommet"
+msgid "{peak} damage landed in one spot in this window"
+msgstr ""
 
 #: src/content/replayDamage.ts
-#, fuzzy
-msgid "{peak} damage was dealt from within {radius} elmos of one spot"
-msgstr "{peak} skade ble gjort fra innenfor {radius} elmo fra ett punkt"
+msgid "{peak} damage was dealt from one spot"
+msgstr ""
 
 #: src/content/replayDamage.ts
-#, fuzzy
-msgid "{peak} damage was dealt from within {radius} elmos of one spot in this window"
-msgstr "{peak} skade ble gjort fra innenfor {radius} elmo fra ett punkt i dette tidsrommet"
+msgid "{peak} damage was dealt from one spot in this window"
+msgstr ""
 
 #: src/workshop/pages/components/InPlaceWrite.tsx
 #, fuzzy
@@ -6924,11 +6909,6 @@ msgstr "{subject} kommer fra enhetslisten motoren skrev da denne reprisen ble an
 #, fuzzy
 msgid "{subject} progress"
 msgstr "Fremdrift for {subject}"
-
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
-#, fuzzy
-msgid "{subjectLabel} from {rangeStart} to {rangeEnd}."
-msgstr "{subjectLabel} fra {rangeStart} til {rangeEnd}."
 
 #: src/challenge/ImportChallengeForm.tsx
 #, fuzzy
@@ -14727,11 +14707,6 @@ msgstr "Bygningstetthet"
 #, fuzzy
 msgid "Building mask"
 msgstr "Bygningsmaske"
-
-#: src/content/pages/components/ReplayMapRail.tsx
-#, fuzzy
-msgid "building orders"
-msgstr "byggeordrer"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -22743,11 +22718,6 @@ msgstr "Hendelse"
 #, fuzzy
 msgid "Event log downloaded."
 msgstr "Hendelseslogg lastet ned."
-
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
-#, fuzzy
-msgid "Events"
-msgstr "Hendelser"
 
 #: src/content/pages/components/ReplayEventList.tsx
 #: src/content/pages/components/ReplayPanel.tsx
@@ -33458,11 +33428,6 @@ msgstr "Mareritt"
 msgid "No"
 msgstr "Nei"
 
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
-#, fuzzy
-msgid "No {countNoun}."
-msgstr "{countNoun}: ingen."
-
 #: src/lego/pages/components/MovementSection.tsx
 #, fuzzy
 msgid "no {standsIn} class"
@@ -33640,11 +33605,6 @@ msgstr "Ingen bygger passer til det."
 msgid "No buildings"
 msgstr "Ingen bygninger"
 
-#: src/content/pages/components/ReplayMapRail.tsx
-#, fuzzy
-msgid "No buildings were ordered in this replay."
-msgstr "Ingen bygninger ble bestilt i denne reprisen."
-
 #: src/lego/overlap.ts
 #, fuzzy
 msgid "No buried pieces."
@@ -33753,16 +33713,6 @@ msgstr ""
 #, fuzzy
 msgid "No counted game has a figure for {label}."
 msgstr "Ingen talte spill har et tall for {label}."
-
-#: src/content/pages/components/ReplayEventLayers.tsx
-#, fuzzy
-msgid "No damage was recorded in this window."
-msgstr "Ingen skade ble registrert i dette tidsrommet."
-
-#: src/content/pages/components/ReplayEventLayers.tsx
-#, fuzzy
-msgid "No damage was recorded."
-msgstr "Ingen skade ble registrert."
 
 #: src/content/pages/PlayerDossierPage.tsx
 #: src/content/pages/StatsPage.tsx
@@ -34567,11 +34517,6 @@ msgstr "Ingen ordrer ble gitt i denne perioden."
 msgid "No orders were given."
 msgstr "Ingen ordrer ble gitt."
 
-#: src/content/pages/components/ReplayMapRail.tsx
-#, fuzzy
-msgid "No orders with a place on the map were given in this replay."
-msgstr "Ingen ordrer med et sted på kartet ble gitt i denne reprisen."
-
 #: src/lego/rerollPart.ts
 #, fuzzy
 msgid "No other module is in the {category} category."
@@ -35285,11 +35230,6 @@ msgstr "Ingen to plasser ligger nærmere hverandre enn utvinnerens radius, {radi
 #, fuzzy
 msgid "No unit data available for this game."
 msgstr "Ingen enhetsdata tilgjengelig for dette spillet."
-
-#: src/content/pages/components/ReplayEventLayers.tsx
-#, fuzzy
-msgid "No unit died in this analysis."
-msgstr "Ingen enhet døde i denne analysen."
 
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
@@ -38072,7 +38012,6 @@ msgid "Ordered cost: {metal} metal and {energy} energy."
 msgstr "Bestilt kostnad: {metal} metall og {energy} energi."
 
 #: src/content/mapAggregate.ts
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "orders"
 msgstr "ordrer"
@@ -38092,26 +38031,11 @@ msgstr "Ordrer som en widget på spillerens maskin sendte til navngitte enheter.
 msgid "Orders aimed at a unit are not on it, as the replay holds the unit and not its position."
 msgstr "Ordrer rettet mot en enhet er ikke på den, fordi reprisen holder enheten og ikke posisjonen."
 
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
-#, fuzzy
-msgid "Orders given"
-msgstr "Gitte ordrer"
-
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
-#, fuzzy
-msgid "Orders given and events"
-msgstr "Gitte ordrer og hendelser"
-
 #. placeholder {0}: rates.periodSec
 #: src/content/pages/components/CommandRateChart.tsx
 #, fuzzy
 msgid "Orders given in each {0} second stretch, shown as a rate per minute."
 msgstr "Ordrer gitt i hver periode på {0} sekunder, vist som tempo per minutt."
-
-#: src/content/pages/components/ReplayMapRail.tsx
-#, fuzzy
-msgid "orders on the map"
-msgstr "ordrer på kartet"
 
 #: src/content/pages/components/CommandRateChart.tsx
 #, fuzzy
@@ -52842,11 +52766,6 @@ msgstr "Hele mappen forsvinner og frigjør {freedBytes}. Du må laste ned denne 
 msgid "the whole match"
 msgstr "hele kampen"
 
-#: src/content/pages/components/ReplayTimeWindowNote.tsx
-#, fuzzy
-msgid "The whole match, {matchStart} to {matchEnd}."
-msgstr "Hele kampen, {matchStart} til {matchEnd}."
-
 #: src/placement/SurfaceBars.tsx
 #, fuzzy
 msgid "The whole selection swung a quarter turn about its own middle, so it keeps its shape. Press R to turn each thing where it stands instead."
@@ -53110,11 +53029,6 @@ msgstr "Denne kontoen har publisert 20 ting den siste timen, som er grensen på 
 #, fuzzy
 msgid "This analysis is from an older logger, so a path may stop where the unit was upgraded."
 msgstr "Denne analysen er fra en eldre logger, så en sti kan stoppe der enheten ble oppgradert."
-
-#: src/content/pages/components/ReplayStartUnitLayer.tsx
-#, fuzzy
-msgid "This analysis recorded no starting unit."
-msgstr "Denne analysen registrerte ingen startenhet."
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -53884,12 +53798,6 @@ msgstr ""
 msgid "This match never recorded a game over, usually because it was quit before it ended. There is nothing to check a playback against, so it cannot be analysed."
 msgstr "Denne kampen registrerte aldri en spillslutt, vanligvis fordi den ble avsluttet før den var ferdig. Det er ingenting å sjekke en avspilling mot, så den kan ikke analyseres."
 
-#: src/content/pages/components/ReplayMapHeat.tsx
-#: src/content/pages/components/ReplayMapUnits.tsx
-#, fuzzy
-msgid "This match set no start boxes."
-msgstr "Denne kampen satte ingen startområder."
-
 #: src/scenario/wording.ts
 #, fuzzy
 msgid "This mission comes with {gameName}, which plays it itself."
@@ -54298,12 +54206,6 @@ msgstr "Denne reprisen er kortere enn én periode på {periodSec} sekunder, så 
 #, fuzzy
 msgid "This replay needs engine {version}, which is not installed and cannot be downloaded here."
 msgstr "Denne reprisen trenger motor {version}, som ikke er installert og ikke kan lastes ned her."
-
-#: src/content/pages/components/ReplayMapHeat.tsx
-#: src/content/pages/components/ReplayMapUnits.tsx
-#, fuzzy
-msgid "This replay recorded no start positions."
-msgstr "Denne reprisen registrerte ingen startposisjoner."
 
 #. placeholder {0}: units.recorded
 #: src/content/pages/components/ReplayEventLayers.tsx
