@@ -334,19 +334,17 @@ describe("the wording", () => {
   });
 
   it("reads the legend's peak in deaths, or in metal", () => {
-    const field = { peakWithinRadius: 2, radius: 128 };
+    const field = { peakWithinRadius: 2 };
     expect(deathLegend(field, false, false)).toEqual({
       label: "Where units died",
-      peak: "2 deaths within 128 elmos of one spot",
+      peak: "2 deaths in one spot",
     });
     expect(
       deathLegend({ ...field, peakWithinRadius: 1 }, false, true).peak,
-    ).toBe("1 death within 128 elmos of one spot in this window");
-    expect(
-      deathLegend({ peakWithinRadius: 1450, radius: 128 }, true, false),
-    ).toEqual({
+    ).toBe("1 death in one spot in this window");
+    expect(deathLegend({ peakWithinRadius: 1450 }, true, false)).toEqual({
       label: "Where metal was lost",
-      peak: "1,450 metal of units lost within 128 elmos of one spot",
+      peak: "1,450 metal of units lost in one spot",
     });
   });
 });

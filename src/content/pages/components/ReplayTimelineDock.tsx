@@ -2,11 +2,19 @@ import type { MessageDescriptor } from "@lingui/core";
 import { msg, plural, t } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
-import { ChevronsDown, ChevronsUp, Pause, Play } from "lucide-react";
+import {
+  ChevronsDown,
+  ChevronsUp,
+  Pause,
+  Play,
+  Rewind,
+  SkipBack,
+} from "lucide-react";
 import { Slider as SliderPrimitive } from "radix-ui";
 import {
   createContext,
   type KeyboardEvent,
+  type MouseEvent,
   type MutableRefObject,
   type ReactNode,
   useContext,
@@ -434,47 +442,60 @@ function Knob({
   );
 }
 
-/** Play, reverse, and the speed. Only a match with a recording has them. */
+/** Go to start, rewind, play and the speed. Only a match with a recording has
+ *  them. Play is the primary control and the rest are quieter. */
 function Transport() {
   const { t: tr } = useLingui();
-  const { playback } = useMatchClock();
+  const { playback, range } = useMatchClock();
   const state = usePlaybackState();
   const playingForward = state.playing && state.direction === 1;
   const playingBack = state.playing && state.direction === -1;
   return (
     <div className="flex items-center gap-1">
+      <Tip label={tr`Go to start`}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-7 text-muted-foreground"
+          aria-label={tr`Go to start`}
+          onClick={() => playback.seek(range.firstFrame)}
+        >
+          <SkipBack className="size-4" />
+        </Button>
+      </Tip>
       <Tip label={playingBack ? tr`Pause` : tr`Play in reverse`}>
         <Button
           type="button"
           variant="ghost"
           size="icon"
-          className="size-7"
+          className="size-7 text-muted-foreground"
           aria-label={playingBack ? tr`Pause` : tr`Play in reverse`}
           onClick={() => (playingBack ? playback.pause() : playback.play(-1))}
         >
           {playingBack ? (
             <Pause className="size-4" />
           ) : (
-            <Play className="size-4 -scale-x-100" />
+            <Rewind className="size-4" />
           )}
         </Button>
       </Tip>
       <Tip label={playingForward ? tr`Pause` : tr`Play`}>
         <Button
           type="button"
-          variant="ghost"
           size="icon"
-          className="size-7"
+          className="size-8 rounded-full"
           aria-label={playingForward ? tr`Pause` : tr`Play`}
           onClick={() => (playingForward ? playback.pause() : playback.play(1))}
         >
           {playingForward ? (
-            <Pause className="size-4" />
+            <Pause className="size-4 fill-current" />
           ) : (
-            <Play className="size-4" />
+            <Play className="size-4 fill-current" />
           )}
         </Button>
       </Tip>
+      <SpeedSelect />
     </div>
   );
 }
@@ -614,6 +635,28 @@ export function ReplayTimelineDock({
     return () => watcher.disconnect();
   }, []);
 
+  // A press on blank space in a row moves the match to that time. Anything
+  // that does something with a press of its own keeps it.
+  const seekFromRow = (event: MouseEvent<HTMLDivElement>) => {
+    const target = event.target;
+    if (
+      target instanceof Element &&
+      target.closest(
+        "button, [role=slider], [data-slot=slider], [data-testid=heat-window-box]",
+      )
+    ) {
+      return;
+    }
+    const { left, width } = event.currentTarget.getBoundingClientRect();
+    if (!(width > 0)) return;
+    const share = Math.min(1, Math.max(0, (event.clientX - left) / width));
+    playback.seek(
+      Math.round(
+        range.firstFrame + share * (range.lastFrame - range.firstFrame),
+      ),
+    );
+  };
+
   const axis = useMemo(
     () => ({ first: range.firstFrame, last: range.lastFrame }),
     [range.firstFrame, range.lastFrame],
@@ -665,7 +708,6 @@ export function ReplayTimelineDock({
           >
             {reading ? groupWords(range, reading) : ""}
           </p>
-          {animates && <SpeedSelect />}
           {folded && (
             <Tip
               label={opened ? tr`Fold the extra lanes` : tr`Show every lane`}
@@ -699,8 +741,10 @@ export function ReplayTimelineDock({
           />
         </div>
         {/* Scrolls when the lanes are opened past the dock's cap. The side
-         * padding is the knob's, which reaches past the lanes. */}
-        <div className="-mx-2 flex min-h-0 gap-2 overflow-y-auto px-2 text-xs">
+         * padding holds what reaches past the lanes: the knob, the Heat
+         * window's ends and the last tick of the axis. The axis ticks are one
+         * line of 12px, so they fit the 15px under the axis border. */}
+        <div className="-mx-4 flex min-h-0 gap-2 overflow-y-auto px-4 text-xs">
           <div className="flex w-24 shrink-0 flex-col text-muted-foreground [&>*]:shrink-0">
             <span className="h-5" />
             {shownLanes.map(({ lane, name }) => (
@@ -726,7 +770,8 @@ export function ReplayTimelineDock({
           <div className="min-w-0 flex-1">
             {/* The scrubber and the lanes, which the playhead crosses. It is
              * also what the columns are measured from. */}
-            <div ref={lanesRef} className="relative">
+            {/* biome-ignore lint/a11y/noStaticElementInteractions lint/a11y/useKeyWithClickEvents: a press on blank space in a row is a pointer shortcut. The scrubber and the keys do the same from the keyboard. */}
+            <div ref={lanesRef} className="relative" onClick={seekFromRow}>
               <div className="h-5">
                 <Knob range={range} onKeyDown={keys?.onKeyDown} />
               </div>
@@ -839,7 +884,7 @@ export function ReplayTimelineDock({
               {ticks.map((tick) => (
                 <span
                   key={tick}
-                  className="absolute top-0.5 -translate-x-1/2 tabular-nums first:translate-x-0"
+                  className="absolute top-0.5 -translate-x-1/2 text-xs leading-3 tabular-nums first:translate-x-0"
                   style={{
                     left: `${totalSec > 0 ? (tick / totalSec) * 100 : 0}%`,
                   }}

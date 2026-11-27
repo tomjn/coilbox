@@ -170,24 +170,23 @@ export function damageTotals(lines: readonly DamageLine[]): DamageTotals {
 
 /** The legend of a damage field: what is drawn and what the peak holds. */
 export function damageLegend(
-  field: { peakWithinRadius?: number; radius: number },
+  field: { peakWithinRadius?: number },
   mode: DamageMode,
   inWindow: boolean,
 ): { label: string; peak: string } {
   const peak = formatNumber(Math.round(field.peakWithinRadius ?? 0));
-  const radius = formatNumber(Math.round(field.radius));
   if (mode === "at") {
     return {
       label: t`Where damage landed`,
       peak: inWindow
-        ? t`${peak} damage landed within ${radius} elmos of one spot in this window`
-        : t`${peak} damage landed within ${radius} elmos of one spot`,
+        ? t`${peak} damage landed in one spot in this window`
+        : t`${peak} damage landed in one spot`,
     };
   }
   return {
     label: t`Where damage came from`,
     peak: inWindow
-      ? t`${peak} damage was dealt from within ${radius} elmos of one spot in this window`
-      : t`${peak} damage was dealt from within ${radius} elmos of one spot`,
+      ? t`${peak} damage was dealt from one spot in this window`
+      : t`${peak} damage was dealt from one spot`,
   };
 }

@@ -67,6 +67,19 @@ export function openAnalysisRun(): void {
   if (action instanceof HTMLButtonElement && !action.disabled) action.click();
 }
 
+/** Sent by {@link goToAnalysisSection} so the page can open the tab that holds
+ *  the analysis section, which is hidden while another tab is open. */
+export const SHOW_ANALYSIS_EVENT = "coilbox:show-analysis";
+
+/** Takes the person to the analysis and recording section, opening its tab
+ *  first when the page has another one open. */
+export function goToAnalysisSection(): void {
+  window.dispatchEvent(new Event(SHOW_ANALYSIS_EVENT));
+  document
+    .getElementById(ANALYSIS_SECTION_ID)
+    ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+}
+
 /** Whether this distribution hides the analysis run. */
 export function analysisRunHidden(): boolean {
   return isProfileHidden("analytics.run");

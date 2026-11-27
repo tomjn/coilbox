@@ -220,6 +220,11 @@ const dots = () =>
       label: dot.getAttribute("aria-label"),
     }),
   );
+/** Waits for a layer to be drawn, which is when its points have been read. */
+const drawn = (layer: string) =>
+  waitFor(() =>
+    expect(document.querySelector(`[data-layer="${layer}"]`)).toBeTruthy(),
+  );
 const boxes = () => document.querySelectorAll('[data-layer="startBox"]');
 
 afterEach(() => {
@@ -358,22 +363,24 @@ describe("the rail's room (#5357)", () => {
 });
 
 describe("a replay with nothing to draw", () => {
-  it("says a replay with no stream recorded no start positions", () => {
+  it("draws no start dot, and has no note, for a replay with no start positions", () => {
     show({ ...INFO, startPositions: undefined });
     expect(dots()).toHaveLength(0);
-    expect(screen.getByText(/recorded no start positions/i)).toBeTruthy();
+    expect(screen.queryByText(/recorded no start positions/i)).toBeNull();
   });
 
-  it("says a match with no start boxes set none", () => {
+  it("draws no start box, and has no note, for a match with none set", () => {
     show({ ...INFO, allyTeams: [] });
-    expect(screen.getByText(/set no start boxes/i)).toBeTruthy();
+    expect(boxes()).toHaveLength(0);
+    expect(screen.queryByText(/set no start boxes/i)).toBeNull();
   });
 
-  it("says so when no building was ordered", async () => {
+  it("draws nothing, and has no note, when no building was ordered", async () => {
     ORDERS = orders([order({ count: 5 })]);
     show();
     fireEvent.click(toggle("Buildings ordered"));
-    expect(await screen.findByText(/no buildings were ordered/i)).toBeTruthy();
+    await waitFor(() => expect(ordersRead).toHaveBeenCalled());
+    expect(screen.queryByText(/no buildings were ordered/i)).toBeNull();
     expect(document.querySelector('[data-layer="buildings"]')).toBeNull();
   });
 
@@ -394,7 +401,7 @@ describe("buildings ordered", () => {
     DATASET = { units: UNITS };
     show();
     fireEvent.click(toggle("Buildings ordered"));
-    expect(await screen.findByText(/3 of 3 orders/)).toBeTruthy();
+    expect(await screen.findByText("Economy")).toBeTruthy();
     expect(screen.queryByText(/not what was built/i)).toBeNull();
     expect(screen.queryByText(/factory queue order/i)).toBeNull();
     expect(screen.queryByText(/A mark is one order/)).toBeNull();
@@ -456,7 +463,7 @@ describe("building density", () => {
     show();
     fireEvent.click(toggle("Building density"));
     expect(
-      await screen.findByText(/Most is 2 orders within 128 elmos of one spot/i),
+      await screen.findByText(/Most is 2 orders in one spot/i),
     ).toBeTruthy();
     expect(screen.getByText("Where buildings were ordered")).toBeTruthy();
     expect(screen.getByText("Least")).toBeTruthy();
@@ -478,7 +485,8 @@ describe("building density", () => {
     ORDERS = orders([]);
     show();
     fireEvent.click(toggle("Building density"));
-    await screen.findByText(/no buildings were ordered/i);
+    await waitFor(() => expect(ordersRead).toHaveBeenCalled());
+    expect(screen.queryByText(/no buildings were ordered/i)).toBeNull();
     expect(screen.queryByText("Least")).toBeNull();
     expect(document.querySelector('[data-layer="density"]')).toBeNull();
   });
@@ -542,11 +550,12 @@ describe("order density", () => {
     expect(document.querySelector('[data-layer="orderDensity"]')).toBeNull();
   });
 
-  it("says so when no order had a place", async () => {
+  it("draws nothing, and has no note, when no order had a place", async () => {
     POINTS = packOrders([]);
     show();
     fireEvent.click(toggle("Order density"));
-    await screen.findAllByText(/no orders with a place on the map/i);
+    await waitFor(() => expect(pointsRead).toHaveBeenCalled());
+    expect(screen.queryByText(/no orders with a place on the map/i)).toBeNull();
     expect(screen.queryByText("Least")).toBeNull();
   });
 });
@@ -564,34 +573,28 @@ describe("the time window", () => {
     lastFrame: 30 * MIN,
   };
   const LONG = { ...INFO, durationSec: 1800 } as DemoInfo;
-  const window = () => screen.queryByTestId("time-window");
-
-  it("is not there while only the layers set before the game are on", () => {
-    ORDERS = EARLY;
-    show(LONG);
-    expect(window()).toBeNull();
-  });
-
-  it("opens on the whole match, with the count the layer has", async () => {
+  it("opens on the whole match", async () => {
     ORDERS = EARLY;
     show(LONG);
     fireEvent.click(toggle("Buildings ordered"));
-    expect(await screen.findByText(/3 of 3 orders/)).toBeTruthy();
+    await drawn("buildings");
     fireEvent.click(screen.getByRole("button", { name: "Heat window" }));
     expect(
       screen
         .getByRole("button", { name: "Whole match" })
         .getAttribute("aria-pressed"),
     ).toBe("true");
-    expect(screen.getByText(/The whole match, 0:00 to 30:00/)).toBeTruthy();
   });
 
   it("does not have the old control under the map", async () => {
     ORDERS = EARLY;
     show(LONG);
     fireEvent.click(toggle("Buildings ordered"));
-    await screen.findByText(/3 of 3 orders/);
+    await drawn("buildings");
     expect(screen.queryByText("Time window")).toBeNull();
+    // And no line under the map that says what the window covers.
+    expect(screen.queryByTestId("time-window")).toBeNull();
+    expect(screen.queryByText(/The whole match, 0:00/)).toBeNull();
     // The lane's two ends are the only sliders there are.
     expect(screen.getAllByRole("slider")).toHaveLength(2);
     expect(
@@ -604,20 +607,15 @@ describe("the time window", () => {
     show(LONG);
     fireEvent.click(toggle("Buildings ordered"));
     fireEvent.click(toggle("Building density"));
-    await screen.findByText(/3 of 3 orders/);
     expect(
-      screen.getByText(/Most is 2 orders within 128 elmos of one spot\./),
+      await screen.findByText(/Most is 2 orders in one spot\./),
     ).toBeTruthy();
 
     // The first five minutes hold the pregame order and the one at 30 seconds.
     press("First 5 minutes");
-    expect(await screen.findByText(/2 of 3 orders/)).toBeTruthy();
-    expect(screen.getByText(/Orders given from 0:00 to 5:00/)).toBeTruthy();
     // The legend's peak is the window's own.
     expect(
-      screen.getByText(
-        /Most is 2 orders within 128 elmos of one spot in this window/,
-      ),
+      await screen.findByText(/Most is 2 orders in one spot in this window/),
     ).toBeTruthy();
     // The start dots are set before the game and stay.
     expect(dots()).toHaveLength(2);
@@ -626,21 +624,26 @@ describe("the time window", () => {
   it("leaves out the pregame order once the window starts after zero", async () => {
     ORDERS = EARLY;
     show(LONG);
-    fireEvent.click(toggle("Buildings ordered"));
-    await screen.findByText(/3 of 3 orders/);
+    fireEvent.click(toggle("Building density"));
+    await screen.findByText(/Most is 2 orders in one spot\./);
     const [start] = screen.getAllByRole("slider");
     act(() => start.focus());
     fireEvent.keyDown(start, { key: "ArrowRight" });
-    expect(await screen.findByText(/2 of 3 orders/)).toBeTruthy();
+    // Only the order at 30 seconds and the later ones are left to peak.
+    expect(
+      await screen.findByText(/Most is 1 order in one spot in this window/),
+    ).toBeTruthy();
   });
 
   it("says none of the orders, and not that no building was ordered, for an empty window", async () => {
     ORDERS = EARLY;
     show(LONG);
     fireEvent.click(toggle("Building density"));
-    await screen.findByText(/3 of 3 orders/);
+    await drawn("density");
     press("Last 5 minutes");
-    expect(await screen.findByText(/0 of 3 orders/)).toBeTruthy();
+    await waitFor(() =>
+      expect(document.querySelector('[data-layer="density"]')).toBeNull(),
+    );
     expect(screen.queryByText(/no buildings were ordered/i)).toBeNull();
     expect(screen.queryByText("Least")).toBeNull();
     expect(document.querySelector('[data-layer="density"]')).toBeNull();
@@ -650,13 +653,12 @@ describe("the time window", () => {
     ORDERS = EARLY;
     show(LONG);
     fireEvent.click(toggle("Building density"));
-    await screen.findByText(/3 of 3 orders/);
+    await screen.findByText(/Most is 2 orders in one spot\./);
     press("First 5 minutes");
-    await screen.findByText(/2 of 3 orders/);
+    await screen.findByText(/in one spot in this window/);
     press("Whole match");
-    expect(await screen.findByText(/3 of 3 orders/)).toBeTruthy();
     expect(
-      screen.getByText(/Most is 2 orders within 128 elmos of one spot\./),
+      await screen.findByText(/Most is 2 orders in one spot\./),
     ).toBeTruthy();
   });
 
@@ -678,36 +680,36 @@ describe("the time window", () => {
     );
     const view = render(page("/replays/a.sdfz"));
     fireEvent.click(toggle("Building density"));
-    await screen.findByText(/3 of 3 orders/);
+    await screen.findByText(/Most is 2 orders in one spot\./);
     press("First 5 minutes");
-    await screen.findByText(/2 of 3 orders/);
+    await screen.findByText(/in one spot in this window/);
     view.rerender(page("/replays/b.sdfz"));
     // Read straight after the path changed, before anything is read for it.
-    expect(screen.getByText(/The whole match, 0:00 to 30:00/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Heat window" }));
+    expect(
+      screen
+        .getByRole("button", { name: "Whole match" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
   });
 
   it("is not remembered between visits", async () => {
     ORDERS = EARLY;
     show(LONG);
     fireEvent.click(toggle("Building density"));
-    await screen.findByText(/3 of 3 orders/);
+    await screen.findByText(/Most is 2 orders in one spot\./);
     press("First 5 minutes");
-    await screen.findByText(/2 of 3 orders/);
+    await screen.findByText(/in one spot in this window/);
     cleanup();
     resetReplayBuildOrders();
     show(LONG);
     // The layer is still on from the last visit, and the window is not.
-    expect(await screen.findByText(/3 of 3 orders/)).toBeTruthy();
-    expect(screen.getByText(/The whole match, 0:00 to 30:00/)).toBeTruthy();
+    expect(
+      await screen.findByText(/Most is 2 orders in one spot\./),
+    ).toBeTruthy();
     expect(localStorage.getItem("coilbox.replayMap.layers")).not.toContain(
       "window",
     );
-  });
-
-  it("goes with the spatial layers when a profile hides them", () => {
-    HIDE = ["analytics.spatialLayers"];
-    show(LONG);
-    expect(window()).toBeNull();
   });
 });
 
@@ -724,12 +726,11 @@ describe("order density in the time window", () => {
     { lastFrame: 30 * MIN },
   );
 
-  it("shows the window while only this layer is on, counting its own points", async () => {
+  it("draws from the points alone, without reading the build orders", async () => {
     POINTS = POINTS_OVER_TIME;
     show(LONG);
-    expect(screen.queryByTestId("time-window")).toBeNull();
     fireEvent.click(toggle("Order density"));
-    expect(await screen.findByText(/4 of 4 orders on the map/)).toBeTruthy();
+    await drawn("orderDensity");
     expect(ordersRead).not.toHaveBeenCalled();
   });
 
@@ -737,11 +738,12 @@ describe("order density in the time window", () => {
     POINTS = POINTS_OVER_TIME;
     show(LONG);
     fireEvent.click(toggle("Order density"));
-    await screen.findByText(/4 of 4 orders on the map/);
-    expect(screen.getByText(/Most is 2 orders within/)).toBeTruthy();
+    expect(
+      await screen.findByText(/Most is 2 orders in one spot/),
+    ).toBeTruthy();
 
     press("First 5 minutes");
-    expect(await screen.findByText(/2 of 4 orders on the map/)).toBeTruthy();
+    await screen.findByText(/in one spot in this window/);
     // Two orders are in the first five minutes, 1 of them from a widget.
     const note = help().getByText(/roughly where attention went/i)
       .parentElement as HTMLElement;
@@ -749,21 +751,16 @@ describe("order density in the time window", () => {
     expect(note.textContent).toMatch(/1 of them were sent by widgets/);
     expect(note.textContent).toMatch(/cannot narrow/);
     expect(
-      screen.getByText(
-        /Most is 2 orders within \d+ elmos of one spot in this window/,
-      ),
+      screen.getByText(/Most is 2 orders in one spot in this window/),
     ).toBeTruthy();
 
     press("Last 5 minutes");
-    expect(await screen.findByText(/2 of 4 orders on the map/)).toBeTruthy();
     expect(
-      screen.getByText(
-        /Most is 2 orders within \d+ elmos of one spot in this window/,
-      ),
+      await screen.findByText(/Most is 2 orders in one spot in this window/),
     ).toBeTruthy();
   });
 
-  it("counts each layer's points under its own name when both are on", async () => {
+  it("narrows each layer's points on its own when both are on", async () => {
     POINTS = POINTS_OVER_TIME;
     ORDERS = {
       ...PLACED,
@@ -773,11 +770,14 @@ describe("order density in the time window", () => {
     show(LONG);
     fireEvent.click(toggle("Building density"));
     fireEvent.click(toggle("Order density"));
-    await screen.findByText(/4 of 4 orders on the map/);
-    expect(screen.getByText(/3 of 3 building orders/)).toBeTruthy();
+    await drawn("orderDensity");
+    await drawn("density");
     press("Last 5 minutes");
-    expect(await screen.findByText(/2 of 4 orders on the map/)).toBeTruthy();
-    expect(screen.getByText(/0 of 3 building orders/)).toBeTruthy();
+    // The two order points near the end are left, and no building order is.
+    await waitFor(() =>
+      expect(document.querySelector('[data-layer="density"]')).toBeNull(),
+    );
+    expect(document.querySelector('[data-layer="orderDensity"]')).toBeTruthy();
   });
 });
 
@@ -789,7 +789,7 @@ describe("one read for the page", () => {
     await screen.findByText(/Opening length in minutes/i);
     fireEvent.click(toggle("Buildings ordered"));
     fireEvent.click(toggle("Building density"));
-    await screen.findByText(/3 of 3 orders/);
+    await drawn("density");
     expect(ordersRead).toHaveBeenCalledTimes(1);
   });
 });
@@ -846,7 +846,7 @@ describe("the profile gate", () => {
 });
 
 describe("what stays in the page and what moves to the help", () => {
-  it("keeps the warning, the reason, the counts and the key beside the controls", async () => {
+  it("keeps the warning, the reason and the key beside the controls", async () => {
     ORDERS = PLACED;
     GAMES = [game("Some Game 2.0")];
     DATASET = { units: UNITS };
@@ -865,21 +865,9 @@ describe("what stays in the page and what moves to the help", () => {
     expect(screen.getByTestId("event-block").textContent).toMatch(
       /This replay has not been analysed/,
     );
-    // The window's counts, as short labels.
-    expect(await screen.findByText(/3 of 3 building orders/)).toBeTruthy();
-    expect(screen.getByText(/1 of 1 orders on the map/)).toBeTruthy();
     // The key to the shapes, and each legend's peak.
     expect(screen.getByText("Economy")).toBeTruthy();
-    expect(screen.getByText(/Most is 1 order within/)).toBeTruthy();
-  });
-
-  it("keeps an empty state in the page", async () => {
-    POINTS = packOrders([]);
-    show();
-    fireEvent.click(toggle("Order density"));
-    expect(
-      (await screen.findAllByText(/no orders with a place on the map/i)).length,
-    ).toBeGreaterThan(0);
+    expect(screen.getByText(/Most is 1 order in one spot/)).toBeTruthy();
   });
 
   it("has none of the explanation in the page until the help is opened", async () => {
@@ -890,7 +878,7 @@ describe("what stays in the page and what moves to the help", () => {
     show();
     fireEvent.click(toggle("Buildings ordered"));
     fireEvent.click(toggle("Order density"));
-    await screen.findByText(/3 of 3 building orders/);
+    await screen.findByText("Economy");
     const moved = [
       /orders and messages recorded/i,
       /allowed to start/i,
@@ -1011,24 +999,16 @@ describe("Zero-K's polygon start boxes (#5313)", () => {
     await act(async () => {});
     expect(startBoxesAsked).not.toHaveBeenCalled();
     expect(boxes()).toHaveLength(0);
-    screen.getByText("This match set no start boxes.");
+    expect(screen.queryByText("This match set no start boxes.")).toBeNull();
   });
 
-  it("shows none, with the same line, for a map Zero-K defines no areas for", async () => {
+  it("shows none for a map Zero-K defines no areas for", async () => {
     GAMES = [ZK];
     STARTBOXES = null;
     show(zerok("Zk No Areas"));
-    await waitFor(() => screen.getByText("This match set no start boxes."));
-    expect(startBoxesAsked).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(startBoxesAsked).toHaveBeenCalledTimes(1));
     expect(boxes()).toHaveLength(0);
-  });
-
-  it("says nothing while the file is being read", async () => {
-    GAMES = [ZK];
-    STARTBOXES = null;
-    show(zerok("Zk Still Reading"));
     expect(screen.queryByText("This match set no start boxes.")).toBeNull();
-    await waitFor(() => screen.getByText("This match set no start boxes."));
   });
 
   it("asks once for the session when the map is shown again", async () => {

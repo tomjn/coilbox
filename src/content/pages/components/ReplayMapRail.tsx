@@ -25,7 +25,7 @@ import type { ReplayMapLayers } from "../../useReplayMapLayers";
 import { RailSwitch } from "./RailSwitch";
 import { EventLayerHelp } from "./ReplayEventLayers";
 import { StartUnitHelp } from "./ReplayStartUnitLayer";
-import { ReplayTimeWindowNote, TimeWindowHelp } from "./ReplayTimeWindowNote";
+import { TimeWindowHelp } from "./ReplayTimeWindowNote";
 import { SectionHelp } from "./SectionHelp";
 
 /**
@@ -43,42 +43,45 @@ import { SectionHelp } from "./SectionHelp";
  * it, so the whole map shows above the dock. It is unset, and so nothing, where
  * the page has two columns and the dock is under them.
  */
-const MAP_VIEW_HEIGHT =
+export const MAP_VIEW_HEIGHT =
   "max(16rem, 100cqh - var(--replay-dock-reserve, 0px) - 4.5rem)";
 
 /**
  * The map and the rail beside it, in every mode of the map card. The rail holds
  * what steers the map and what the map is read by, so a mode puts its switches
  * there and, under them, the legend for each thing that is on. Below a wide
- * window the rail drops under the map. What belongs to the whole card width
- * goes in `under`.
+ * window the rail drops under the map.
  */
 export function ReplayMapLayout({
   shape,
   map,
   rail,
-  under,
 }: {
-  /** The map's width and height, which give the box its shape. */
-  shape: { width: number; height: number };
+  /** The map's width and height, which give the box its shape. Null for a view
+   *  that fills the column whatever its size, as the 3D view does. */
+  shape: { width: number; height: number } | null;
   map: ReactNode;
   rail: ReactNode;
-  under?: ReactNode;
 }) {
   return (
     // A container, so the rail goes beside the map when the card has the width
     // for it, which in the page's two columns is not a matter of the window's.
-    <div className="@container flex flex-col gap-3">
+    <div className="@container">
       <div className="flex flex-col gap-4 @xl:flex-row @xl:items-start">
         <div
           data-map-column
-          // All the width the card has, and no wider than lets the map keep its
-          // shape inside the share of the window's height it may take, so a
-          // tall map still fits on screen and the rail sits against it.
-          style={{
-            maxWidth: `calc(${MAP_VIEW_HEIGHT} * ${shape.width} / ${shape.height})`,
-          }}
-          className="min-w-0 @xl:flex-1"
+          // All the width the card has less the rail's, and no wider than lets
+          // the map keep its shape inside the share of the window's height it
+          // may take, so a tall map still fits on screen. The rail takes the
+          // width the map does not.
+          style={
+            shape
+              ? {
+                  maxWidth: `calc(${MAP_VIEW_HEIGHT} * ${shape.width} / ${shape.height})`,
+                }
+              : undefined
+          }
+          className="min-w-0 @xl:w-full @xl:shrink @xl:grow-0"
         >
           {map}
         </div>
@@ -89,12 +92,11 @@ export function ReplayMapLayout({
           // legends does not run past the card. Under the map it is as tall as
           // it needs to be. The padding keeps a focus ring from being clipped.
           style={{ "--rail-max-height": MAP_VIEW_HEIGHT } as CSSProperties}
-          className="flex min-w-0 flex-col gap-3 @xl:w-52 @xl:shrink-0 @xl:max-h-(--rail-max-height) @xl:overflow-x-hidden @xl:overflow-y-auto @xl:p-1"
+          className="flex min-w-0 flex-col gap-3 @xl:basis-52 @xl:grow @xl:shrink-0 @xl:max-h-(--rail-max-height) @xl:overflow-x-hidden @xl:overflow-y-auto @xl:p-1"
         >
           {rail}
         </div>
       </div>
-      {under}
     </div>
   );
 }
@@ -216,19 +218,18 @@ export function LayerSwitches({
 
 /** What the peak of an order heat field holds, in words. */
 function orderPeak(
-  field: { peakWithinRadius?: number; radius: number },
+  field: { peakWithinRadius?: number },
   inWindow: boolean,
 ): string {
   const count = Math.round(field.peakWithinRadius ?? 0);
-  const radius = formatNumber(Math.round(field.radius));
   return inWindow
     ? plural(count, {
-        one: `# order within ${radius} elmos of one spot in this window`,
-        other: `# orders within ${radius} elmos of one spot in this window`,
+        one: `# order in one spot in this window`,
+        other: `# orders in one spot in this window`,
       })
     : plural(count, {
-        one: `# order within ${radius} elmos of one spot`,
-        other: `# orders within ${radius} elmos of one spot`,
+        one: `# order in one spot`,
+        other: `# orders in one spot`,
       });
 }
 
@@ -274,74 +275,11 @@ export function HeatLegends({ layers }: { layers: ReplayMapLayers }) {
   );
 }
 
-/** What the window covers, and how much of each layer falls inside it, straight
- *  under the map it filters. The window is set on the timeline dock's Heat
- *  window lane (#5309). It is shown while a layer that has a time is on. */
-export function MapTimeWindow({ layers }: { layers: ReplayMapLayers }) {
-  const { t } = useLingui();
-  const {
-    on,
-    buildLayer,
-    windowed,
-    ev,
-    endOfMatchSec,
-    timeWindow,
-    orderCount,
-    result,
-    placedCount,
-  } = layers;
-  if (!layers.layersShown || !(windowed || ev.active)) return null;
-  return (
-    <div data-map-window className="w-full max-w-3xl">
-      <ReplayTimeWindowNote
-        matchEndSec={endOfMatchSec}
-        window={timeWindow}
-        // With the order layer on as well there are two kinds of point to
-        // count, and each is counted under its own name.
-        count={
-          !windowed
-            ? null
-            : on.orderDensity && !buildLayer
-              ? orderCount
-              : result
-                ? placedCount
-                : null
-        }
-        noun={
-          on.orderDensity
-            ? buildLayer
-              ? t`building orders`
-              : t`orders on the map`
-            : undefined
-        }
-        also={
-          on.orderDensity && buildLayer
-            ? {
-                count: orderCount,
-                noun: t`orders on the map`,
-              }
-            : undefined
-        }
-        events={ev.counts}
-        subject={windowSubject(windowed, ev.active)}
-      />
-    </div>
-  );
-}
-
 /** What is still being read, what could not be, and what came back empty, for
  *  the layers that read build orders and every order. */
 export function ReadNotes({ layers }: { layers: ReplayMapLayers }) {
-  const {
-    orders,
-    orderPoints,
-    wantOrders,
-    wantPoints,
-    result,
-    built,
-    placedCount,
-    allOrders,
-  } = layers;
+  const { orders, orderPoints, wantOrders, wantPoints, result, allOrders } =
+    layers;
   return (
     <>
       {wantOrders && orders.loading && (
@@ -352,11 +290,6 @@ export function ReadNotes({ layers }: { layers: ReplayMapLayers }) {
       {wantOrders && orders.failed && (
         <p className="text-xs text-destructive">
           <Trans>The build orders could not be read from this replay.</Trans>
-        </p>
-      )}
-      {wantOrders && built && placedCount.total === 0 && (
-        <p className="text-xs text-muted-foreground">
-          <Trans>No buildings were ordered in this replay.</Trans>
         </p>
       )}
       {wantOrders && result?.incomplete && (
@@ -376,13 +309,6 @@ export function ReadNotes({ layers }: { layers: ReplayMapLayers }) {
       {wantPoints && orderPoints.failed && (
         <p className="text-xs text-destructive">
           <Trans>The orders could not be read from this replay.</Trans>
-        </p>
-      )}
-      {wantPoints && allOrders && allOrders.count === 0 && (
-        <p className="text-xs text-muted-foreground">
-          <Trans>
-            No orders with a place on the map were given in this replay.
-          </Trans>
         </p>
       )}
       {wantPoints && allOrders?.incomplete && (

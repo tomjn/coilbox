@@ -520,14 +520,13 @@ describe("starting unit paths", () => {
     expect(help()).toMatch(/where one starting unit went in this window/);
   });
 
-  it("says so when the analysis holds no starting unit", async () => {
+  it("draws nothing, and has no note, when the analysis holds no starting unit", async () => {
     analysed();
     EVENTS = MATCH.map(({ startUnit: _flag, ...rest }) => rest);
     show();
     fireEvent.click(toggle("Starting unit paths"));
-    await waitFor(() =>
-      expect(notes()).toMatch(/This analysis recorded no starting unit/),
-    );
+    await waitFor(() => expect(eventsRead).toHaveBeenCalled());
+    expect(screen.queryByTestId("start-units")).toBeNull();
     expect(layer()).toBeNull();
   });
 });

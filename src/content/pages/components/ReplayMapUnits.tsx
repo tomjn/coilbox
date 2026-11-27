@@ -395,8 +395,6 @@ function UnitsView({
     info,
     extent: on.startBoxes ? extent : null,
   });
-  const hasBoxes = startAreas.loading || startAreas.areas.length > 0;
-  const noStarts = on.starts && (info.startPositions?.length ?? 0) === 0;
   const primary = usePrimaryPlayer();
   const meTeam = primary ? playerTeam(info, primary) : undefined;
   // Where each starting unit appeared, as the flat map's dots are placed (#5346).
@@ -567,11 +565,10 @@ function UnitsView({
             className="relative w-full overflow-hidden rounded-md border border-border/50 bg-[#0d1117]"
           >
             {minimapUrl && (
-              // Dimmed, so a team colour stands out from ground of the same hue.
               <img
                 src={minimapUrl}
                 alt={tr`Minimap of ${mapName}`}
-                className="absolute inset-0 size-full object-fill opacity-55 saturate-50"
+                className="absolute inset-0 size-full object-fill"
               />
             )}
             {/* Under the canvas, so a box or a dot never hides a unit or takes
@@ -638,10 +635,6 @@ function UnitsView({
             />
           </MapHelp>
           <p
-            ref={countsRef}
-            className="min-h-4 text-xs text-muted-foreground tabular-nums"
-          />
-          <p
             data-testid="recorded-unit-name"
             className="min-h-4 text-xs font-medium"
           >
@@ -685,18 +678,6 @@ function UnitsView({
           {layers.layersShown ? (
             <div data-map-controls className="flex flex-col gap-3">
               <LayerSwitches layers={layers} only={UNIT_MAP_LAYERS} />
-              <div data-map-notes className="flex flex-col gap-2">
-                {on.startBoxes && !hasBoxes && (
-                  <p className="text-xs text-muted-foreground">
-                    <Trans>This match set no start boxes.</Trans>
-                  </p>
-                )}
-                {noStarts && (
-                  <p className="text-xs text-muted-foreground">
-                    <Trans>This replay recorded no start positions.</Trans>
-                  </p>
-                )}
-              </div>
             </div>
           ) : (
             on.startBoxes &&
@@ -706,6 +687,10 @@ function UnitsView({
               </p>
             )
           )}
+          <p
+            ref={countsRef}
+            className="min-h-4 text-xs text-muted-foreground tabular-nums"
+          />
           <TeamKey header={header} styles={styles} />
         </>
       }
