@@ -202,6 +202,23 @@ Sometimes coilbox cannot read what the hub needs from the replay, and the box sa
 - The recording stops before the end of the match. The hub only takes a whole match.
 - The game the match was played on is not installed, or another version of it is. Install the version it was played on, then try again.
 
+### Send a replay's analysis and track
+
+Once the hub has a replay, you can also send it what coilbox found when it played the match again, and the match's recorded track for replay rewind. See [Analyse a replay](replays.md#analyse-a-replay). Anyone who was in the match can send these, whoever sent the replay.
+
+A Send analysis button appears beside On the hub when the replay has an analysis that played out exactly as the match did. A run that did not is never sent.
+
+1. Select Send analysis.
+2. The button says The hub is checking the analysis… while the hub compares it with the replay. Coilbox asks the hub how it went every few seconds while the page is open.
+3. Once the hub has passed the analysis, the button says Send track if the replay has an up to date recording. Select it.
+4. The button says Sending track…, then The hub is checking the track…, then Track on the hub.
+
+If the hub refuses the analysis, the button says Analysis refused. Select it to see why. Coilbox does not offer the track then.
+
+If the track is not sent, the button says Track not sent. Select it to see why. Where trying again could help, for example when someone else is sending a track of the same match, there is a Send again button.
+
+Sending the same analysis twice does nothing new. The hub answers with what it made of the first one.
+
 ### Send your finished matches automatically
 
 Settings > Coilbox hub has Send my finished matches to the hub, under Replays. It is off until you turn it on. See [Settings](#settings).
@@ -216,7 +233,9 @@ It sends nothing until you are signed in to the hub. A match that ended while yo
 
 If the hub or a mirror cannot take a replay, coilbox tries again later, waiting longer each time. It keeps trying for a week after the match. If the hub refuses the replay, or the week runs out, coilbox tells you the replay was not sent and why.
 
-Turning the setting off forgets every replay still waiting to be sent, and stops one that is being sent.
+With the setting on, coilbox also sends a match's analysis, then its track, when you analyse and record it. It waits until the hub has the replay. If the hub is still checking the analysis, coilbox asks again every minute, and sends the track once the analysis has passed. A match you analysed before turning the setting on is not sent by itself. Use the buttons on its page.
+
+Turning the setting off forgets every replay, analysis and track still waiting to be sent, and stops one that is being sent.
 
 ### What a sent replay holds
 
@@ -229,6 +248,10 @@ When you send a replay, coilbox sends the hub:
 - where each player started
 - each player's build orders, with the list of units in them and what each unit costs
 - your hub account and the lobby name you were in the match under
+
+When you send an analysis, coilbox sends the version of coilbox's analysis it came from and the list of events it recorded, such as each unit made, given and lost, and the final totals. It leaves out the list of unit types the game has, which coilbox keeps apart.
+
+When you send a track, coilbox sends the track file exactly as it was recorded, which holds where every unit was during the match, and your hub account.
 
 ## Settings
 
