@@ -43,9 +43,13 @@ const aiValue = (a: { kind: string; shortName: string }) =>
 export function RefightPanel({
   info,
   filename,
+  factionsPending = false,
 }: {
   info: DemoInfo;
   filename: string;
+  /** The factions picked in the match are still being named, so `info` may
+   * still hold the start script's sides. */
+  factionsPending?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -61,6 +65,7 @@ export function RefightPanel({
           <RefightForm
             info={info}
             filename={filename}
+            factionsPending={factionsPending}
             onLaunched={() => setOpen(false)}
           />
         )}
@@ -72,10 +77,12 @@ export function RefightPanel({
 function RefightForm({
   info,
   filename,
+  factionsPending,
   onLaunched,
 }: {
   info: DemoInfo;
   filename: string;
+  factionsPending: boolean;
   onLaunched: () => void;
 }) {
   const {
@@ -291,7 +298,7 @@ function RefightForm({
       <div className="flex items-center gap-2">
         <Button
           onClick={refightNow}
-          disabled={pending || running || !target}
+          disabled={pending || running || !target || factionsPending}
           className="flex-1 gap-1.5"
         >
           {pending ? (
@@ -307,7 +314,7 @@ function RefightForm({
           // A preset stores only what the match changed, which needs the game's
           // option list to compare against. Refighting now does not, because it
           // sends the match's values whatever they are.
-          disabled={pending || optionsLoading}
+          disabled={pending || optionsLoading || factionsPending}
           variant="outline"
         />
       </div>

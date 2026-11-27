@@ -34,6 +34,7 @@ import { useReplayUserState } from "../replayUserState";
 import { gameNamesMatch } from "../resolveContent";
 import { MatchClockProvider } from "../useMatchClock";
 import { useReplayEngine } from "../useReplayEngine";
+import { useReplayFactions } from "../useReplayFactions";
 import { useReplaysRoot } from "../useReplaysRoot";
 import { SeriesEmphasisProvider } from "../useSeriesEmphasis";
 import { unfinishedWarning } from "./components/ClearUnfinishedButton";
@@ -95,10 +96,14 @@ export default function ReplayDetailPage() {
   // An empty file has no header to read. It is not an error, so it is not
   // decoded (issue #3868).
   const unfinished = replay?.unfinished === true;
-  const { info, loading, error } = useDemoInfo(
+  const decoded = useDemoInfo(
     selected?.enginePath,
     unfinished ? undefined : replay?.path,
   );
+  const { loading, error } = decoded;
+  // Every section reads the faction a player picked in the match, not the
+  // start script's.
+  const { info, pending: factionsPending } = useReplayFactions(decoded.info);
   // Drives the engine-mismatch "may not sync" hint under the header.
   const { resolved } = useReplayTarget(info?.engineVersion ?? "");
   const engine = useReplayEngine(info?.engineVersion ?? "");
@@ -346,7 +351,13 @@ export default function ReplayDetailPage() {
                 onRemixed={onRemixed}
               />
             )}
-            {info && <RefightPanel info={info} filename={filename} />}
+            {info && (
+              <RefightPanel
+                info={info}
+                filename={filename}
+                factionsPending={factionsPending}
+              />
+            )}
             {info && (
               <WatchWithRewindButton
                 replayPath={replay.path}

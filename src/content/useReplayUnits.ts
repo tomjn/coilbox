@@ -149,7 +149,10 @@ function useKeptUnitLists(gameId: string | undefined, wanted: boolean) {
  * read. They count in the stream's ids, so they are ignored for `events`.
  */
 export function useReplayUnits(
-  info: DemoInfo,
+  info: Pick<
+    DemoInfo,
+    "gameType" | "remixed" | "sourceGametype" | "gameId" | "matchSetup"
+  >,
   wanted: boolean,
   ids: UnitIds = "stream",
   carried?: readonly string[],

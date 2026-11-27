@@ -68,7 +68,9 @@ vi.mock("../config", () => ({
     loading: false,
     error: null,
   }),
+  useUnitsyncGameInfo: () => ({ info: null, status: "idle" }),
   useUnitsyncHeightmap: () => ({}),
+  useUnitsyncUnitDataset: () => ({ dataset: null, status: "idle" }),
   useUnitsyncMapSkybox: () => ({}),
   useUnitsyncMinimap: () => ({ startPositions: [] }),
 }));

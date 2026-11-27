@@ -1249,8 +1249,9 @@ pub use branding::branding_image_dir;
 /// order, start position, chat and APM issues are its first callers.
 pub use demo::stream::read_stream;
 pub use model::{
-    ChatDest, CommandOrigin, DemoStream, LuaMessageCounts, Order, RecordedAward, RecordedAwardId,
-    RecordedPlace, StreamEvent, StreamEventKind, StreamStop, PREGAME_FRAME,
+    ChatDest, CommandOrigin, DemoStream, LuaMessageCounts, Order, PickedFaction, RecordedAward,
+    RecordedAwardId, RecordedPick, RecordedPlace, StreamEvent, StreamEventKind, StreamStop,
+    PREGAME_FRAME,
 };
 
 /// Build the plugin. Registered as `"coilbox-content"`; the frontend invokes
