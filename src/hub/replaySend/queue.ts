@@ -36,8 +36,8 @@ let revision = 0;
 
 export function autoSendReplaysAllowed(): boolean {
   return (
-    isHubAssetUploadOffered() &&
-    readStoredSettingIfInstalled<boolean>(AUTO_SEND_REPLAYS_KEY, false)
+    readStoredSettingIfInstalled<boolean>(AUTO_SEND_REPLAYS_KEY, false) &&
+    isHubAssetUploadOffered()
   );
 }
 
