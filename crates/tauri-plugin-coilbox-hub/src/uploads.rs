@@ -1117,9 +1117,10 @@ pub fn begin<R: Runtime>(
 /// (issue #5493).
 ///
 /// `request` carries the file's hash and size, which the command worked out
-/// from the file, and the summary the replay page read. `consent` must come
-/// from the grant a press of the replay's send button opened, because the
-/// uploads switch is about pictures and never admits a replay.
+/// from the file, and the summary the webview read. `consent` must come from
+/// the grant a press of the replay's send button opened, or from the switch
+/// that sends finished matches (issue #5494). The uploads switch is about
+/// pictures and never admits a replay.
 pub fn begin_replay<R: Runtime>(
     app: AppHandle<R>,
     hub_url: String,

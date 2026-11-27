@@ -14,7 +14,7 @@
 //!   deleting a file.
 //! - Each upload spends storage the whole community shares.
 //!
-//! # Two ways to agree
+//! # Ways to agree
 //!
 //! The switch, "Send pictures of your games and maps to the hub", is agreement to
 //! automatic sends: the library sweeps and the blueprint backfill. It is off by
@@ -27,7 +27,12 @@
 //! from a grant admits only that subject, so a grant for one map cannot carry
 //! another map or a game's pictures. Grants live in memory and die with the app.
 //!
-//! A distribution profile that turned the hub or its uploads off refuses both.
+//! Replays have their own switch, "Send my finished matches to the hub", also
+//! off by default (issue #5494). [`AssetUploadConsent::check_replay`] reads it,
+//! and its proof admits replays and nothing else.
+//!
+//! A distribution profile that turned the hub or its uploads off refuses all of
+//! them.
 //!
 //! # Why this is in Rust
 //!
@@ -74,8 +79,16 @@ pub const GRANT_ENDED: &str = "This send to the hub has already ended.";
 pub const ENGINE_NEEDS_GRANT: &str =
     "An engine build is only sent when you press its upload button.";
 
-/// What a replay send without a grant says.
-pub const REPLAY_NEEDS_GRANT: &str = "A replay is only sent when you press its send button.";
+/// The switch that sends finished matches (issue #5494), stored as
+/// [`SETTING_KEY`] is. Mirrored in `src/hub/replaySend/queue.ts`.
+pub const AUTO_REPLAY_SETTING_KEY: &str = "hub.autoSendReplays";
+
+/// What a replay send without a grant says while that switch is off.
+pub const REPLAY_NEEDS_GRANT: &str = "A replay is only sent when you press its send button, or when \"Send my finished matches to the hub\" is on in Settings > Coilbox hub.";
+
+/// What anything but a replay is told by a proof from the replay switch.
+pub const REPLAYS_ONLY: &str =
+    "Sending finished matches to the hub does not cover sending anything else.";
 
 /// The one game, map or engine build a manual send is for.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -112,12 +125,23 @@ impl SendSubject {
 /// Proof that sending was permitted when the operation began.
 ///
 /// Its value is that it cannot be made any other way: the field is private and
-/// [`check`](Self::check) is the only constructor, so a function taking one cannot
-/// be reached without the check having run. A proof made from a grant carries
-/// the grant's subject, and the `admits_*` methods hold a send to it. See the
-/// module docs.
+/// [`check`](Self::check) and [`check_replay`](Self::check_replay) are the only
+/// constructors, so a function taking one cannot be reached without a check
+/// having run. A proof carries what was agreed to, and the `admits_*` methods
+/// hold a send to it. See the module docs.
 #[derive(Debug)]
-pub struct AssetUploadConsent(Option<SendSubject>);
+pub struct AssetUploadConsent(Agreed);
+
+/// What the user agreed to.
+#[derive(Debug)]
+enum Agreed {
+    /// The pictures switch.
+    Pictures,
+    /// One send they pressed a button for.
+    Grant(SendSubject),
+    /// The switch that sends finished matches.
+    Replays,
+}
 
 impl AssetUploadConsent {
     /// Read the profile, and either the setting or the grant, and hand back a proof
@@ -136,15 +160,45 @@ impl AssetUploadConsent {
                 return Err(PROFILE_REFUSED.to_string());
             }
             return grant_subject(id)
-                .map(|subject| Self(Some(subject)))
+                .map(|subject| Self(Agreed::Grant(subject)))
                 .ok_or_else(|| GRANT_ENDED.to_string());
         }
-        let settings = coilbox_portable::settings_file(app)?;
-        let stored = std::fs::read_to_string(settings).ok();
-        if permitted(profile.as_deref(), stored.as_deref()) {
-            Ok(Self(None))
+        if permitted(profile.as_deref(), read_settings(app)?.as_deref()) {
+            Ok(Self(Agreed::Pictures))
         } else {
             Err(REFUSED.to_string())
+        }
+    }
+
+    /// The check for a replay: the grant a press of its send button opened, or
+    /// without one the switch that sends finished matches, read off disk. The
+    /// pictures switch says nothing about replays.
+    pub fn check_replay<R: Runtime>(
+        app: &AppHandle<R>,
+        grant: Option<&str>,
+    ) -> Result<Self, String> {
+        if grant.is_some() {
+            return Self::check(app, grant);
+        }
+        if permitted_by(
+            read_profile().as_deref(),
+            read_settings(app)?.as_deref(),
+            AUTO_REPLAY_SETTING_KEY,
+        ) {
+            Ok(Self(Agreed::Replays))
+        } else {
+            Err(REPLAY_NEEDS_GRANT.to_string())
+        }
+    }
+
+    /// The one thing this proof is held to, or `None` for the pictures switch,
+    /// which covers any picture, map or game. The replay switch covers none of
+    /// those.
+    fn subject(&self) -> Result<Option<&SendSubject>, String> {
+        match &self.0 {
+            Agreed::Pictures => Ok(None),
+            Agreed::Grant(subject) => Ok(Some(subject)),
+            Agreed::Replays => Err(REPLAYS_ONLY.to_string()),
         }
     }
 
@@ -154,7 +208,7 @@ impl AssetUploadConsent {
         &self,
         identities: impl IntoIterator<Item = &'a AssetIdentity>,
     ) -> Result<(), String> {
-        let Some(subject) = &self.0 else {
+        let Some(subject) = self.subject()? else {
             return Ok(());
         };
         for identity in identities {
@@ -184,7 +238,7 @@ impl AssetUploadConsent {
 
     /// Whether every map named here is this proof's subject.
     pub fn admits_maps<'a>(&self, names: impl IntoIterator<Item = &'a str>) -> Result<(), String> {
-        let Some(subject) = &self.0 else {
+        let Some(subject) = self.subject()? else {
             return Ok(());
         };
         for name in names {
@@ -197,7 +251,7 @@ impl AssetUploadConsent {
 
     /// Whether this game is this proof's subject.
     pub fn admits_game(&self, shortname: &str) -> Result<(), String> {
-        match &self.0 {
+        match self.subject()? {
             None => Ok(()),
             Some(SendSubject::Game { shortname: granted })
                 if granted.eq_ignore_ascii_case(shortname) =>
@@ -212,20 +266,21 @@ impl AssetUploadConsent {
     /// sent by a press of its upload button, so the uploads switch, which is
     /// about pictures, never admits one.
     pub fn admits_engine(&self, filename: &str) -> Result<(), String> {
-        match &self.0 {
+        match self.subject()? {
             None => Err(ENGINE_NEEDS_GRANT.to_string()),
             Some(SendSubject::Engine { filename: granted }) if granted == filename => Ok(()),
             Some(subject) => Err(subject.refuse(filename)),
         }
     }
 
-    /// Whether this replay is this proof's subject. A replay is only ever sent by
-    /// a press of its send button, so the uploads switch never admits one.
+    /// Whether this replay may go: it is the one whose send button was pressed,
+    /// or finished matches are being sent. The pictures switch never admits one.
     pub fn admits_replay(&self, game_id: &str) -> Result<(), String> {
         match &self.0 {
-            None => Err(REPLAY_NEEDS_GRANT.to_string()),
-            Some(SendSubject::Replay { game_id: granted }) if granted == game_id => Ok(()),
-            Some(subject) => Err(subject.refuse(game_id)),
+            Agreed::Pictures => Err(REPLAY_NEEDS_GRANT.to_string()),
+            Agreed::Replays => Ok(()),
+            Agreed::Grant(SendSubject::Replay { game_id: granted }) if granted == game_id => Ok(()),
+            Agreed::Grant(subject) => Err(subject.refuse(game_id)),
         }
     }
 
@@ -234,14 +289,26 @@ impl AssetUploadConsent {
     /// anywhere else.
     #[cfg(test)]
     pub(crate) fn for_test() -> Self {
-        Self(None)
+        Self(Agreed::Pictures)
     }
 
     /// A grant-based proof for tests inside this crate.
     #[cfg(test)]
     pub(crate) fn for_test_subject(subject: SendSubject) -> Self {
-        Self(Some(subject))
+        Self(Agreed::Grant(subject))
     }
+
+    /// A proof from the replay switch, for tests inside this crate.
+    #[cfg(test)]
+    pub(crate) fn for_test_auto_replays() -> Self {
+        Self(Agreed::Replays)
+    }
+}
+
+/// The settings file's text, when there is one.
+fn read_settings<R: Runtime>(app: &AppHandle<R>) -> Result<Option<String>, String> {
+    let settings = coilbox_portable::settings_file(app)?;
+    Ok(std::fs::read_to_string(settings).ok())
 }
 
 /// The distribution profile's text, when this is a portable install with one.
@@ -294,6 +361,11 @@ fn grant_subject(id: &str) -> Option<SendSubject> {
 /// unreadable, or any other value is off, because the only way this reads as
 /// agreement is if somebody stored agreement.
 fn permitted(profile_json: Option<&str>, stored_setting: Option<&str>) -> bool {
+    permitted_by(profile_json, stored_setting, SETTING_KEY)
+}
+
+/// [`permitted`] for the switch stored under `key`.
+fn permitted_by(profile_json: Option<&str>, stored_setting: Option<&str>, key: &str) -> bool {
     if !profile_permits(profile_json) {
         return false;
     }
@@ -301,7 +373,7 @@ fn permitted(profile_json: Option<&str>, stored_setting: Option<&str>) -> bool {
         Some(Ok(value)) => value,
         _ => return false,
     };
-    settings.get(SETTING_KEY).and_then(Value::as_str) == Some("true")
+    settings.get(key).and_then(Value::as_str) == Some("true")
 }
 
 /// The profile's half of the decision, which a manual send also has to pass.
@@ -510,6 +582,41 @@ mod tests {
             AssetUploadConsent::for_test().admits_replay(id),
             Err(REPLAY_NEEDS_GRANT.to_string())
         );
+    }
+
+    fn auto_replays(value: &str) -> String {
+        format!(r#"{{"hub.autoSendReplays":"{value}"}}"#)
+    }
+
+    #[test]
+    fn sending_finished_matches_is_off_until_turned_on() {
+        let on = |stored: &str| permitted_by(None, Some(stored), AUTO_REPLAY_SETTING_KEY);
+        assert!(!permitted_by(None, None, AUTO_REPLAY_SETTING_KEY));
+        assert!(!on(&auto_replays("false")));
+        assert!(on(&auto_replays("true")));
+        // The pictures switch is a different question.
+        assert!(!on(&settings("true")));
+        assert!(!permitted(None, Some(&auto_replays("true"))));
+    }
+
+    #[test]
+    fn a_profile_with_uploads_off_beats_the_replay_switch() {
+        assert!(!permitted_by(
+            Some(r#"{"hubAssetUploads":false}"#),
+            Some(&auto_replays("true")),
+            AUTO_REPLAY_SETTING_KEY,
+        ));
+    }
+
+    #[test]
+    fn the_replay_switch_admits_any_replay_and_nothing_else() {
+        let proof = AssetUploadConsent::for_test_auto_replays();
+        assert!(proof.admits_replay(&"0".repeat(32)).is_ok());
+        let refused = Err(REPLAYS_ONLY.to_string());
+        assert_eq!(proof.admits_game("bar"), refused);
+        assert_eq!(proof.admits_maps(["x"]), refused);
+        assert_eq!(proof.admits_assets([&map_picture("x")]), refused);
+        assert_eq!(proof.admits_engine("x.7z"), refused);
     }
 
     #[test]
