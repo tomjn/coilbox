@@ -56,6 +56,10 @@ function loadPicture(url: string): Promise<HTMLImageElement | null> {
   if (!picture) {
     picture = new Promise((resolve) => {
       const image = new Image();
+      // The 3D view uploads the picture to WebGL, which refuses one from
+      // another origin unless it was asked for with CORS. The scheme answers
+      // with `Access-Control-Allow-Origin: *`.
+      image.crossOrigin = "anonymous";
       image.onload = () => resolve(image);
       image.onerror = () => resolve(null);
       image.src = url;

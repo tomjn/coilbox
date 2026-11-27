@@ -25,6 +25,14 @@ export interface UnitIcons {
     lit: boolean,
     pixelRatio: number,
   ): CanvasImageSource | null;
+  /**
+   * The untinted icon of a unit definition, for a view that tints it itself,
+   * with the name of its icon type and its edge in CSS pixels. Null when the
+   * unit has no icon.
+   */
+  type(
+    def: number,
+  ): { name: string; picture: IconPicture; edge: number } | null;
 }
 
 /** How wide an icon of type size 1 is on the screen, in CSS pixels. The game
@@ -149,6 +157,13 @@ export function createUnitIcons(
         cache.set(key, sprite);
       }
       return sprite;
+    },
+    type(def) {
+      const type = typeOf(def);
+      const name = unitIcon[def];
+      return type && name
+        ? { name, picture: type.picture, edge: iconEdge(type.size) }
+        : null;
     },
   };
 }

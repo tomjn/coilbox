@@ -1,11 +1,14 @@
 /**
- * The recorded match's units as dots on the replay's 3D terrain.
+ * The recorded match's units on the replay's 3D terrain, as the game's own map
+ * icons, or as dots for a unit with no icon and while the icons load.
  *
  * The data is the flat map's own: `collectScene` fills the same arrays from the
  * same track handle at the clock's frame. Only the drawing differs. Each unit is
  * one point in its team's colour, stood on the ground at its elmo position the
  * way the scenario editor's units are (`placement/unitsLayer.ts`): scene
- * position from `worldToScene`, height from the raw height field.
+ * position from `worldToScene`, height from the raw height field. Units of one
+ * icon type share one `THREE.Points`, whose picture is tinted by each unit's
+ * colour the way the engine and the flat map tint it.
  *
  * The layer draws when the clock moves or a window of the track arrives, once
  * per animation frame however many of those came first, and asks for no frame
@@ -19,6 +22,7 @@ import { worldToScene } from "@/placement/scene";
 import { groundHeight, type HeightField } from "@/placement/terrain";
 import type { ReplayTrackHandle } from "../replayTrack";
 import type { ReplayClock } from "./clock";
+import type { UnitIcons } from "./icons";
 import type { MapViewEnv } from "./loop";
 import type { TeamStyle } from "./paint";
 import { collectScene, createMapScene, type MapScene } from "./scene";
@@ -40,8 +44,10 @@ export const DOT_PIXELS = 7;
 /** The colour of a team the style table does not know. */
 const UNKNOWN_TEAM = "#888888";
 
-/** What the points hang off, so the layer can be found in the scene. */
-const LAYER_NAME = "replay-unit-dots";
+/** What the dots hang off, so the layer can be found in the scene. */
+export const DOTS_NAME = "replay-unit-dots";
+/** What the points of one icon type hang off, followed by the type's name. */
+export const ICONS_NAME = "replay-unit-icons:";
 
 /**
  * Writes where each of the scene's units stands, as `x, y, z` in scene space,
@@ -134,64 +140,144 @@ export interface UnitDotsDeps {
   teams: ReadonlyMap<number, TeamStyle>;
   ground: DotGround;
   env: MapViewEnv;
+  /** The game's map icons. Null draws every unit as a dot. */
+  icons?: UnitIcons | null;
 }
 
 export interface UnitDotsLayer {
   /** Colour the teams in these styles from the next picture. */
   setTeams(teams: ReadonlyMap<number, TeamStyle>): void;
-  /** Draws the clock's frame now. How many dots it drew, or null while the
+  /** Draw units as these icons from the next picture, or all as dots. */
+  setIcons(icons: UnitIcons | null): void;
+  /** Draws the clock's frame now. How many units it drew, or null while the
    *  frame's window is still loading. */
   drawNow(): number | null;
   dispose(): void;
+}
+
+/** One `THREE.Points` with buffers for as many units as it has room for. */
+interface Group {
+  points: THREE.Points;
+  material: THREE.PointsMaterial;
+  texture: THREE.Texture;
+  geometry: THREE.BufferGeometry;
+  capacity: number;
+  positions: Float32Array;
+  rgb: Float32Array;
+  /** How many units it draws in the picture being filled. */
+  count: number;
+}
+
+function createGroup(
+  name: string,
+  size: number,
+  texture: THREE.Texture,
+  icon: boolean,
+): Group {
+  const material = new THREE.PointsMaterial({
+    size,
+    sizeAttenuation: false,
+    vertexColors: true,
+    // A dot is a cut-out of its colour. An icon's picture is multiplied by
+    // the colour, which is how the engine tints it.
+    ...(icon
+      ? { map: texture, alphaTest: 0.1 }
+      : { alphaMap: texture, alphaTest: 0.5 }),
+    // Drawn through the terrain so a unit behind a ridge is not lost, as the
+    // scenario editor's marker boxes are.
+    depthTest: false,
+    transparent: true,
+  });
+  const geometry = new THREE.BufferGeometry();
+  const points = new THREE.Points(geometry, material);
+  points.name = name;
+  points.renderOrder = 2;
+  // The geometry has no bounds until it is filled, and the units span the map.
+  points.frustumCulled = false;
+  return {
+    points,
+    material,
+    texture,
+    geometry,
+    capacity: 0,
+    positions: new Float32Array(0),
+    rgb: new Float32Array(0),
+    count: 0,
+  };
+}
+
+/** A fresh geometry with room for `count` units. The old one is disposed,
+ *  because replacing an attribute leaves its buffer on the GPU. */
+function growGroup(group: Group, count: number): void {
+  group.capacity = Math.max(count, group.capacity * 2, 256);
+  group.positions = new Float32Array(group.capacity * 3);
+  group.rgb = new Float32Array(group.capacity * 3);
+  group.geometry.dispose();
+  group.geometry = new THREE.BufferGeometry();
+  group.geometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(group.positions, 3).setUsage(
+      THREE.DynamicDrawUsage,
+    ),
+  );
+  group.geometry.setAttribute(
+    "color",
+    new THREE.BufferAttribute(group.rgb, 3).setUsage(THREE.DynamicDrawUsage),
+  );
+  group.points.geometry = group.geometry;
+}
+
+function disposeGroup(group: Group): void {
+  group.points.removeFromParent();
+  group.geometry.dispose();
+  group.texture.dispose();
+  group.material.dispose();
 }
 
 export function createUnitDotsLayer(deps: UnitDotsDeps): UnitDotsLayer {
   const { view, track, clock, ground, env } = deps;
   const collected = createMapScene();
   let colours = dotColours(deps.teams);
-  let capacity = 0;
-  let positions = new Float32Array(0);
-  let rgb = new Float32Array(0);
+  let icons = deps.icons ?? null;
+  let allPositions = new Float32Array(0);
+  let allRgb = new Float32Array(0);
 
-  const material = new THREE.PointsMaterial({
-    size: DOT_PIXELS,
-    sizeAttenuation: false,
-    vertexColors: true,
-    alphaMap: dotTexture(),
-    alphaTest: 0.5,
-    // Drawn through the terrain so a unit behind a ridge is not lost, as the
-    // scenario editor's marker boxes are.
-    depthTest: false,
-    transparent: true,
-  });
-  let geometry = new THREE.BufferGeometry();
-  const points = new THREE.Points(geometry, material);
-  points.name = LAYER_NAME;
-  points.renderOrder = 2;
-  // The geometry has no bounds until it is filled, and the dots span the map.
-  points.frustumCulled = false;
-  view.scene.add(points);
+  const dots = createGroup(DOTS_NAME, DOT_PIXELS, dotTexture(), false);
+  growGroup(dots, 0);
+  view.scene.add(dots.points);
+  /** The points of each icon type, made when a unit of that type is first
+   *  drawn. */
+  const iconGroups = new Map<string, Group>();
+  /** The group each unit definition is drawn in. */
+  const groupOfDef = new Map<number, Group>();
 
-  /** A fresh geometry with room for `count` dots. The old one is disposed,
-   *  because replacing an attribute leaves its buffer on the GPU. */
-  const grow = (count: number) => {
-    capacity = Math.max(count, capacity * 2, 256);
-    positions = new Float32Array(capacity * 3);
-    rgb = new Float32Array(capacity * 3);
-    geometry.dispose();
-    geometry = new THREE.BufferGeometry();
-    geometry.setAttribute(
-      "position",
-      new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage),
-    );
-    geometry.setAttribute(
-      "color",
-      new THREE.BufferAttribute(rgb, 3).setUsage(THREE.DynamicDrawUsage),
-    );
-    points.geometry = geometry;
+  const groupOf = (def: number): Group => {
+    let group = groupOfDef.get(def);
+    if (group) return group;
+    const type = icons?.type(def) ?? null;
+    if (!type) {
+      group = dots;
+    } else {
+      group = iconGroups.get(type.name);
+      if (!group) {
+        const texture = new THREE.Texture(type.picture);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.needsUpdate = true;
+        group = createGroup(ICONS_NAME + type.name, type.edge, texture, true);
+        growGroup(group, 0);
+        view.scene.add(group.points);
+        iconGroups.set(type.name, group);
+      }
+    }
+    groupOfDef.set(def, group);
+    return group;
   };
 
-  grow(0);
+  const dropIcons = () => {
+    for (const group of iconGroups.values()) disposeGroup(group);
+    iconGroups.clear();
+    groupOfDef.clear();
+  };
 
   let dirty = true;
   let pending: number | null = null;
@@ -201,15 +287,43 @@ export function createUnitDotsLayer(deps: UnitDotsDeps): UnitDotsLayer {
     const frame = clock.frame;
     track.follow(frame, clock.direction);
     if (!collectScene(track, frame, collected)) return null;
-    if (collected.units > capacity) grow(collected.units);
-    const count = writeDotPositions(collected, ground, view.scale, positions);
-    writeDotColours(collected, colours, rgb);
-    const attributes = geometry.attributes;
-    attributes.position.needsUpdate = true;
-    attributes.color.needsUpdate = true;
-    geometry.setDrawRange(0, count);
+    const units = collected.units;
+    if (allPositions.length < units * 3) {
+      allPositions = new Float32Array(units * 3);
+      allRgb = new Float32Array(units * 3);
+    }
+    writeDotPositions(collected, ground, view.scale, allPositions);
+    writeDotColours(collected, colours, allRgb);
+
+    for (const group of [dots, ...iconGroups.values()]) group.count = 0;
+    const of: Group[] = new Array(units);
+    for (let i = 0; i < units; i++) {
+      const group = groupOf(collected.unitDef[i]);
+      of[i] = group;
+      group.count++;
+    }
+    // Read again, as counting can make the group of a type first seen now.
+    for (const group of [dots, ...iconGroups.values()]) {
+      if (group.count > group.capacity) growGroup(group, group.count);
+      group.count = 0;
+    }
+    for (let i = 0; i < units; i++) {
+      const group = of[i];
+      const at = group.count * 3;
+      for (let k = 0; k < 3; k++) {
+        group.positions[at + k] = allPositions[i * 3 + k];
+        group.rgb[at + k] = allRgb[i * 3 + k];
+      }
+      group.count++;
+    }
+    for (const group of [dots, ...iconGroups.values()]) {
+      const attributes = group.geometry.attributes;
+      attributes.position.needsUpdate = true;
+      attributes.color.needsUpdate = true;
+      group.geometry.setDrawRange(0, group.count);
+    }
     view.render();
-    return count;
+    return units;
   };
 
   const tick = () => {
@@ -233,16 +347,20 @@ export function createUnitDotsLayer(deps: UnitDotsDeps): UnitDotsLayer {
       colours = dotColours(next);
       invalidate();
     },
+    setIcons(next) {
+      if (next === icons) return;
+      icons = next;
+      dropIcons();
+      invalidate();
+    },
     drawNow: draw,
     dispose() {
       disposed = true;
       if (pending !== null) env.cancelFrame(pending);
       pending = null;
       for (const stop of stops) stop();
-      points.removeFromParent();
-      geometry.dispose();
-      material.alphaMap?.dispose();
-      material.dispose();
+      dropIcons();
+      disposeGroup(dots);
       view.render();
     },
   };

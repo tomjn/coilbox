@@ -18,6 +18,7 @@ import { useUnitsyncHeightField, useUnitsyncMapSkybox } from "../../config";
 import type { ReplayTrackHandle } from "../../replayTrack";
 import { useReplayMapLayers } from "../../useReplayMapLayers";
 import { useUnitDots3d } from "../../useUnitDots3d";
+import { useUnitMapIcons } from "../../useUnitMapIcons";
 import { useUnitMapStyles } from "../../useUnitMapStyles";
 import { EventLayerNotes } from "./ReplayEventLayers";
 import {
@@ -43,6 +44,7 @@ const REPLAY_CONTENT_ATTRIBUTE = "data-replay-content";
 const REPLAY_DOCK_ATTRIBUTE = "data-replay-dock";
 
 const NO_TEAMS: ReplayTrackHandle["header"]["teams"] = [];
+const NO_UNIT_DEFS: readonly string[] = [];
 
 /**
  * The 3D mode of the replay's map card: the map as terrain, with the 3D view's
@@ -50,8 +52,8 @@ const NO_TEAMS: ReplayTrackHandle["header"]["teams"] = [];
  * that paint on the ground, the two densities and deaths or damage, have their
  * switches and legends in the rail, and read through the time window.
  *
- * The recorded units stand on the terrain as dots in their team's colour, at
- * the page's match clock. They are drawn from `track`, the handle the card
+ * The recorded units stand on the terrain as the game's map icons in their
+ * team's colour, at the page's match clock, and as dots where there is none. They are drawn from `track`, the handle the card
  * holds open for the flat map too.
  */
 export function ReplayMap3D({
@@ -140,7 +142,12 @@ export function ReplayMap3D({
     replayPath,
     track?.header.teams ?? NO_TEAMS,
   );
-  useUnitDots3d(handle, track, teams, ground);
+  const icons = useUnitMapIcons(
+    info,
+    track?.header.unitDefs ?? NO_UNIT_DEFS,
+    track !== null,
+  );
+  useUnitDots3d(handle, track, teams, ground, icons);
 
   return (
     <ReplayMapLayout

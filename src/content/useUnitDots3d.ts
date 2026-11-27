@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 
 import type { MapScene3D } from "@/lib/mapScene";
+import type { UnitIcons } from "./replayMapView/icons";
 import type { TeamStyle } from "./replayMapView/paint";
 import {
   createUnitDotsLayer,
@@ -11,8 +12,8 @@ import type { ReplayTrackHandle } from "./replayTrack";
 import { useMatchClock } from "./useMatchClock";
 
 /**
- * Puts the recorded match's units on the 3D view as dots, at the page's match
- * clock. Nothing is drawn without the scene, the open track and the ground to
+ * Puts the recorded match's units on the 3D view as the game's icons, or dots
+ * where there are none, at the page's match clock. Nothing is drawn without the scene, the open track and the ground to
  * stand on. The layer is made again when any of those changes and disposed when
  * the view unmounts.
  *
@@ -24,11 +25,14 @@ export function useUnitDots3d(
   track: ReplayTrackHandle | null,
   teams: ReadonlyMap<number, TeamStyle>,
   ground: DotGround | null,
+  icons: UnitIcons | null,
 ): void {
   const { clock } = useMatchClock();
   const layerRef = useRef<UnitDotsLayer | null>(null);
   const teamsRef = useRef(teams);
   teamsRef.current = teams;
+  const iconsRef = useRef(icons);
+  iconsRef.current = icons;
 
   useEffect(() => {
     if (!view || !track || !ground) return;
@@ -38,6 +42,7 @@ export function useUnitDots3d(
       clock,
       teams: teamsRef.current,
       ground,
+      icons: iconsRef.current,
       env: {
         requestFrame: (callback) => requestAnimationFrame(callback),
         cancelFrame: (id) => cancelAnimationFrame(id),
@@ -53,4 +58,8 @@ export function useUnitDots3d(
   useEffect(() => {
     layerRef.current?.setTeams(teams);
   }, [teams]);
+
+  useEffect(() => {
+    layerRef.current?.setIcons(icons);
+  }, [icons]);
 }

@@ -5,6 +5,7 @@ import type { MapScene3D } from "@/lib/mapScene";
 import { fieldFromGrid } from "@/placement/terrain";
 import fixture from "../fixtures/replay-track-window.json";
 import { createReplayClock } from "./clock";
+import type { UnitIcons } from "./icons";
 import type { TeamStyle } from "./paint";
 import { createMapScene } from "./scene";
 import { testTrack } from "./testTrack";
@@ -12,6 +13,7 @@ import {
   createUnitDotsLayer,
   type DotGround,
   dotColours,
+  ICONS_NAME,
   writeDotColours,
   writeDotPositions,
 } from "./unitDots3d";
@@ -182,6 +184,31 @@ describe("the unit dots layer", () => {
     frames.run();
     expect(track.waiting().length).toBeGreaterThan(0);
     expect(view.drawn.mock.calls.length).toBe(drawn);
+    expect(pointsOf(view).geometry.drawRange.count).toBe(1);
+  });
+
+  it("draws a unit with a game icon as that icon, at the icon's size, and goes back to dots without icons", async () => {
+    const { view, frames, layer } = await setup();
+    const picture = {} as CanvasImageSource;
+    const icons: UnitIcons = {
+      edge: () => 0,
+      sprite: () => null,
+      type: () => ({ name: "tank", picture, edge: 12 }),
+    };
+    layer.setIcons(icons);
+    frames.run();
+    const iconPoints = view.scene.getObjectByName(
+      `${ICONS_NAME}tank`,
+    ) as THREE.Points;
+    expect(iconPoints.geometry.drawRange.count).toBe(1);
+    expect(pointsOf(view).geometry.drawRange.count).toBe(0);
+    const material = iconPoints.material as THREE.PointsMaterial;
+    expect(material.size).toBe(12);
+    expect(material.map?.image).toBe(picture);
+
+    layer.setIcons(null);
+    frames.run();
+    expect(view.scene.getObjectByName(`${ICONS_NAME}tank`)).toBeUndefined();
     expect(pointsOf(view).geometry.drawRange.count).toBe(1);
   });
 
