@@ -1314,6 +1314,34 @@ describe("the lanes of the dock", () => {
     });
   });
 
+  it("moves the clock to the time under a press on blank space in a row", async () => {
+    analysed();
+    LOGGED = kills([30]);
+    await show();
+    // 1,024 pixels of axis over 150 frames: a quarter of it is frame 38.
+    for (const name of ["Kills", "Chat", "Players"]) {
+      await act(async () => {
+        fireEvent.click(lane(name), { clientX: 256 });
+      });
+      expect(clockFrame()).toBe(Math.round(150 / 4));
+      await act(async () => {
+        hook().clock.set(0);
+      });
+    }
+  });
+
+  it("leaves a press on a mark to the mark", async () => {
+    analysed();
+    LOGGED = kills([30]);
+    await show();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Unit destroyed/ }), {
+        clientX: 900,
+      });
+    });
+    expect(clockFrame()).toBe(30);
+  });
+
   it("draws chat sent before the match at the start of the axis, and says so", async () => {
     CHAT = {
       messages: [line(-1, "hi all"), line(60, "later")],

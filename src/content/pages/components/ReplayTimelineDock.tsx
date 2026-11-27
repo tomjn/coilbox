@@ -7,6 +7,7 @@ import { Slider as SliderPrimitive } from "radix-ui";
 import {
   createContext,
   type KeyboardEvent,
+  type MouseEvent,
   type MutableRefObject,
   type ReactNode,
   useContext,
@@ -614,6 +615,28 @@ export function ReplayTimelineDock({
     return () => watcher.disconnect();
   }, []);
 
+  // A press on blank space in a row moves the match to that time. Anything
+  // that does something with a press of its own keeps it.
+  const seekFromRow = (event: MouseEvent<HTMLDivElement>) => {
+    const target = event.target;
+    if (
+      target instanceof Element &&
+      target.closest(
+        "button, [role=slider], [data-slot=slider], [data-testid=heat-window-box]",
+      )
+    ) {
+      return;
+    }
+    const { left, width } = event.currentTarget.getBoundingClientRect();
+    if (!(width > 0)) return;
+    const share = Math.min(1, Math.max(0, (event.clientX - left) / width));
+    playback.seek(
+      Math.round(
+        range.firstFrame + share * (range.lastFrame - range.firstFrame),
+      ),
+    );
+  };
+
   const axis = useMemo(
     () => ({ first: range.firstFrame, last: range.lastFrame }),
     [range.firstFrame, range.lastFrame],
@@ -726,7 +749,8 @@ export function ReplayTimelineDock({
           <div className="min-w-0 flex-1">
             {/* The scrubber and the lanes, which the playhead crosses. It is
              * also what the columns are measured from. */}
-            <div ref={lanesRef} className="relative">
+            {/* biome-ignore lint/a11y/noStaticElementInteractions lint/a11y/useKeyWithClickEvents: a press on blank space in a row is a pointer shortcut. The scrubber and the keys do the same from the keyboard. */}
+            <div ref={lanesRef} className="relative" onClick={seekFromRow}>
               <div className="h-5">
                 <Knob range={range} onKeyDown={keys?.onKeyDown} />
               </div>
