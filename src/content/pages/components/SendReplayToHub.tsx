@@ -24,10 +24,12 @@ import { describeError } from "@/i18n/uiError";
 import { notify } from "@/notify/notify";
 import { useLastLogin, useLobbyAccounts } from "../../../lobby-servers/config";
 import type { DemoInfo } from "../../bindings";
+import { hubPickUnitIds } from "../../hubPlayedFactions";
 import { signedInLobbyNames, userNameInReplay } from "../../replayHubName";
 import { buildReplaySummary, type SummaryProblem } from "../../replaySummary";
 import { useMatchStats } from "../../useMatchStats";
 import { useReplayBuildOrders } from "../../useReplayBuildOrders";
+import { useRecordedGameSides } from "../../useReplayFactions";
 import { useReplayUnits } from "../../useReplayUnits";
 
 const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
@@ -92,6 +94,9 @@ export function SendReplayToHub({
     "stream",
     orders?.unitNames,
   );
+  // A picked start unit needs the game's sides to say which faction it is.
+  const picksUnit = hubPickUnitIds(info.players).length > 0;
+  const sides = useRecordedGameSides(info, wanted && picksUnit);
 
   if (!info.gameId || info.remixed || !name) return null;
   const gameId = info.gameId;
@@ -151,19 +156,34 @@ export function SendReplayToHub({
   };
 
   const failed = stats.error !== null || builds.failed;
-  // A match with no build orders names no units, so it waits for nothing more.
+  // A match with no build orders and no picked unit names no units, so it
+  // waits for nothing more.
+  const needsUnits = picksUnit || (orders?.orders.length ?? 0) > 0;
   const unitsReady =
-    orders?.orders.length === 0 ||
-    (units.source !== null && units.status !== "loading");
+    !needsUnits || (units.source !== null && units.status !== "loading");
   // Another version's ids can name the wrong unit, which the hub would refuse.
-  const otherBuild = units.source?.kind === "differentBuild";
+  const otherBuild = needsUnits && units.source?.kind === "differentBuild";
+  const sidesReady =
+    !picksUnit || (sides.scanned && sides.status !== "loading");
+  // With no sides to read, the hub would refuse a picked faction sent as none.
+  const sidesFailed =
+    picksUnit &&
+    sides.scanned &&
+    (!sides.installed || sides.status === "error");
   const made =
-    !failed && stats.data && orders && unitsReady && !otherBuild
+    !failed &&
+    !sidesFailed &&
+    stats.data &&
+    orders &&
+    unitsReady &&
+    sidesReady &&
+    !otherBuild
       ? buildReplaySummary(
           info,
           stats.data.trailer,
           orders,
           units.described ?? [],
+          sides.sides,
         )
       : null;
 
@@ -222,7 +242,7 @@ export function SendReplayToHub({
         </div>
       </>
     );
-  } else if (otherBuild && orders && orders.orders.length > 0) {
+  } else if (otherBuild) {
     body = (
       <p>
         {t`Another version of the game is installed, so Coilbox cannot say which unit each build order was for. Install the version it was played on, then try again.`}
@@ -233,6 +253,12 @@ export function SendReplayToHub({
       <p>
         {stats.error ??
           t`Coilbox could not read the build orders in this replay.`}
+      </p>
+    );
+  } else if (sidesFailed) {
+    body = (
+      <p>
+        {t`Coilbox could not read the game's factions, which the hub checks. Install the game it was played on, then try again.`}
       </p>
     );
   } else if (!made) {

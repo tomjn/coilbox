@@ -17031,6 +17031,10 @@ msgstr "Coilbox は勢力を読み取れなかったため、勢力のロゴは�
 msgid "Coilbox could not read the file."
 msgstr "Coilbox はファイルを読み取れませんでした。"
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Coilbox could not read the game's factions, which the hub checks. Install the game it was played on, then try again."
+msgstr ""
+
 #: src/hub/manualSend/run.ts
 #: src/hub/upload/bulkMaps.ts
 #, fuzzy

@@ -17034,6 +17034,10 @@ msgstr "Coilbox non ha potuto leggere le fazioni, quindi non sono stati inviati 
 msgid "Coilbox could not read the file."
 msgstr "Coilbox non ha potuto leggere il file."
 
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Coilbox could not read the game's factions, which the hub checks. Install the game it was played on, then try again."
+msgstr ""
+
 #: src/hub/manualSend/run.ts
 #: src/hub/upload/bulkMaps.ts
 #, fuzzy

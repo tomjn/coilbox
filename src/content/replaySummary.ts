@@ -2,9 +2,10 @@ import type {
   DemoBuildOrders,
   DemoInfo,
   DemoTrailer,
-  ReplayPlayer,
+  Side,
   UnitDatasetEntry,
 } from "./bindings";
+import { hubFaction, hubPickUnitIds } from "./hubPlayedFactions";
 import { resolveBuildUnit } from "./replayBuildOrders";
 import { classifyUnit } from "./unitCategory";
 
@@ -13,8 +14,8 @@ import { classifyUnit } from "./unitCategory";
  * `hub-php/docs/replay-uploads.md` in coilbox-hub sets out. The hub checks it
  * against the file (coilbox-hub #663), so every part comes from the reads the
  * replay page already shows: the header and start script in `DemoInfo`, the
- * trailer the statistics read, the build orders the Builds tab reads, and the
- * units `useReplayUnits` names them with.
+ * trailer the statistics read, the build orders the Builds tab reads, the
+ * units `useReplayUnits` names them with, and the game's sides.
  */
 export interface ReplaySummary {
   v: 1;
@@ -63,37 +64,25 @@ export type SummaryProblem =
 const snakeCase = (field: string) =>
   field.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
 
-/**
- * The faction a player played, as the summary sends it.
- *
- * For now the team's `side` in the start script. The hub expects the faction
- * of the player's last pick that counts, and falls back to the side only when
- * there is none, so a replay where somebody picked another faction in game is
- * refused until #5504 replaces this body with that rule.
- */
-export function summaryFaction(
-  _info: DemoInfo,
-  player: ReplayPlayer,
-): string | null {
-  return player.side ?? null;
-}
-
 const number = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
 
 /**
  * Build the summary, or say why it cannot be built.
  *
+ * `info` is the replay as decoded, whose sides are the start script's.
  * `units` is the list `useReplayUnits` answers, in id order, and only a list
  * that says what each unit costs will do. A unit's `name` is the one the
  * replay's own unit list gives, when it has one, because that is what the hub
- * checks it against.
+ * checks it against. `sides` is the game's side data, which names the faction a
+ * picked start unit belongs to.
  */
 export function buildReplaySummary(
   info: DemoInfo,
   trailer: DemoTrailer,
   orders: DemoBuildOrders,
   units: readonly UnitDatasetEntry[],
+  sides: readonly Side[],
 ): { summary: ReplaySummary } | { problem: SummaryProblem } {
   if (!info.winnersKnown || info.durationSec <= 0) {
     return { problem: { kind: "unfinished" } };
@@ -114,7 +103,7 @@ export function buildReplaySummary(
       name: player.name,
       team: player.team,
       ally_team: player.allyTeam,
-      faction: summaryFaction(info, player),
+      faction: hubFaction(player, units, sides),
     });
   }
 
@@ -142,15 +131,21 @@ export function buildReplaySummary(
     .sort(([a], [b]) => a - b)
     .map(([team, list]) => ({ team, orders: list }));
 
-  const used = [
-    ...new Set(buildOrders.flatMap((t) => t.orders.map((o) => o.unit_def_id))),
-  ].sort((a, b) => a - b);
+  const built = new Set(
+    buildOrders.flatMap((t) => t.orders.map((o) => o.unit_def_id)),
+  );
+  // A picked start unit is listed too, for the hub to name it by.
+  const used = [...new Set([...built, ...hubPickUnitIds(info.players)])].sort(
+    (a, b) => a - b,
+  );
   const listed: ReplaySummary["units"] = [];
   for (const id of used) {
-    const unit = resolveBuildUnit(id, units as UnitDatasetEntry[]);
+    const unit = resolveBuildUnit(id, units);
     const metal = number(unit?.stats?.metalCost);
     const energy = number(unit?.stats?.energyCost);
     if (!unit || metal === null || energy === null) {
+      // The hub does not check a picked unit it is given no name for.
+      if (!built.has(id)) continue;
       return { problem: { kind: "unknownUnit", unitDefId: id } };
     }
     listed.push({
