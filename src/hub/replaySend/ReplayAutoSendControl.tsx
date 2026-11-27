@@ -11,7 +11,12 @@ import { AUTO_SEND_REPLAYS_KEY } from "./queue";
  * the hub plugin reads it off disk before a replay goes without a press of its
  * send button.
  */
-export function ReplayAutoSendControl() {
+export function ReplayAutoSendControl({
+  heading = true,
+}: {
+  /** False where the page around the switch already says what it is for. */
+  heading?: boolean;
+}) {
   const { t } = useLingui();
   const [on, setOn] = useSetting<boolean>(AUTO_SEND_REPLAYS_KEY, false);
   const label = t`Send my finished multiplayer matches to the hub`;
@@ -19,9 +24,11 @@ export function ReplayAutoSendControl() {
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-sm font-semibold">
-        <Trans>Replays</Trans>
-      </h2>
+      {heading && (
+        <h2 className="text-sm font-semibold">
+          <Trans>Replays</Trans>
+        </h2>
+      )}
       <SettingList>
         {offered ? (
           <SettingRow
