@@ -47,6 +47,14 @@ vi.mock("@/hub/account", () => ({
   },
 }));
 vi.mock("@/hub/config", () => ({ useHubUrl: () => "https://hub.test" }));
+let analyses = new Map<string, unknown>();
+let tracks = new Map<string, unknown>();
+vi.mock("@/content/replayAnalysis", () => ({
+  useStoredAnalyses: () => analyses,
+}));
+vi.mock("@/content/replayTracks", () => ({
+  useStoredTracks: () => tracks,
+}));
 vi.mock("@/lobby-servers/config", () => ({
   useLobbyAccounts: () => [
     { accounts: [{ serverId: "s", username: "Alice", lastUsedAt: 1 }] },
@@ -59,7 +67,7 @@ import {
   memorySettingsStorage,
   writeStoredSetting,
 } from "@/lib/storedSetting";
-import { queueFinishedReplay } from "./queue";
+import { queueFinishedReplay, readReplayExtrasQueue } from "./queue";
 import ReplayAutoSend from "./ReplayAutoSend";
 import { ReplayAutoSendControl } from "./ReplayAutoSendControl";
 
@@ -77,6 +85,8 @@ const turn = (on: boolean) => {
 beforeEach(() => {
   offered = true;
   signedIn = true;
+  analyses = new Map();
+  tracks = new Map();
   stored.clear();
   installSettingsStorage(memorySettingsStorage());
   run.mockClear();
@@ -118,6 +128,40 @@ describe("the background sender", () => {
     expect(run).toHaveBeenCalledTimes(1);
     act(() => vi.advanceTimersByTime(5000));
     expect(run).toHaveBeenCalledTimes(2);
+  });
+
+  const analysis = (gameId: string, at: number, outcome = "reproduced") => ({
+    gameId,
+    outcome,
+    analysedAtMs: at,
+    map: "Persepolis",
+  });
+
+  it("queues a match's analysis and track when an analysis run of it finishes (#5495)", () => {
+    turn(true);
+    analyses = new Map([["old", analysis("old", 1)]]);
+    const { rerender } = render(<ReplayAutoSend />);
+    expect(readReplayExtrasQueue()).toEqual([]);
+    const now = Date.now();
+    analyses = new Map([
+      ["old", analysis("old", 1)],
+      ["new", analysis("new", now)],
+      ["off", analysis("off", now, "diverged")],
+    ]);
+    rerender(<ReplayAutoSend />);
+    expect(readReplayExtrasQueue().map((one) => one.gameId)).toEqual(["new"]);
+    expect(readReplayExtrasQueue()[0]?.mapName).toBe("Persepolis");
+  });
+
+  it("queues a match when a track of it is recorded after an earlier run (#5495)", () => {
+    turn(true);
+    analyses = new Map([["m", analysis("m", 1)]]);
+    const { rerender } = render(<ReplayAutoSend />);
+    tracks = new Map([
+      ["m", { gameId: "m", state: "current", lastWatchedMs: Date.now() }],
+    ]);
+    rerender(<ReplayAutoSend />);
+    expect(readReplayExtrasQueue().map((one) => one.gameId)).toEqual(["m"]);
   });
 
   it("stops everything while the setting is off", () => {

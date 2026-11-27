@@ -1757,6 +1757,26 @@ export const contentReplayAnalysisEvents = defineCommand<
 >("coilbox-content", "content_replay_analysis_events");
 
 /**
+ * A reproduced run's log as the hub takes it (issue #5495): the logger's
+ * version and its lines as one string, without the line Coilbox puts first in
+ * its stored copy. Null when nothing is stored or the run diverged.
+ */
+export const contentReplayAnalysisLog = defineCommand<
+  { gameId: string },
+  { log: { loggerVersion: number; events: string } | null }
+>("coilbox-content", "content_replay_analysis_log");
+
+/**
+ * What sending a match's track to the hub needs (issue #5495): the stored
+ * file and the format version in its header. Null unless the match has a
+ * current track.
+ */
+export const contentReplayTrackUploadFacts = defineCommand<
+  { gameId: string },
+  { track: { path: string; formatVersion: number } | null }
+>("coilbox-content", "content_replay_track_upload_facts");
+
+/**
  * One recorded track on disk (issue #3786). `current` can be played. `stale`
  * was made by an older or newer recorder, or does not read as a track, and is
  * offered for recording again.

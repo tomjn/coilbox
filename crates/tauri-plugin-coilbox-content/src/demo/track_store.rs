@@ -268,6 +268,44 @@ pub fn stored_for_replay(dir: &Path, replay: &Path) -> Option<(String, u64)> {
     Some((game_id, size))
 }
 
+/// A match's stored track as the hub takes it (issue #5495): its path and the
+/// format version in its header. None unless the track is a current one for
+/// this game id, so only a track recorded from this replay by this recorder is
+/// ever sent, exactly as it was stored.
+pub fn upload_facts(dir: &Path, game_id: &str) -> Result<Option<(PathBuf, u16)>, String> {
+    let path = track_path(dir, game_id)?;
+    if state(dir, game_id)? != Some(TrackState::Current) {
+        return Ok(None);
+    }
+    // The reader opens only the one format version it knows, so a current
+    // track is in that one.
+    Ok(Some((path, coilbox_track::FORMAT_VERSION)))
+}
+
+/// `content_replay_track_upload_facts`: what sending a match's track to the
+/// hub needs. Answers `track` with `path` and `formatVersion`, or null when the
+/// match has no current track.
+#[tauri::command]
+pub(crate) async fn content_replay_track_upload_facts<R: Runtime>(
+    app: AppHandle<R>,
+    game_id: String,
+) -> picoframe_core::CliResult {
+    let dir = match app_store_dir(&app) {
+        Ok(dir) => dir,
+        Err(e) => return picoframe_core::CliResult::err(e),
+    };
+    match tauri::async_runtime::spawn_blocking(move || upload_facts(&dir, &game_id)).await {
+        Ok(Ok(facts)) => picoframe_core::CliResult::ok(serde_json::json!({
+            "track": facts.map(|(path, version)| serde_json::json!({
+                "path": path.to_string_lossy(),
+                "formatVersion": version,
+            })),
+        })),
+        Ok(Err(e)) => picoframe_core::CliResult::err(e),
+        Err(e) => picoframe_core::CliResult::err(format!("replay track task failed: {e}")),
+    }
+}
+
 /// `content_replay_tracks`: every track on disk, for the library to join to
 /// its replays by game id. Each entry has its `state`, `sizeBytes` and
 /// `lastWatchedMs`. The answer also has `totalBytes`, what they take together,
@@ -329,6 +367,22 @@ mod tests {
             std::fs::write(path, track_bytes(id, RECORDER_VERSION))
         })
         .expect("a current track stores")
+    }
+
+    #[test]
+    fn only_a_current_track_has_upload_facts() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(upload_facts(dir.path(), ID).unwrap(), None);
+        put(dir.path(), ID, &track_bytes(ID, RECORDER_VERSION - 1));
+        assert_eq!(upload_facts(dir.path(), ID).unwrap(), None);
+        put(dir.path(), ID, &track_bytes(OTHER, RECORDER_VERSION));
+        assert_eq!(upload_facts(dir.path(), ID).unwrap(), None);
+        store_current(dir.path(), ID);
+        assert_eq!(
+            upload_facts(dir.path(), ID).unwrap(),
+            Some((track_path(dir.path(), ID).unwrap(), FORMAT_VERSION))
+        );
+        assert!(upload_facts(dir.path(), "../x").is_err());
     }
 
     #[test]

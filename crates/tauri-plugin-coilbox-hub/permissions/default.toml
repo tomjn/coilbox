@@ -1,7 +1,7 @@
 "$schema" = "schemas/schema.json"
 
 [default]
-description = "Allows listing the Coilbox hub sign in providers, signing in with one, signing out again, reading who is signed in, publishing as them, and asking what pictures and maps it has and sending it pictures, map facts and game facts read from local archives once the user has agreed to it, either through the uploads switch or by asking for one send. Also sending a map or game archive to a hub mirror, sending a replay of a match the user was in, listing those uploads and cancelling one."
+description = "Allows listing the Coilbox hub sign in providers, signing in with one, signing out again, reading who is signed in, publishing as them, and asking what pictures and maps it has and sending it pictures, map facts and game facts read from local archives once the user has agreed to it, either through the uploads switch or by asking for one send. Also sending a map or game archive to a hub mirror, sending a replay of a match the user was in and its analysis and track, listing those uploads and cancelling one."
 permissions = [
   "allow-hub-providers",
   "allow-hub-sign-in",
@@ -19,6 +19,8 @@ permissions = [
   "allow-hub-manual-send-end",
   "allow-hub-archive-upload-start",
   "allow-hub-replay-upload-start",
+  "allow-hub-replay-analysis-send",
+  "allow-hub-replay-track-upload-start",
   "allow-hub-archive-upload-list",
   "allow-hub-archive-upload-cancel",
 ]

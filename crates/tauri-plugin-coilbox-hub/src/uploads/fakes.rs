@@ -143,6 +143,20 @@ struct HubState {
     last_status_answer: Option<(u16, Value)>,
     /// The authorization header of each status request.
     status_requests: Vec<Option<String>>,
+    /// Answers to the track route, as `replay_answers` are.
+    track_answers: VecDeque<Option<(u16, Value)>>,
+    last_track_answer: Option<(u16, Value)>,
+    track_requests: Vec<(String, Option<String>, String)>,
+    /// Analyses sent, by who sent them and the body, with their id. The same
+    /// pair again is answered with the first send, as the hub does.
+    analyses: Vec<((Option<String>, String), u64)>,
+    /// The states a sent analysis's check goes through, one for each send
+    /// after the first. The last repeats.
+    analysis_states: VecDeque<(String, Option<String>)>,
+    last_analysis_state: (String, Option<String>),
+    /// Answer every analysis with this instead.
+    analysis_refusal: Option<(u16, Value)>,
+    analysis_requests: Vec<(String, Option<String>, String)>,
 }
 
 pub struct FakeHub {
@@ -156,6 +170,7 @@ impl FakeHub {
         let state = Arc::new(Mutex::new(HubState {
             mirror: mirror_base.to_owned(),
             last_state: "listed".into(),
+            last_analysis_state: ("checking".into(), None),
             ..HubState::default()
         }));
         let shared = state.clone();
@@ -207,6 +222,40 @@ impl FakeHub {
     /// The authorization header and the body of each replay request.
     pub fn replay_requests(&self) -> Vec<(Option<String>, String)> {
         self.state.lock().unwrap().replay_requests.clone()
+    }
+
+    /// What the track route answers in turn, the last for ever after. `None`
+    /// is an upload slot on the mirror.
+    pub fn tracking(self, answers: Vec<Option<(u16, Value)>>) -> Self {
+        self.state.lock().unwrap().track_answers = answers.into();
+        self
+    }
+
+    /// The path, the authorization header and the body of each track request.
+    pub fn track_requests(&self) -> Vec<(String, Option<String>, String)> {
+        self.state.lock().unwrap().track_requests.clone()
+    }
+
+    /// The states a sent analysis's check reports on each send after the
+    /// first, the last for ever after. A send that is not the first is
+    /// answered with the first one's id and the check's state.
+    pub fn checking_analyses(self, states: &[(&str, Option<&str>)]) -> Self {
+        self.state.lock().unwrap().analysis_states = states
+            .iter()
+            .map(|(state, reason)| ((*state).to_owned(), reason.map(str::to_owned)))
+            .collect();
+        self
+    }
+
+    /// Answer every analysis with this.
+    pub fn refusing_analyses(self, status: u16, body: Value) -> Self {
+        self.state.lock().unwrap().analysis_refusal = Some((status, body));
+        self
+    }
+
+    /// The path, the authorization header and the body of each analysis sent.
+    pub fn analysis_requests(&self) -> Vec<(String, Option<String>, String)> {
+        self.state.lock().unwrap().analysis_requests.clone()
     }
 
     /// The authorization header and the body of each reservation.
@@ -285,6 +334,81 @@ fn hub_answer(state: &Mutex<HubState>, request: &Request) -> Reply {
         }
         if let Some((status, body)) = state.last_status_answer.clone() {
             return Reply::Json(status, body);
+        }
+    }
+    let in_replays = request.path.strip_prefix("/api/v1/replays/");
+    if let (Some(rest), "POST") = (in_replays, request.method.as_str()) {
+        let auth = request.headers.get("authorization").cloned();
+        let body = String::from_utf8_lossy(&request.body).into_owned();
+        if let Some(game_id) = rest.strip_suffix("/tracks/uploads") {
+            state
+                .track_requests
+                .push((request.path.clone(), auth, body));
+            if let Some(next) = state.track_answers.pop_front() {
+                state.last_track_answer = next;
+            }
+            if let Some((status, body)) = state.last_track_answer.clone() {
+                return Reply::Json(status, body);
+            }
+            let count = state.track_requests.len();
+            let mirror = state.mirror.clone();
+            return Reply::Json(
+                if count == 1 { 201 } else { 200 },
+                json!({ "upload": {
+                    "id": UPLOAD_ID,
+                    "game_id": game_id,
+                    "format_version": 1,
+                    "state": "uploading",
+                    "mirror": "jj",
+                    "filename": format!("{game_id}.cbtrack"),
+                    "upload_url": format!("{mirror}/upload.php"),
+                    "limits_url": format!("{mirror}/limits.php"),
+                    "token": format!("token-{count}"),
+                    "start_by": 1,
+                    "reserved_until": 2,
+                }}),
+            );
+        }
+        if let Some(game_id) = rest.strip_suffix("/analyses") {
+            state
+                .analysis_requests
+                .push((request.path.clone(), auth.clone(), body.clone()));
+            if let Some((status, body)) = state.analysis_refusal.clone() {
+                return Reply::Json(status, body);
+            }
+            let key = (auth, body.clone());
+            let logger_version = serde_json::from_str::<Value>(&body)
+                .ok()
+                .and_then(|b| b.get("logger_version").cloned())
+                .unwrap_or(Value::Null);
+            let earlier = state
+                .analyses
+                .iter()
+                .find(|(seen, _)| *seen == key)
+                .map(|(_, id)| *id);
+            let (status, id, (checked, reason)) = match earlier {
+                Some(id) => {
+                    if let Some(next) = state.analysis_states.pop_front() {
+                        state.last_analysis_state = next;
+                    }
+                    (200, id, state.last_analysis_state.clone())
+                }
+                None => {
+                    let id = state.analyses.len() as u64 + 1;
+                    state.analyses.push((key, id));
+                    (202, id, ("checking".to_owned(), None))
+                }
+            };
+            return Reply::Json(
+                status,
+                json!({ "analysis": {
+                    "id": id,
+                    "game_id": game_id,
+                    "logger_version": logger_version,
+                    "state": checked,
+                    "reason": reason,
+                }}),
+            );
         }
     }
     if request.method == "GET" && request.path == format!("/api/v1/uploads/{UPLOAD_ID}") {

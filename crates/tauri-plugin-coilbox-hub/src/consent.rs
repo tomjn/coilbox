@@ -29,7 +29,8 @@
 //!
 //! Replays have their own switch, "Send my finished matches to the hub", also
 //! off by default (issue #5494). [`AssetUploadConsent::check_replay`] reads it,
-//! and its proof admits replays and nothing else.
+//! and its proof admits replays, their analyses and their tracks (issue #5495)
+//! and nothing else.
 //!
 //! A distribution profile that turned the hub or its uploads off refuses all of
 //! them.
@@ -102,6 +103,10 @@ pub enum SendSubject {
     Engine { filename: String },
     /// A match replay, by the game id in its header (issue #5493).
     Replay { game_id: String },
+    /// A match's analysis, by the replay's game id (issue #5495).
+    Analysis { game_id: String },
+    /// A match's recorded track, by the replay's game id (issue #5495).
+    Track { game_id: String },
 }
 
 impl SendSubject {
@@ -110,7 +115,9 @@ impl SendSubject {
             Self::Game { shortname } => shortname,
             Self::Map { map_name } => map_name,
             Self::Engine { filename } => filename,
-            Self::Replay { game_id } => game_id,
+            Self::Replay { game_id } | Self::Analysis { game_id } | Self::Track { game_id } => {
+                game_id
+            }
         }
     }
 
@@ -280,6 +287,30 @@ impl AssetUploadConsent {
             Agreed::Pictures => Err(REPLAY_NEEDS_GRANT.to_string()),
             Agreed::Replays => Ok(()),
             Agreed::Grant(SendSubject::Replay { game_id: granted }) if granted == game_id => Ok(()),
+            Agreed::Grant(subject) => Err(subject.refuse(game_id)),
+        }
+    }
+
+    /// Whether this match's analysis may go: it is the one whose send button
+    /// was pressed, or finished matches are being sent. A grant for the replay
+    /// itself does not cover its analysis, and the pictures switch never does.
+    pub fn admits_analysis(&self, game_id: &str) -> Result<(), String> {
+        match &self.0 {
+            Agreed::Pictures => Err(REPLAY_NEEDS_GRANT.to_string()),
+            Agreed::Replays => Ok(()),
+            Agreed::Grant(SendSubject::Analysis { game_id: granted }) if granted == game_id => {
+                Ok(())
+            }
+            Agreed::Grant(subject) => Err(subject.refuse(game_id)),
+        }
+    }
+
+    /// Whether this match's track may go, on the same terms as its analysis.
+    pub fn admits_track(&self, game_id: &str) -> Result<(), String> {
+        match &self.0 {
+            Agreed::Pictures => Err(REPLAY_NEEDS_GRANT.to_string()),
+            Agreed::Replays => Ok(()),
+            Agreed::Grant(SendSubject::Track { game_id: granted }) if granted == game_id => Ok(()),
             Agreed::Grant(subject) => Err(subject.refuse(game_id)),
         }
     }
@@ -606,6 +637,29 @@ mod tests {
             Some(&auto_replays("true")),
             AUTO_REPLAY_SETTING_KEY,
         ));
+    }
+
+    #[test]
+    fn an_analysis_and_a_track_each_need_their_own_grant() {
+        let id = "9f2c4b1ad07e5386c1f4a92b6e8d0375";
+        let analysis =
+            AssetUploadConsent::for_test_subject(SendSubject::Analysis { game_id: id.into() });
+        assert!(analysis.admits_analysis(id).is_ok());
+        assert!(analysis.admits_analysis(&"0".repeat(32)).is_err());
+        assert!(analysis.admits_track(id).is_err());
+        assert!(analysis.admits_replay(id).is_err());
+        let track = AssetUploadConsent::for_test_subject(SendSubject::Track { game_id: id.into() });
+        assert!(track.admits_track(id).is_ok());
+        assert!(track.admits_analysis(id).is_err());
+        let replay =
+            AssetUploadConsent::for_test_subject(SendSubject::Replay { game_id: id.into() });
+        assert!(replay.admits_analysis(id).is_err());
+        assert!(replay.admits_track(id).is_err());
+        assert!(AssetUploadConsent::for_test().admits_analysis(id).is_err());
+        assert!(AssetUploadConsent::for_test().admits_track(id).is_err());
+        let auto = AssetUploadConsent::for_test_auto_replays();
+        assert!(auto.admits_analysis(id).is_ok());
+        assert!(auto.admits_track(id).is_ok());
     }
 
     #[test]
