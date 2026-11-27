@@ -1,5 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { loadGithubGameRepos } from "../content/branding";
+import { BAR_RAPID_MASTER, isBarGame, resolveBarTag } from "./barRapid";
 import { dlDownloadFileRaw, dlDownloadRaw } from "./bindings";
 import { type DownloadAttempt, downloadKey, hostOf } from "./downloadHistory";
 import { downloadFromMirrors } from "./downloadMirrors";
@@ -187,10 +188,28 @@ async function downloadGameAnySourceImpl(opts: {
       //
       // Every configured master is tried, because pr-downloader only ever
       // searches the one it is given and games are spread across several.
-      // Beyond All Reason's master is no longer one of them (see
-      // `rapidMasters.ts`), so BAR itself now comes back as "no source could
-      // provide" here.
+      //
+      // Beyond All Reason goes to BAR's own master and only there, by its exact
+      // tag (see `barRapid.ts`). No other game is ever sent to BAR.
       case "rapid": {
+        if (isBarGame(gameName)) {
+          log.begin(
+            source,
+            { reference: gameName, mirror: hostOf(BAR_RAPID_MASTER) },
+            { label: "Beyond All Reason" },
+          );
+          const tag = await resolveBarTag(gameName);
+          if (!tag)
+            throw new Error(t`Beyond All Reason does not list "${gameName}".`);
+          await dlDownloadRaw({
+            tag,
+            masterUrl: BAR_RAPID_MASTER,
+            writePath,
+            opId,
+            onProgress: progressChannel(onProgress),
+          });
+          return "rapid";
+        }
         for (const master of masters) {
           log.begin(
             source,

@@ -5,6 +5,7 @@ const {
   dlDownloadFileRaw,
   dlGithubReleaseArchives,
   dlSpringfilesList,
+  dlVersions,
   loadGithubGameRepos,
   notify,
 } = vi.hoisted(() => ({
@@ -12,6 +13,7 @@ const {
   dlDownloadFileRaw: vi.fn(),
   dlGithubReleaseArchives: vi.fn(),
   dlSpringfilesList: vi.fn(),
+  dlVersions: vi.fn(),
   loadGithubGameRepos: vi.fn(),
   notify: vi.fn(),
 }));
@@ -21,6 +23,7 @@ vi.mock("./bindings", () => ({
   dlDownloadFileRaw,
   dlGithubReleaseArchives,
   dlSpringfilesList,
+  dlVersions,
 }));
 vi.mock("../content/branding", () => ({ loadGithubGameRepos }));
 vi.mock("../notify/notify", () => ({ notify }));
@@ -49,11 +52,11 @@ import { DEFAULT_RAPID_MASTERS } from "./rapidMasters";
 import { SourceWalkError } from "./sourceWalk";
 
 /** A game with no GitHub repo and no springfiles entry, so only rapid is tried. */
-const BAR_GAME = "Beyond All Reason test-30922-8064a43";
+const RAPID_GAME = "Rapid Only Game test-30922-8064a43";
 
 const run = () =>
   downloadGameAnySource({
-    gameName: BAR_GAME,
+    gameName: RAPID_GAME,
     writePath: "/data",
     onProgress: () => {},
   });
@@ -583,7 +586,7 @@ describe("downloadGameAnySource, rapid step", () => {
     expect(dlDownloadRaw.mock.calls.map((c) => c[0].masterUrl)).toEqual(
       DEFAULT_RAPID_MASTERS.map((r) => r.url),
     );
-    expect(dlDownloadRaw.mock.calls[0][0].tag).toBe(BAR_GAME);
+    expect(dlDownloadRaw.mock.calls[0][0].tag).toBe(RAPID_GAME);
   });
 
   it("stops at the first master that has the game", async () => {
@@ -599,6 +602,82 @@ describe("downloadGameAnySource, rapid step", () => {
       expect(String(err)).toContain(master.name);
     }
     expect(dlDownloadRaw).toHaveBeenCalledTimes(DEFAULT_RAPID_MASTERS.length);
+  });
+});
+
+describe("downloadGameAnySource, Beyond All Reason", () => {
+  const BAR = "Beyond All Reason test-32096-66fbac2";
+  const BAR_MASTER = "https://repos-cdn.beyondallreason.dev";
+  const version = (tag: string, name: string) => ({
+    tag,
+    md5: "ee4273a7c6d4469932e10dcb26a840a1",
+    name,
+    depends: [],
+    kind: tag.includes(":git:") ? "snapshot" : "release",
+    installed: false,
+  });
+  // BAR's real index lists a build under its moving tag and its commit tag.
+  const index = {
+    versions: [
+      version("byar:test", BAR),
+      version("byar:git:66fbac233d51bbee7fe21ceb1fbc28017c2a36dc", BAR),
+    ],
+    ageSecs: 0,
+    stale: false,
+  };
+  const fetchBar = () =>
+    downloadGameAnySource({
+      gameName: BAR,
+      writePath: "/data",
+      onProgress: () => {},
+    });
+
+  it("fetches BAR from BAR's master by its exact commit tag", async () => {
+    dlVersions.mockResolvedValue(index);
+    dlDownloadRaw.mockResolvedValueOnce({ message: "ok" });
+
+    await expect(fetchBar()).resolves.toBe("rapid");
+
+    expect(dlVersions).toHaveBeenCalledWith(
+      expect.objectContaining({ repoUrl: `${BAR_MASTER}/byar` }),
+    );
+    expect(dlDownloadRaw).toHaveBeenCalledTimes(1);
+    expect(dlDownloadRaw.mock.calls[0][0]).toMatchObject({
+      tag: "byar:git:66fbac233d51bbee7fe21ceb1fbc28017c2a36dc",
+      masterUrl: BAR_MASTER,
+    });
+  });
+
+  it("fetches BAR's index again when a new build is missing from the copy held", async () => {
+    dlVersions
+      .mockResolvedValueOnce({ ...index, versions: [] })
+      .mockResolvedValueOnce(index);
+    dlDownloadRaw.mockResolvedValueOnce({ message: "ok" });
+
+    await expect(fetchBar()).resolves.toBe("rapid");
+
+    expect(dlVersions).toHaveBeenCalledTimes(2);
+    expect(dlVersions.mock.calls[1][0]).toMatchObject({ refresh: true });
+  });
+
+  it("fails without asking pr-downloader or any other master when BAR does not list the build", async () => {
+    dlVersions.mockResolvedValue({ ...index, versions: [] });
+
+    const err = await fetchBar().catch((e: Error) => e);
+
+    expect(String(err)).toContain(`Beyond All Reason does not list "${BAR}"`);
+    expect(dlDownloadRaw).not.toHaveBeenCalled();
+  });
+
+  it("never asks BAR for another game", async () => {
+    dlDownloadRaw.mockRejectedValue(new Error("no source could provide"));
+
+    await run().catch(() => {});
+
+    expect(dlVersions).not.toHaveBeenCalled();
+    for (const [args] of dlDownloadRaw.mock.calls) {
+      expect(args.masterUrl).not.toContain("beyondallreason");
+    }
   });
 });
 

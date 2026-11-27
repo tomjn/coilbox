@@ -211,7 +211,8 @@ export const dlGithubReleaseArchives = defineCommand<
 
 /**
  * Download a map by spring name via the sidecar. `searchUrl` overrides
- * `PRD_HTTP_SEARCH_URL` (springrts default; BAR's files-cdn for BAR maps).
+ * `PRD_HTTP_SEARCH_URL` (springrts default). The plugin refuses a search on
+ * Beyond All Reason's servers.
  */
 /** Raw start command WITHOUT the completion notification — for internal callers
  * that compose several attempts into one logical download (fallback chains),

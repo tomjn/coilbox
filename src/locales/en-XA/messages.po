@@ -11368,6 +11368,10 @@ msgstr ""
 msgid "Between two minutes"
 msgstr ""
 
+#: src/downloads/downloadGame.ts
+msgid "Beyond All Reason does not list \"{gameName}\"."
+msgstr ""
+
 #: src/conquest/galaxy3d/GalaxyView.tsx
 msgid "binary pair — {primary} + {companion}"
 msgstr ""

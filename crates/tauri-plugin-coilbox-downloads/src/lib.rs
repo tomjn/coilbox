@@ -34,6 +34,53 @@ use tauri::{
 /// rapid repo is one of several (BAR, mod-specific repos, etc.).
 const DEFAULT_MASTER: &str = "https://repos.springrts.com";
 
+/// pr-downloader's own default `PRD_HTTP_SEARCH_URL`, from its `--help`. A game
+/// download searches this after rapid, so it is set explicitly rather than left
+/// to whatever the sidecar defaults to.
+const SPRINGFILES_SEARCH_URL: &str = "https://springfiles.springrts.com/json.php";
+
+/// Whether an address is on Beyond All Reason's servers. Coilbox asks those for
+/// BAR's own game and nothing else.
+fn is_bar_host(url: &str) -> bool {
+    let host = host_of(url).to_ascii_lowercase();
+    host == "beyondallreason.dev" || host.ends_with(".beyondallreason.dev")
+}
+
+/// The environment for a rapid game download. BAR's master is refused for any
+/// tag outside its `byar` repository, so no other game is ever looked up there.
+fn rapid_download_envs(
+    tag: &str,
+    master_url: Option<&str>,
+) -> Result<Vec<(String, String)>, String> {
+    let mut envs = vec![(
+        "PRD_HTTP_SEARCH_URL".to_string(),
+        SPRINGFILES_SEARCH_URL.to_string(),
+    )];
+    if let Some(m) = master_url.map(str::trim).filter(|s| !s.is_empty()) {
+        if is_bar_host(m) && !tag.starts_with("byar:") {
+            return Err(format!(
+                "Beyond All Reason's servers are only used for Beyond All Reason, not {tag}."
+            ));
+        }
+        let master = format!("{}/repos.gz", m.trim_end_matches('/'));
+        envs.push(("PRD_RAPID_REPO_MASTER".to_string(), master));
+        envs.push(("PRD_RAPID_USE_STREAMER".to_string(), "false".to_string()));
+    }
+    Ok(envs)
+}
+
+/// The environment for a map download. A search on BAR's servers is refused:
+/// their search stores a copy of any map it is asked for, at BAR's cost.
+fn map_download_envs(search_url: Option<&str>) -> Result<Vec<(String, String)>, String> {
+    match search_url.map(str::trim).filter(|s| !s.is_empty()) {
+        Some(s) if is_bar_host(s) => {
+            Err("Maps are never searched for on Beyond All Reason's servers.".to_string())
+        }
+        Some(s) => Ok(vec![("PRD_HTTP_SEARCH_URL".to_string(), s.to_string())]),
+        None => Ok(Vec::new()),
+    }
+}
+
 const SIDECAR_MISSING: &str =
     "pr-downloader sidecar not found. Bundle the `prdownloader` resource folder (scripts/assemble-prdownloader.sh) or set PRD_SIDECAR.";
 
@@ -676,12 +723,10 @@ async fn dl_download(
         args.push("--filesystem-writepath".to_string());
         args.push(wp);
     }
-    let mut envs = Vec::new();
-    if let Some(m) = master_url.filter(|s| !s.trim().is_empty()) {
-        let master = format!("{}/repos.gz", m.trim_end_matches('/'));
-        envs.push(("PRD_RAPID_REPO_MASTER".to_string(), master));
-        envs.push(("PRD_RAPID_USE_STREAMER".to_string(), "false".to_string()));
-    }
+    let envs = match rapid_download_envs(&tag, master_url.as_deref()) {
+        Ok(envs) => envs,
+        Err(e) => return CliResult::err(e),
+    };
     let (cancel, child_slot) = cancel_slots(&op_id);
     let res = run_sidecar_streaming(args, envs, on_progress, cancel, child_slot).await;
     if let Some(id) = &op_id {
@@ -905,8 +950,8 @@ async fn dl_evolutionrts_maps() -> CliResult {
 }
 
 /// `dl_download_map` — download a map by spring name via the sidecar. `search_url`
-/// overrides `PRD_HTTP_SEARCH_URL` (springrts by default; BAR's files-cdn when
-/// downloading a BAR map). `op_id` (optional) makes it user-cancellable.
+/// overrides `PRD_HTTP_SEARCH_URL` (springrts by default), and is refused on
+/// BAR's servers. `op_id` (optional) makes it user-cancellable.
 #[tauri::command]
 async fn dl_download_map(
     spring_name: String,
@@ -926,10 +971,10 @@ async fn dl_download_map(
         args.push("--filesystem-writepath".to_string());
         args.push(wp);
     }
-    let mut envs = Vec::new();
-    if let Some(s) = search_url.filter(|s| !s.trim().is_empty()) {
-        envs.push(("PRD_HTTP_SEARCH_URL".to_string(), s));
-    }
+    let envs = match map_download_envs(search_url.as_deref()) {
+        Ok(envs) => envs,
+        Err(e) => return CliResult::err(e),
+    };
     let (cancel, child_slot) = cancel_slots(&op_id);
     let res = run_sidecar_streaming(args, envs, on_progress, cancel, child_slot).await;
     if let Some(id) = &op_id {
@@ -2140,6 +2185,83 @@ mod writable_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn env<'a>(envs: &'a [(String, String)], key: &str) -> Option<&'a str> {
+        envs.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
+    }
+
+    #[test]
+    fn a_bar_tag_is_fetched_from_bar_with_the_search_kept_on_springfiles() {
+        let envs = rapid_download_envs(
+            "byar:git:66fbac2",
+            Some("https://repos-cdn.beyondallreason.dev"),
+        )
+        .unwrap();
+        assert_eq!(
+            env(&envs, "PRD_RAPID_REPO_MASTER"),
+            Some("https://repos-cdn.beyondallreason.dev/repos.gz")
+        );
+        assert_eq!(
+            env(&envs, "PRD_HTTP_SEARCH_URL"),
+            Some(SPRINGFILES_SEARCH_URL)
+        );
+    }
+
+    #[test]
+    fn bar_s_master_is_refused_for_any_other_tag() {
+        for tag in [
+            "Metal Factions v2.40",
+            "byar-chobby:test",
+            "zk:stable",
+            "Beyond All Reason test-1",
+        ] {
+            assert!(
+                rapid_download_envs(tag, Some("https://repos-cdn.beyondallreason.dev/")).is_err(),
+                "{tag} was allowed"
+            );
+            assert!(
+                rapid_download_envs(tag, Some("repos.beyondallreason.dev")).is_err(),
+                "{tag} was allowed"
+            );
+        }
+    }
+
+    #[test]
+    fn other_masters_and_no_master_keep_the_search_on_springfiles() {
+        let envs = rapid_download_envs("zk:stable", Some("https://repos.springrts.com")).unwrap();
+        assert_eq!(
+            env(&envs, "PRD_RAPID_REPO_MASTER"),
+            Some("https://repos.springrts.com/repos.gz")
+        );
+        assert_eq!(
+            env(&envs, "PRD_HTTP_SEARCH_URL"),
+            Some(SPRINGFILES_SEARCH_URL)
+        );
+        let envs = rapid_download_envs("zk:stable", None).unwrap();
+        assert_eq!(env(&envs, "PRD_RAPID_REPO_MASTER"), None);
+        assert_eq!(
+            env(&envs, "PRD_HTTP_SEARCH_URL"),
+            Some(SPRINGFILES_SEARCH_URL)
+        );
+    }
+
+    #[test]
+    fn a_map_search_on_bar_s_servers_is_refused() {
+        assert!(map_download_envs(Some("https://files-cdn.beyondallreason.dev/find")).is_err());
+        assert!(map_download_envs(Some("https://FILES-CDN.BeyondAllReason.dev/find")).is_err());
+        assert_eq!(map_download_envs(None).unwrap(), Vec::new());
+        let envs = map_download_envs(Some("https://springfiles.springrts.com/json.php")).unwrap();
+        assert_eq!(
+            env(&envs, "PRD_HTTP_SEARCH_URL"),
+            Some("https://springfiles.springrts.com/json.php")
+        );
+    }
+
+    #[test]
+    fn a_lookalike_host_is_not_taken_for_bar() {
+        assert!(!is_bar_host("https://notbeyondallreason.dev/x"));
+        assert!(!is_bar_host("https://example.com/?u=beyondallreason.dev"));
+    }
 
     /// A plain `http://` import is refused before anything is fetched, with a
     /// code the frontend translates and not a sentence it has to match on.
