@@ -25695,6 +25695,10 @@ msgstr "試合へ移動"
 msgid "Go to recording"
 msgstr "記録へ移動"
 
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Go to start"
+msgstr ""
+
 #: src/content/pages/components/ReplayEventLayers.tsx
 #: src/content/pages/components/ReplayStartUnitLayer.tsx
 #, fuzzy

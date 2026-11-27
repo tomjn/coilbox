@@ -25703,6 +25703,10 @@ msgstr "Naar gevecht"
 msgid "Go to recording"
 msgstr "Naar opname"
 
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Go to start"
+msgstr ""
+
 #: src/content/pages/components/ReplayEventLayers.tsx
 #: src/content/pages/components/ReplayStartUnitLayer.tsx
 #, fuzzy

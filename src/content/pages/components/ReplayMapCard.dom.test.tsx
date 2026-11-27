@@ -1314,6 +1314,34 @@ describe("the lanes of the dock", () => {
     });
   });
 
+  it("moves the clock to the time under a press on blank space in a row", async () => {
+    analysed();
+    LOGGED = kills([30]);
+    await show();
+    // 1,024 pixels of axis over 150 frames: a quarter of it is frame 38.
+    for (const name of ["Kills", "Chat", "Players"]) {
+      await act(async () => {
+        fireEvent.click(lane(name), { clientX: 256 });
+      });
+      expect(clockFrame()).toBe(Math.round(150 / 4));
+      await act(async () => {
+        hook().clock.set(0);
+      });
+    }
+  });
+
+  it("leaves a press on a mark to the mark", async () => {
+    analysed();
+    LOGGED = kills([30]);
+    await show();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Unit destroyed/ }), {
+        clientX: 900,
+      });
+    });
+    expect(clockFrame()).toBe(30);
+  });
+
   it("draws chat sent before the match at the start of the axis, and says so", async () => {
     CHAT = {
       messages: [line(-1, "hi all"), line(60, "later")],
@@ -1586,6 +1614,35 @@ describe("the dock's place", () => {
     dock.getByTestId("match-clock");
     dock.getByRole("slider", { name: "Time in the match" });
     expect(dock.getByTestId("timeline-axis").textContent).toBe("0:00");
+  });
+
+  it("has go to start, rewind, play and the speed, in that order, in one group", async () => {
+    await show("current", "/replay?frame=60");
+    const dock = within(screen.getByRole("group", { name: "Timeline" }));
+    const names = ["Go to start", "Play in reverse", "Play"];
+    const controls = [
+      ...names.map((name) => dock.getByRole("button", { name })),
+      dock.getByRole("combobox", { name: "Playback speed" }),
+    ];
+    const group = controls[0].parentElement as HTMLElement;
+    const inGroup = Array.from(
+      group.querySelectorAll("button, [role=combobox]"),
+    );
+    expect(inGroup).toEqual(controls);
+    // Play is the filled, primary one.
+    expect(controls[2].className).toContain("bg-primary");
+    expect(controls[1].className).not.toContain("bg-primary");
+    // The clock's readout follows the group.
+    expect(
+      group.compareDocumentPosition(dock.getByTestId("match-clock")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("goes to the start of the match from its button", async () => {
+    await show("current", "/replay?frame=60");
+    await click("Go to start");
+    expect(clockFrame()).toBe(0);
   });
 });
 
