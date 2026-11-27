@@ -532,6 +532,9 @@ export interface RecordedPick {
   frame: number;
   unitDefId?: number;
   name?: string;
+  /** The internal name of the unit `unitDefId` is, from the unit list the
+   * replay carries, which Beyond All Reason's does. */
+  unit?: string;
 }
 
 /** One player/spectator from a demo, with side + ally-team resolved from their team. */

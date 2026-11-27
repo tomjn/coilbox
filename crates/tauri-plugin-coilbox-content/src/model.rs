@@ -730,7 +730,8 @@ pub enum PickedFaction {
     Name(String),
 }
 
-/// A pick the game took: `frame` and either `unitDefId` or `name`.
+/// A pick the game took: `frame`, either `unitDefId` or `name`, and `unit` when
+/// the replay names the id.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct RecordedPick {
@@ -738,6 +739,11 @@ pub struct RecordedPick {
     pub frame: i32,
     #[serde(flatten)]
     pub picked: PickedFaction,
+    /// The internal name of the unit a [`PickedFaction::UnitDefId`] names, from
+    /// the unit list the replay carries. Absent for a replay with none, which
+    /// is every game but Beyond All Reason.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unit: Option<String>,
 }
 
 /// One award a game recorded in its replay.

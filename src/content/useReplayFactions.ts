@@ -6,7 +6,7 @@ import {
   useUnitsyncScan,
 } from "./config";
 import { closestInstalledGame, recordedGame } from "./replayBuildOrders";
-import { withPickedSides } from "./replayFactions";
+import { needsUnitList, withPickedSides } from "./replayFactions";
 import { useReplayUnits } from "./useReplayUnits";
 
 /** Stands in while there is no replay, so the hooks below are always called. */
@@ -25,8 +25,7 @@ export function useReplayFactions(info: DemoInfo | null): {
   pending: boolean;
 } {
   const picked = info?.players.some((p) => p.pick) ?? false;
-  const byUnit =
-    info?.players.some((p) => p.pick?.unitDefId !== undefined) ?? false;
+  const byUnit = info?.players.some((p) => needsUnitList(p.pick)) ?? false;
   const { selected } = useScanTargetSelection();
   const scan = useUnitsyncScan(selected?.enginePath, selected?.rootPath);
   // Every version of a game spells its sides and start units the same way, so a

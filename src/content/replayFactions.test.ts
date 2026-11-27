@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { GameItem, ReplayUnitDefSets, StatRecord } from "./bindings";
+import type {
+  GameItem,
+  RecordedPick,
+  ReplayUnitDefSets,
+  StatRecord,
+} from "./bindings";
 import {
   pickedSide,
   resetStatSidesForTests,
@@ -20,6 +25,12 @@ describe("pickedSide", () => {
     expect(pickedSide({ frame: -1, unitDefId: 3 }, UNITS, SIDES)).toBe(
       "Legion",
     );
+  });
+
+  it("takes the replay's own name for the unit over the list's", () => {
+    const pick = { frame: -1, unitDefId: 1, unit: "legcom" };
+    expect(pickedSide(pick, UNITS, SIDES)).toBe("Legion");
+    expect(pickedSide(pick, null, SIDES)).toBe("Legion");
   });
 
   it("has no answer for an id the list cannot name", () => {
@@ -70,7 +81,7 @@ function game(name: string, archive = `${name}.sdz`): GameItem {
 
 function record(
   gameType: string,
-  pick: { frame: number; unitDefId?: number; name?: string } | undefined,
+  pick: RecordedPick | undefined,
   more: Partial<StatRecord> = {},
 ): StatRecord {
   return {
@@ -126,6 +137,22 @@ describe("resolveStatSides", () => {
     );
     // The sides come from the installed version of the same game.
     expect(sideOf(got)).toBe("Legion");
+  });
+
+  it("reads no unit list for picks the replay names itself", async () => {
+    const units = vi.fn(async () => UNITS);
+    const kept = vi.fn(async () => null);
+    const records = [
+      record(
+        "Game 1",
+        { frame: -1, unitDefId: 7, unit: "legcom" },
+        { remixed: true },
+      ),
+    ];
+    const got = await resolveStatSides(records, reads({ units, kept }));
+    expect(sideOf(got)).toBe("Legion");
+    expect(units).not.toHaveBeenCalled();
+    expect(kept).not.toHaveBeenCalled();
   });
 
   it("leaves a remix's unit ids alone, which are another game's", async () => {

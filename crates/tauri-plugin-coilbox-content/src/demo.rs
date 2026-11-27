@@ -5539,6 +5539,7 @@ mod tests {
         let picked = RecordedPick {
             frame: 34,
             picked: PickedFaction::UnitDefId(19),
+            unit: None,
         };
         let detail = demo_info(None, &path).unwrap();
         assert_eq!(detail.start_positions.len(), 1);

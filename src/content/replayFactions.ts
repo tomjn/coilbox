@@ -25,8 +25,8 @@ import { storedListFor } from "./replayUnitDefs";
  * The side a pick stands for, spelled as the game's side data spells it.
  * `units` is the recorded game's unit list in id order and `sides` the game's
  * sides. A picked name needs neither, and is returned as sent when no side
- * matches it. Undefined for a unit id that cannot be named, or that names no
- * side's start unit.
+ * matches it. A pick the replay named itself needs no `units`. Undefined for a
+ * unit id that cannot be named, or that names no side's start unit.
  */
 export function pickedSide(
   pick: RecordedPick,
@@ -37,7 +37,9 @@ export function pickedSide(
   if (name !== undefined)
     return sides.find((s) => s.name.toLowerCase() === name)?.name ?? pick.name;
   if (pick.unitDefId === undefined) return undefined;
-  const unit = resolveBuildUnit(pick.unitDefId, units)?.name.toLowerCase();
+  const unit = (
+    pick.unit ?? resolveBuildUnit(pick.unitDefId, units)?.name
+  )?.toLowerCase();
   if (unit === undefined) return undefined;
   return sides.find((s) => s.startUnit?.toLowerCase() === unit)?.name;
 }
@@ -57,6 +59,11 @@ export function withPickedSides<
     return { ...p, side };
   });
   return changed ? out : players;
+}
+
+/** Whether a pick's unit id can only be named from a unit list. */
+export function needsUnitList(pick: RecordedPick | undefined): boolean {
+  return pick?.unitDefId !== undefined && pick.unit === undefined;
 }
 
 /** What {@link resolveStatSides} reads. */
@@ -93,7 +100,7 @@ async function recordPlayers(
   // A unit id counts into the recorded version's list and no other. A remix's
   // ids are those of the game it was made from, which a record does not name.
   let units: UnitDatasetEntry[] | null = null;
-  const byUnit = record.players.some((p) => p.pick?.unitDefId !== undefined);
+  const byUnit = record.players.some((p) => needsUnitList(p.pick));
   if (byUnit && !record.remixed) {
     const kept = record.gameId ? await read.kept(record.gameId) : null;
     const source = pickUnitSource(

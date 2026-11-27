@@ -81,7 +81,7 @@ The result names the winning side, for example "Team 1 won". It can also say "No
 
 Players lists everyone who played, grouped by side. The winning side has a Winner badge, and each player's row says Won or Lost.
 
-- A player's faction is the one they picked at the start of the match, in Beyond All Reason, Splinter Faction, TA Recoil, TAP and Metal Factions. For everyone else it is the one the lobby set. Naming a picked faction needs the game installed, and in most cases the replay's own version of it. Without that the lobby's faction is shown. Player stats and Refight this setup use the same faction.
+- A player's faction is the one they picked at the start of the match, in Beyond All Reason, Splinter Faction, TA Recoil, TAP and Metal Factions. For everyone else it is the one the lobby set. Naming a picked faction needs the game installed. A Beyond All Reason replay can use any version. For the others it needs the replay's own version, or a unit list coilbox kept for the replay. Without that the lobby's faction is shown. Player stats and Refight this setup use the same faction.
 - Select a player's name to open their page in Player stats. See [Career and player stats](career-and-stats.md#another-player-s-page).
 - Rating appears when the lobby recorded one.
 - APM is actions per minute.

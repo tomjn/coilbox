@@ -101,6 +101,9 @@ pub(super) fn picks_end(game: &str) -> Option<i32> {
 /// is open: before frame 900, and before frame `n + 91` once every team in
 /// `teams` has picked, where `n` is the frame of the pick by the last team to
 /// make its first. Every other game takes them only before the first frame.
+///
+/// A unit id pick is named from the unit list the replay carries, when the walk
+/// met one.
 pub(super) fn counted_picks(
     game: &str,
     stream: &DemoStream,
@@ -129,12 +132,32 @@ pub(super) fn counted_picks(
     } else {
         PREGAME_FRAME + 1
     };
+    // Each player's game sends the same list, so the first will do.
+    let unit_names = stream.events.iter().find_map(|e| match &e.kind {
+        StreamEventKind::UnitDefNames { names, .. } => Some(names),
+        _ => None,
+    });
     // A later pick replaces an earlier one from the same player.
     sent.into_iter()
         .filter(|(frame, ..)| *frame < closed_at)
         .map(|(frame, player, _, picked)| {
+            // The list counts definitions from 1.
+            let unit = match picked {
+                PickedFaction::UnitDefId(id) => id
+                    .checked_sub(1)
+                    .and_then(|at| unit_names.and_then(|names| names.get(at as usize)))
+                    .cloned(),
+                PickedFaction::Name(_) => None,
+            };
             let picked = picked.clone();
-            (player, RecordedPick { frame, picked })
+            (
+                player,
+                RecordedPick {
+                    frame,
+                    picked,
+                    unit,
+                },
+            )
         })
         .collect()
 }
@@ -165,6 +188,7 @@ mod tests {
         RecordedPick {
             frame,
             picked: PickedFaction::UnitDefId(id),
+            unit: None,
         }
     }
 
@@ -229,9 +253,29 @@ mod tests {
                 RecordedPick {
                     frame: PREGAME_FRAME,
                     picked: PickedFaction::Name("aven".into()),
+                    unit: None,
                 }
             )]
         );
+    }
+
+    #[test]
+    fn a_pick_is_named_from_the_unit_list_the_replay_carries() {
+        let mut list = b"unitdefs:".to_vec();
+        let mut zlib = flate2::write::ZlibEncoder::new(&mut list, Default::default());
+        std::io::Write::write_all(&mut zlib, br#"["armcom","legcom"]"#).unwrap();
+        zlib.finish().unwrap();
+        let s = Packets::default()
+            .lua_msg(1, 100, 0, b"changeStartUnit2")
+            .lua_msg(2, 100, 0, b"changeStartUnit3")
+            // The list can arrive after the picks.
+            .lua_msg(1, 100, 0, &list);
+        let named: Vec<Option<String>> =
+            picks("Beyond All Reason test-32071-e1cbffe", s, &[(1, 1), (2, 2)])
+                .into_iter()
+                .map(|(_, pick)| pick.unit)
+                .collect();
+        assert_eq!(named, [Some("legcom".to_string()), None]);
     }
 
     #[test]
