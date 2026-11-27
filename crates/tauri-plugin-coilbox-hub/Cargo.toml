@@ -28,6 +28,8 @@ coilbox-map-catalog = { path = "../coilbox-map-catalog" }
 # user's answer and the distribution profile off disk rather than being told.
 coilbox-portable = { path = "../coilbox-portable" }
 tauri-plugin-opener = "2"
+# The hash of a replay file, which the hub's replay route asks for.
+sha2 = { workspace = true }
 # rustls-tls keeps OpenSSL out of the build, the same reason the downloads plugin
 # picks it. `multipart` is the upload route's body shape (issue #1633): a JSON
 # declaration beside the encoded bytes, neither of which belongs inside the other.
