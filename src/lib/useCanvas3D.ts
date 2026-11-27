@@ -118,7 +118,12 @@ function takeRenderer(): Pooled {
   for (let one = parked.pop(); one; one = parked.pop()) {
     if (!one.renderer.getContext().isContextLost()) {
       one.owned = true;
-      // What the last view set, put back to what three starts with.
+      // What the last view set, put back to what three starts with, along
+      // with three's record of the GL state, so nothing the last view left
+      // bound or enabled carries into the next one's first frame.
+      one.renderer.resetState();
+      one.renderer.setScissorTest(false);
+      one.renderer.clippingPlanes = [];
       one.renderer.localClippingEnabled = false;
       one.renderer.setClearColor(0x000000, 0);
       one.renderer.clear();

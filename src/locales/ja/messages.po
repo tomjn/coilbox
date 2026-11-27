@@ -14690,11 +14690,6 @@ msgstr "建物 {place}"
 msgid "Building <0>{baseName} (compat {version})</0>"
 msgstr "<0>{baseName}（互換 {version}）</0>を作成中"
 
-#: src/mapconv/pages/components/MapPreview3D.tsx
-#, fuzzy
-msgid "Building 3D preview…"
-msgstr "3D プレビューを作成しています…"
-
 #: src/content/mapAggregate.ts
 #: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
@@ -30091,6 +30086,10 @@ msgstr "輸送ユニットの積み降ろし"
 msgid "Loading channels…"
 msgstr "チャンネルを読み込み中…"
 
+#: src/mapconv/pages/components/MapPreview3D.tsx
+msgid "Loading colour…"
+msgstr ""
+
 #: src/campaign/pages/MissionBriefingPage.tsx
 #, fuzzy
 msgid "Loading content…"
@@ -30145,6 +30144,10 @@ msgstr "レポートを読み込み中…"
 #, fuzzy
 msgid "Loading sides…"
 msgstr "勢力を読み込み中…"
+
+#: src/mapconv/pages/components/MapPreview3D.tsx
+msgid "Loading terrain…"
+msgstr ""
 
 #: src/downloads/pages/components/HubEngineList.tsx
 msgid "Loading test builds…"

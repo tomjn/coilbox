@@ -14690,11 +14690,6 @@ msgstr "Gebäude {place}"
 msgid "Building <0>{baseName} (compat {version})</0>"
 msgstr "Erstelle <0>{baseName} (compat {version})</0>"
 
-#: src/mapconv/pages/components/MapPreview3D.tsx
-#, fuzzy
-msgid "Building 3D preview…"
-msgstr "3D-Vorschau wird erstellt…"
-
 #: src/content/mapAggregate.ts
 #: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
@@ -30091,6 +30086,10 @@ msgstr "Laden und Entladen eines Transporters"
 msgid "Loading channels…"
 msgstr "Kanäle werden geladen…"
 
+#: src/mapconv/pages/components/MapPreview3D.tsx
+msgid "Loading colour…"
+msgstr ""
+
 #: src/campaign/pages/MissionBriefingPage.tsx
 #, fuzzy
 msgid "Loading content…"
@@ -30145,6 +30144,10 @@ msgstr "Bericht wird geladen…"
 #, fuzzy
 msgid "Loading sides…"
 msgstr "Fraktionen werden geladen…"
+
+#: src/mapconv/pages/components/MapPreview3D.tsx
+msgid "Loading terrain…"
+msgstr ""
 
 #: src/downloads/pages/components/HubEngineList.tsx
 msgid "Loading test builds…"
