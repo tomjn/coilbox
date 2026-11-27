@@ -5,6 +5,7 @@ import type { MapScene3D } from "@/lib/mapScene";
 import { fieldFromGrid } from "@/placement/terrain";
 import fixture from "../fixtures/replay-track-window.json";
 import { createReplayClock } from "./clock";
+import { BLASTS_NAME } from "./deathBlasts3d";
 import type { UnitIcons } from "./icons";
 import type { TeamStyle } from "./paint";
 import { createMapScene } from "./scene";
@@ -210,6 +211,27 @@ describe("the unit dots layer", () => {
     frames.run();
     expect(view.scene.getObjectByName(`${ICONS_NAME}tank`)).toBeUndefined();
     expect(pointsOf(view).geometry.drawRange.count).toBe(1);
+  });
+
+  it("marks where a unit died with a circle part way through its fade, and only while explosions are on", async () => {
+    const { track, clock, view, frames, layer } = await setup();
+    const blasts = () =>
+      view.scene.getObjectByName(BLASTS_NAME) as THREE.Points;
+    // Unit 1's last frame is 89, so at 95 it died 6 frames ago.
+    clock.set(95);
+    await track.seek(95);
+    frames.run();
+    expect(blasts().geometry.drawRange.count).toBe(0);
+
+    layer.setExplosions(true);
+    frames.run();
+    expect(blasts().geometry.drawRange.count).toBe(1);
+    // 0.4 seconds at 30 frames a second is a span of 12 frames.
+    expect(blasts().geometry.attributes.progress.array[0]).toBeCloseTo(6 / 13);
+
+    clock.set(110);
+    frames.run();
+    expect(blasts().geometry.drawRange.count).toBe(0);
   });
 
   it("removes its points and frees the GPU objects when disposed", async () => {

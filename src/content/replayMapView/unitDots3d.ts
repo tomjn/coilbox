@@ -22,6 +22,7 @@ import { worldToScene } from "@/placement/scene";
 import { groundHeight, type HeightField } from "@/placement/terrain";
 import type { ReplayTrackHandle } from "../replayTrack";
 import type { ReplayClock } from "./clock";
+import { createDeathBlasts } from "./deathBlasts3d";
 import type { UnitIcons } from "./icons";
 import type { MapViewEnv } from "./loop";
 import type { TeamStyle } from "./paint";
@@ -142,6 +143,9 @@ export interface UnitDotsDeps {
   env: MapViewEnv;
   /** The game's map icons. Null draws every unit as a dot. */
   icons?: UnitIcons | null;
+  /** Mark where units died, as the flat map's Explosions switch says. Left
+   *  out it is off. */
+  explosions?: boolean;
 }
 
 export interface UnitDotsLayer {
@@ -149,6 +153,8 @@ export interface UnitDotsLayer {
   setTeams(teams: ReadonlyMap<number, TeamStyle>): void;
   /** Draw units as these icons from the next picture, or all as dots. */
   setIcons(icons: UnitIcons | null): void;
+  /** Mark where units died from the next picture, or not. */
+  setExplosions(on: boolean): void;
   /** Draws the clock's frame now. How many units it drew, or null while the
    *  frame's window is still loading. */
   drawNow(): number | null;
@@ -245,6 +251,9 @@ export function createUnitDotsLayer(deps: UnitDotsDeps): UnitDotsLayer {
   const dots = createGroup(DOTS_NAME, DOT_PIXELS, dotTexture(), false);
   growGroup(dots, 0);
   view.scene.add(dots.points);
+  let explosions = deps.explosions ?? false;
+  const blasts = createDeathBlasts(view.scale);
+  view.scene.add(blasts.points);
   /** The points of each icon type, made when a unit of that type is first
    *  drawn. */
   const iconGroups = new Map<string, Group>();
@@ -273,6 +282,42 @@ export function createUnitDotsLayer(deps: UnitDotsDeps): UnitDotsLayer {
     return group;
   };
 
+  /** Shots landing are left to the flat map, which draws the shots too. */
+  const writeDeaths = () => {
+    let deaths = 0;
+    for (let i = 0; i < collected.blasts; i++) {
+      if (collected.blastDeath[i]) deaths++;
+    }
+    const out = blasts.reserve(deaths);
+    let n = 0;
+    for (let i = 0; i < collected.blasts; i++) {
+      if (!collected.blastDeath[i]) continue;
+      const x = collected.blastX[i];
+      const z = collected.blastZ[i];
+      const at = worldToScene(
+        { x, z },
+        ground.worldWidth,
+        ground.worldHeight,
+        view.scale,
+      );
+      out.positions[n * 3] = at.x;
+      out.positions[n * 3 + 1] =
+        groundHeight(
+          ground.field,
+          x,
+          z,
+          ground.worldWidth,
+          ground.worldHeight,
+          ground.minHeight,
+          ground.maxHeight,
+        ) * view.scale;
+      out.positions[n * 3 + 2] = at.z;
+      out.progress[n] = collected.blastProgress[i];
+      n++;
+    }
+    blasts.show(n);
+  };
+
   const dropIcons = () => {
     for (const group of iconGroups.values()) disposeGroup(group);
     iconGroups.clear();
@@ -286,7 +331,8 @@ export function createUnitDotsLayer(deps: UnitDotsDeps): UnitDotsLayer {
   const draw = (): number | null => {
     const frame = clock.frame;
     track.follow(frame, clock.direction);
-    if (!collectScene(track, frame, collected)) return null;
+    if (!collectScene(track, frame, collected, explosions)) return null;
+    writeDeaths();
     const units = collected.units;
     if (allPositions.length < units * 3) {
       allPositions = new Float32Array(units * 3);
@@ -353,6 +399,11 @@ export function createUnitDotsLayer(deps: UnitDotsDeps): UnitDotsLayer {
       dropIcons();
       invalidate();
     },
+    setExplosions(next) {
+      if (next === explosions) return;
+      explosions = next;
+      invalidate();
+    },
     drawNow: draw,
     dispose() {
       disposed = true;
@@ -361,6 +412,7 @@ export function createUnitDotsLayer(deps: UnitDotsDeps): UnitDotsLayer {
       for (const stop of stops) stop();
       dropIcons();
       disposeGroup(dots);
+      blasts.dispose();
       view.render();
     },
   };

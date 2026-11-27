@@ -26,7 +26,10 @@ export function useUnitDots3d(
   teams: ReadonlyMap<number, TeamStyle>,
   ground: DotGround | null,
   icons: UnitIcons | null,
+  explosions: boolean,
 ): void {
+  const explosionsRef = useRef(explosions);
+  explosionsRef.current = explosions;
   const { clock } = useMatchClock();
   const layerRef = useRef<UnitDotsLayer | null>(null);
   const teamsRef = useRef(teams);
@@ -43,6 +46,7 @@ export function useUnitDots3d(
       teams: teamsRef.current,
       ground,
       icons: iconsRef.current,
+      explosions: explosionsRef.current,
       env: {
         requestFrame: (callback) => requestAnimationFrame(callback),
         cancelFrame: (id) => cancelAnimationFrame(id),
@@ -62,4 +66,8 @@ export function useUnitDots3d(
   useEffect(() => {
     layerRef.current?.setIcons(icons);
   }, [icons]);
+
+  useEffect(() => {
+    layerRef.current?.setExplosions(explosions);
+  }, [explosions]);
 }

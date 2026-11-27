@@ -16,6 +16,7 @@ import type { ExpandBounds } from "../../../mapconv/pages/components/useExpanded
 import type { DemoInfo } from "../../bindings";
 import { useUnitsyncHeightField, useUnitsyncMapSkybox } from "../../config";
 import type { ReplayTrackHandle } from "../../replayTrack";
+import { useUnitMapExplosions } from "../../unitMapExplosions";
 import { useReplayMapLayers } from "../../useReplayMapLayers";
 import { useUnitDots3d } from "../../useUnitDots3d";
 import { useUnitMapIcons } from "../../useUnitMapIcons";
@@ -147,7 +148,9 @@ export function ReplayMap3D({
     track?.header.unitDefs ?? NO_UNIT_DEFS,
     track !== null,
   );
-  useUnitDots3d(handle, track, teams, ground, icons);
+  // The flat map's Explosions switch, so a choice there holds here too.
+  const [explosions] = useUnitMapExplosions();
+  useUnitDots3d(handle, track, teams, ground, icons, explosions);
 
   return (
     <ReplayMapLayout
