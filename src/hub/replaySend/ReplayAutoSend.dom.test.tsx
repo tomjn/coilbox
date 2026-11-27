@@ -68,7 +68,11 @@ import {
   writeStoredSetting,
 } from "@/lib/storedSetting";
 import { rememberTrackOnHub } from "../replayExtras/onHub";
-import { queueFinishedReplay, readReplayExtrasQueue } from "./queue";
+import {
+  dropQueuedExtras,
+  queueFinishedReplay,
+  readReplayExtrasQueue,
+} from "./queue";
 import ReplayAutoSend from "./ReplayAutoSend";
 import { ReplayAutoSendControl } from "./ReplayAutoSendControl";
 
@@ -154,25 +158,47 @@ describe("the background sender", () => {
     expect(readReplayExtrasQueue()[0]?.mapName).toBe("Persepolis");
   });
 
-  it("queues a match when a track of it is recorded after an earlier run (#5495)", () => {
+  const track = (gameId: string) => ({
+    gameId,
+    state: "current",
+    lastWatchedMs: Date.now(),
+  });
+
+  it("queues nothing when an old recording is watched (#5523)", () => {
     turn(true);
     analyses = new Map([["m", analysis("m", 1)]]);
     const { rerender } = render(<ReplayAutoSend />);
-    tracks = new Map([
-      ["m", { gameId: "m", state: "current", lastWatchedMs: Date.now() }],
-    ]);
+    // Watching sets the track file's time, and the next read shows it.
+    tracks = new Map([["m", track("m")]]);
+    rerender(<ReplayAutoSend />);
+    expect(readReplayExtrasQueue()).toEqual([]);
+  });
+
+  it("queues a match again when its run's recording is read after its analysis (#5495)", () => {
+    turn(true);
+    const { rerender } = render(<ReplayAutoSend />);
+    analyses = new Map([["m", analysis("m", Date.now())]]);
+    rerender(<ReplayAutoSend />);
+    // The sender found no track yet and finished with the match.
+    act(() => dropQueuedExtras("m"));
+    tracks = new Map([["m", track("m")]]);
     rerender(<ReplayAutoSend />);
     expect(readReplayExtrasQueue().map((one) => one.gameId)).toEqual(["m"]);
+    // Watching it afterwards is not news.
+    act(() => dropQueuedExtras("m"));
+    tracks = new Map([["m", track("m")]]);
+    rerender(<ReplayAutoSend />);
+    expect(readReplayExtrasQueue()).toEqual([]);
   });
 
   it("queues nothing for a track the hub is known to hold (#5520)", () => {
     turn(true);
-    analyses = new Map([["m", analysis("m", 1)]]);
     const { rerender } = render(<ReplayAutoSend />);
+    analyses = new Map([["m", analysis("m", Date.now())]]);
+    rerender(<ReplayAutoSend />);
+    act(() => dropQueuedExtras("m"));
     rememberTrackOnHub("m", "https://hub.test");
-    tracks = new Map([
-      ["m", { gameId: "m", state: "current", lastWatchedMs: Date.now() }],
-    ]);
+    tracks = new Map([["m", track("m")]]);
     rerender(<ReplayAutoSend />);
     expect(readReplayExtrasQueue()).toEqual([]);
   });
