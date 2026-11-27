@@ -359,7 +359,7 @@ async function sendExtras(
         return { kind: "done" };
       }
       // The hub cannot replace its track yet. It is asked again when the match
-      // is next recorded, or from the replay's page (issue #5525).
+      // is next analysed and recorded, or from the replay's page (issue #5525).
       if (outcome.code === "older_kept") return { kind: "done" };
       const again = trackWorthAnotherTry(outcome);
       if (theirs && !again) return { kind: "done" };
