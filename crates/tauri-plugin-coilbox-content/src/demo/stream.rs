@@ -92,11 +92,40 @@ pub fn read_stream(demo: &Path) -> Result<DemoStream, String> {
     decode_stream(&bytes)
 }
 
+/// Walk the opening of a replay's demo stream, up to the first packet after the
+/// frame clock reaches `frame`. A `frame` of 0 is the pregame alone.
+pub(super) fn read_opening(demo: &Path, frame: i32) -> Result<DemoStream, String> {
+    let mut rdr = open_maybe_gzip(demo)?;
+    let mut bytes = Vec::new();
+    let mut want = FIRST_READ;
+    loop {
+        // Only as much of the file as the opening takes, because a gzipped
+        // replay is decompressed as it is read and the rest is most of it.
+        let wanted = (want - bytes.len()) as u64;
+        (&mut rdr)
+            .take(wanted)
+            .read_to_end(&mut bytes)
+            .map_err(|e| format!("read demo: {e}"))?;
+        let all_read = bytes.len() < want;
+        match decode_stream_until(&bytes, Until::Frame(frame)) {
+            Ok(stream) if all_read || stream.last_frame >= frame => return Ok(stream),
+            Err(e) if all_read => return Err(e),
+            // The prefix ends before the opening does, or before the stream
+            // starts. Read twice as much and walk again.
+            _ => want = want.saturating_mul(2),
+        }
+    }
+}
+
+/// How much of a replay the first read takes, in bytes. A read size and not a
+/// limit: an opening longer than this is read in further doubling steps.
+const FIRST_READ: usize = 256 * 1024;
+
 /// Where each team started, by `[teamN]` index, for the teams `is_team` accepts.
 ///
-/// The walk stops at the first frame, because the engine sends every start
-/// position before the game starts. A position sent after that arrives when
-/// units have already spawned, so it is not where the team started.
+/// Only the pregame counts, because the engine sends every start position before
+/// the game starts. A position sent after that arrives when units have already
+/// spawned, so it is not where the team started.
 ///
 /// The last pregame message per team counts. `CGame` applies each one in order
 /// with `CTeam::SetStartPos`, and `CGameServer::StartGame` ends the pregame by
@@ -107,39 +136,6 @@ pub fn read_stream(demo: &Path) -> Result<DemoStream, String> {
 /// A team the stream never mentions is absent. So is a team whose last message
 /// says its player never readied and carries no position at all, which is the
 /// server's zero vector for a position nobody sent.
-pub fn read_start_positions(
-    demo: &Path,
-    is_team: impl Fn(i32) -> bool,
-) -> Result<Vec<TeamStartPosition>, String> {
-    let mut rdr = open_maybe_gzip(demo)?;
-    let mut bytes = Vec::new();
-    let mut want = FIRST_READ;
-    loop {
-        // Only as much of the file as the pregame takes, because a gzipped
-        // replay is decompressed as it is read and the rest is most of it.
-        let wanted = (want - bytes.len()) as u64;
-        (&mut rdr)
-            .take(wanted)
-            .read_to_end(&mut bytes)
-            .map_err(|e| format!("read demo: {e}"))?;
-        let all_read = bytes.len() < want;
-        match decode_stream_until(&bytes, Until::GameStarts) {
-            Ok(stream) if all_read || stream.last_frame != PREGAME_FRAME => {
-                return Ok(start_positions(&stream, is_team));
-            }
-            Err(e) if all_read => return Err(e),
-            // The prefix ends before the pregame does, or before the stream
-            // starts. Read twice as much and walk again.
-            _ => want = want.saturating_mul(2),
-        }
-    }
-}
-
-/// How much of a replay the first read takes, in bytes. A read size and not a
-/// limit: a pregame longer than this is read in further doubling steps.
-const FIRST_READ: usize = 256 * 1024;
-
-/// The reduction behind [`read_start_positions`], over a walked stream.
 pub(super) fn start_positions(
     stream: &DemoStream,
     is_team: impl Fn(i32) -> bool,
@@ -174,8 +170,9 @@ pub(super) fn start_positions(
 enum Until {
     /// To the end of the stream.
     TheEnd,
-    /// To the first frame, so the pregame events only.
-    GameStarts,
+    /// Until the frame clock reaches this frame. 0 is the first frame, so the
+    /// pregame events only.
+    Frame(i32),
 }
 
 /// Find the stream in a whole replay's bytes and walk it.
@@ -239,8 +236,8 @@ fn unknown_format(
 /// `NETMSG_NEWFRAME` advances it by one, and on every real replay measured each
 /// keyframe was exactly one past the frame before it.
 ///
-/// With [`Until::GameStarts`] the walk ends at the first packet after the frame
-/// clock leaves [`PREGAME_FRAME`], and says nothing about why in `stopped`.
+/// With [`Until::Frame`] the walk ends at the first packet after the frame clock
+/// reaches that frame, and says nothing about why in `stopped`.
 #[cfg(test)]
 fn walk(stream: &[u8], until: Until) -> DemoStream {
     walk_with(stream, until, "", DECODERS)
@@ -258,7 +255,7 @@ fn walk_with(stream: &[u8], until: Until, game: &str, decoders: &[LuaDecoder]) -
     };
     let mut at = 0;
     while at < stream.len() {
-        if until == Until::GameStarts && out.last_frame != PREGAME_FRAME {
+        if matches!(until, Until::Frame(frame) if out.last_frame >= frame) {
             break;
         }
         let Some(head) = stream.get(at..at + CHUNK_HEADER_SIZE) else {
@@ -760,6 +757,11 @@ pub(crate) mod fixture {
         /// walked stream.
         pub(crate) fn walked(&self) -> DemoStream {
             walk(&self.bytes, Until::TheEnd)
+        }
+
+        /// The same, as a replay of `game`.
+        pub(crate) fn walked_as(&self, game: &str) -> DemoStream {
+            walk_with(&self.bytes, Until::TheEnd, game, DECODERS)
         }
 
         /// One chunk: `f32 modGameTime, u32 length`, then the payload as given.
@@ -1276,7 +1278,7 @@ mod tests {
     }
 
     fn positions_of(p: Packets, is_team: impl Fn(i32) -> bool) -> Vec<TeamStartPosition> {
-        let s = walk(&p.bytes(), Until::GameStarts);
+        let s = walk(&p.bytes(), Until::Frame(0));
         start_positions(&s, is_team)
     }
 
@@ -1353,7 +1355,7 @@ mod tests {
             .start_pos(255, 0, 1, [1.0, 0.0, 2.0])
             .newframes(3)
             .chat(0, 254, "gg");
-        let bounded = walk(&p.bytes(), Until::GameStarts);
+        let bounded = walk(&p.bytes(), Until::Frame(0));
         assert_eq!(bounded.events.len(), 1);
         assert_eq!(bounded.stopped, None);
         assert_eq!(walk(&p.bytes(), Until::TheEnd).events.len(), 2);
@@ -1366,7 +1368,7 @@ mod tests {
             .bytes();
         bytes.extend_from_slice(&0.0f32.to_le_bytes());
         bytes.extend_from_slice(&0x7FFF_FFFFu32.to_le_bytes());
-        let s = walk(&bytes, Until::GameStarts);
+        let s = walk(&bytes, Until::Frame(0));
         assert!(s.stopped.is_some());
         assert_eq!(start_positions(&s, every_team), vec![at(0, 1.0, 0.0, 2.0)]);
     }

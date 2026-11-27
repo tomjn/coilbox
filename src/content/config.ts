@@ -26,6 +26,7 @@ import {
   contentStatsQuery,
   contentStatsWatchStart,
   contentStatsWatchStop,
+  contentUnitDefSet,
   type DemoInfo,
   type EngineConfigResult,
   type GameInfoResult,
@@ -76,6 +77,7 @@ import { invalidateInstalledContent } from "./installedContent";
 import { writeLastScan } from "./lastScan";
 import { useRecordMapAppearance } from "./mapAppearanceCache";
 import { readCachedModel } from "./modelFile";
+import { resolveStatSides } from "./replayFactions";
 import { forgetScanHints, rememberScanHints } from "./scanHints";
 import { deriveSetup } from "./setup";
 import { unitIconDataUrl } from "./unitIcon";
@@ -2712,6 +2714,47 @@ export function useStoredStatsRecords(enabled: boolean): StatRecord[] {
 }
 
 /**
+ * The records with the faction each player picked in the match in place of the
+ * start script's side (#5489), see `resolveStatSides`. Reads nothing for a
+ * library with no picks. Until the names are read, and for a pick that cannot be
+ * named, a record keeps the script's side.
+ */
+function useStatFactions(records: StatRecord[]): StatRecord[] {
+  const picked = useMemo(
+    () => records.some((r) => r.players.some((p) => p.pick)),
+    [records],
+  );
+  const { selected } = useScanTargetSelection();
+  const enginePath = picked ? selected?.enginePath : undefined;
+  const dataDir = picked ? selected?.rootPath : undefined;
+  const games = useUnitsyncScan(enginePath, dataDir).data?.games;
+  const [resolved, setResolved] = useState<{
+    from: StatRecord[];
+    records: StatRecord[];
+  } | null>(null);
+
+  useEffect(() => {
+    if (!enginePath || !dataDir || !games) return;
+    let cancelled = false;
+    resolveStatSides(records, {
+      games,
+      sides: async (archive) =>
+        (await primeGameInfo(enginePath, dataDir, archive)).sides,
+      units: async (archive) =>
+        (await loadUnitsyncUnitDataset(enginePath, dataDir, archive)).units,
+      kept: (gameId) => contentUnitDefSet({ gameId }),
+    }).then((named) => {
+      if (!cancelled) setResolved({ from: records, records: named });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [records, enginePath, dataDir, games]);
+
+  return resolved?.from === records ? resolved.records : records;
+}
+
+/**
  * Load the local stats database for the whole library: it ingests every root's
  * new/changed demos (idempotent, off the UI thread) then holds the record set.
  * `enginePath` locates demotool for the winner read; when absent the native decode
@@ -2822,5 +2865,6 @@ export function useReplayStats(roots: string[], enginePath?: string) {
     };
   }, [refreshFromQuery]);
 
-  return { records, summary, ingesting, error, refresh };
+  const named = useStatFactions(records);
+  return { records: named, summary, ingesting, error, refresh };
 }

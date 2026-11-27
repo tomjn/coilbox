@@ -37,7 +37,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::demo::{self, DemoFileEntry};
 use crate::metrics::TeamTotals;
-use crate::model::DemoInfo;
+use crate::model::{DemoInfo, RecordedPick};
 
 /// The current stats-store schema. Bumped when the record shape changes in a way a
 /// stale store couldn't be read as (today: a straight re-ingest rebuilds it).
@@ -50,7 +50,8 @@ use crate::model::DemoInfo;
 /// 5: a record's players and AIs carry their team id (`team`), and the team
 /// totals include units lost. Both are read off a record by the same key
 /// (`teamTotals[].team`), so neither means anything without the other.
-pub const STATS_SCHEMA_VERSION: u32 = 5;
+/// 6: a record's players carry the faction they picked in the match (`pick`).
+pub const STATS_SCHEMA_VERSION: u32 = 6;
 
 /// One player (or spectator) as recorded in a game, flattened from the demo's
 /// start-script. `side` is the faction; `won` is set only for a decided game where
@@ -68,6 +69,10 @@ pub struct StatPlayer {
     pub ally_team: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub side: Option<String>,
+    /// The faction the player picked in the match, which a view shows in place
+    /// of `side` when it can name it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pick: Option<RecordedPick>,
     pub spectator: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub won: Option<bool>,
@@ -241,6 +246,7 @@ fn record_from(
             team: if p.spectator { None } else { p.team },
             ally_team: p.ally_team,
             side: p.side,
+            pick: p.pick,
             spectator: p.spectator,
             won: p.won,
             skill: p.skill,
@@ -508,6 +514,7 @@ mod tests {
             team: Some(ally),
             ally_team: Some(ally),
             side: Some("Armada".into()),
+            pick: None,
             rgb_color: None,
             spectator: false,
             won,

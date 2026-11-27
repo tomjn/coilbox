@@ -522,6 +522,21 @@ export interface MetricRatio {
   denominator: MetricKey;
 }
 
+/**
+ * The faction a player picked in the match, as the game's Lua message gave it:
+ * a start unit's definition id in the recorded game's numbering, or the
+ * faction's name. Only a pick sent while the game was taking picks is here.
+ */
+export interface RecordedPick {
+  /** The frame it was sent in, -1 before the match started. */
+  frame: number;
+  unitDefId?: number;
+  name?: string;
+  /** The internal name of the unit `unitDefId` is, from the unit list the
+   * replay carries, which Beyond All Reason's does. */
+  unit?: string;
+}
+
 /** One player/spectator from a demo, with side + ally-team resolved from their team. */
 export interface ReplayPlayer {
   /** The `[playerN]` number, which a chat line's or a timeline event's
@@ -533,6 +548,9 @@ export interface ReplayPlayer {
   allyTeam?: number;
   /** Faction (the team's `side`, e.g. `Armada`/`Cortex`/`Legion`). */
   side?: string;
+  /** The faction picked in the match, which `useReplayFactions` puts in place
+   * of `side` when it can name it. */
+  pick?: RecordedPick;
   /** Normalized team colour `[r, g, b]` in 0..1, when present. */
   rgbColor?: [number, number, number];
   spectator: boolean;
@@ -712,6 +730,9 @@ export interface StatPlayer {
   allyTeam?: number;
   /** Faction (the team's `side`). */
   side?: string;
+  /** The faction picked in the match. `useReplayStats` puts it in place of
+   * `side` when it can name it. */
+  pick?: RecordedPick;
   spectator: boolean;
   /** Set only for a decided game where the player wasn't a spectator. */
   won?: boolean;

@@ -14,6 +14,7 @@ use std::io::Read;
 use flate2::read::ZlibDecoder;
 
 use super::def_sets::{usable_text, MAX_NAME_BYTES, MAX_UNITS};
+use super::faction_picks;
 use crate::model::{RecordedAward, RecordedAwardId, RecordedPlace, StreamEventKind};
 
 /// One `NETMSG_LUAMSG`, borrowed from the stream.
@@ -56,10 +57,22 @@ pub(super) const DECODERS: &[LuaDecoder] = &[
         name: "barUnitDefNames",
         decode: bar_unit_def_names,
     },
+    LuaDecoder {
+        name: "barFactionPick",
+        decode: faction_picks::bar_pick,
+    },
+    LuaDecoder {
+        name: "byteFactionPick",
+        decode: faction_picks::byte_pick,
+    },
+    LuaDecoder {
+        name: "metalFactionsPick",
+        decode: faction_picks::metal_factions_pick,
+    },
 ];
 
 /// LuaRules, as [`LuaMsg::handle`] numbers it.
-const LUA_RULES: u16 = 100;
+pub(super) const LUA_RULES: u16 = 100;
 
 /// Beyond All Reason's awards, sent once at game over. The message is a run of
 /// fields, each a marker byte and then ASCII `team:score`, or the team alone for

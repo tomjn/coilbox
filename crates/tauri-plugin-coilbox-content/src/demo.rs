@@ -21,7 +21,7 @@
 //! The demo stream itself, which is what each player did, is walked by
 //! [`stream`].
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -37,12 +37,13 @@ use crate::metrics::{self, TeamTotals};
 use crate::model::{
     AiInfo, AllyTeamInfo, ChatLine, DemoChat, DemoInfo, DemoStream, DemoTrailer, PlayerInfo,
     PlayerStats, ReplayFile, StartBox, StreamEvent, StreamEventKind, TeamAction, TeamStatSample,
-    TeamStatSeries, TimelineEvent, TimelineEventKind,
+    TeamStatSeries, TimelineEvent, TimelineEventKind, PREGAME_FRAME,
 };
 
 pub(crate) mod analysis;
 mod build_orders;
 pub(crate) mod def_sets;
+mod faction_picks;
 mod lua_msg;
 pub mod map_grids;
 pub(crate) mod match_setup;
@@ -810,16 +811,36 @@ fn decode(
     let player_stats = trailer.and_then(|t| t.players);
     let mut info = build_demo_info(raw, &game, winners, player_stats);
     info.stale_remix = is_stale_remix(demo, &info);
-    if with_start_positions {
-        // A stream this decoder cannot read costs the positions and nothing
-        // else, the way a refused trailer costs the statistics.
-        let teams: HashSet<i32> = game
-            .children
-            .iter()
-            .filter_map(|(name, _)| index_suffix(name, "team"))
-            .collect();
-        info.start_positions =
-            stream::read_start_positions(demo, |t| teams.contains(&t)).unwrap_or_default();
+    // A remix's stream is the recorded game's, so its picks are read as that
+    // game's.
+    let recorded = info.source_gametype.clone();
+    let recorded = recorded.unwrap_or_else(|| info.game_type.clone());
+    let picks_end = faction_picks::picks_end(&recorded);
+    if with_start_positions || picks_end.is_some() {
+        // A stream this decoder cannot read costs the positions and the picks
+        // and nothing else, the way a refused trailer costs the statistics.
+        if let Ok(opening) = stream::read_opening(demo, picks_end.unwrap_or(PREGAME_FRAME + 1)) {
+            if with_start_positions {
+                let teams: HashSet<i32> = game
+                    .children
+                    .iter()
+                    .filter_map(|(name, _)| index_suffix(name, "team"))
+                    .collect();
+                info.start_positions = stream::start_positions(&opening, |t| teams.contains(&t));
+            }
+            let seats: BTreeMap<u8, i32> = info
+                .players
+                .iter()
+                .filter(|p| !p.spectator)
+                .filter_map(|p| Some((u8::try_from(p.player).ok()?, p.team?)))
+                .collect();
+            let mut picks = faction_picks::counted_picks(&recorded, &opening, &seats);
+            for p in &mut info.players {
+                p.pick = u8::try_from(p.player)
+                    .ok()
+                    .and_then(|number| picks.remove(&number));
+            }
+        }
     }
     Ok((info, totals))
 }
@@ -1801,6 +1822,7 @@ fn build_demo_info(
             team,
             ally_team,
             side,
+            pick: None,
             rgb_color,
             spectator,
             won,
@@ -3620,7 +3642,10 @@ mod tests {
     // ---- the demo stream, inside a whole file --------------------------------
 
     use super::stream::fixture::Packets;
-    use crate::model::{ChatDest, LeaveReason, StreamEventKind, TeamAction, PREGAME_FRAME};
+    use crate::model::{
+        ChatDest, LeaveReason, PickedFaction, RecordedPick, StreamEventKind, TeamAction,
+        PREGAME_FRAME,
+    };
 
     /// A finished 1v1 with a demo stream in it: a start position, two frames,
     /// and a line of chat.
@@ -3881,6 +3906,7 @@ mod tests {
                         StreamEventKind::Team { .. } => "team",
                         StreamEventKind::NewPlayer { .. } => "newPlayer",
                         StreamEventKind::MatchAwards { .. } => "matchAwards",
+                        StreamEventKind::FactionPick { .. } => "factionPick",
                     })
                     .or_default() += 1;
             }
@@ -5496,6 +5522,41 @@ mod tests {
         assert_eq!(c.awards.len(), 1);
         assert_eq!(c.awards[0].places[0].team, 1);
         assert!(c.messages.is_empty());
+    }
+
+    #[test]
+    fn a_players_pick_is_on_both_decodes_beside_the_scripts_side() {
+        // A real Splinter Faction 0.1.97 packet: player 0 picks unit def 19.
+        let s = Packets::default()
+            .start_pos(0, 0, 1, [724.0, 0.0, 800.0])
+            .keyframe(0)
+            .newframes(34)
+            .raw(b"\x32\x0a\x00\x00\x64\x00\x00\x8a19");
+        let script = "[game]\n{\ngametype=SplinterFaction 0.1.97;\n[player0]\n{\nname=A;\nteam=0;\n}\n[player1]\n{\nname=B;\nspectator=1;\nteam=0;\n}\n[team0]\n{\nside=Loz Alliance;\nallyteam=0;\n}\n}\n";
+        let mut f = fixture_with_stream(s.bytes());
+        f.script = script.to_string();
+        let path = write_tmp("faction_pick.sdf", &f.bytes());
+        let picked = RecordedPick {
+            frame: 34,
+            picked: PickedFaction::UnitDefId(19),
+            unit: None,
+        };
+        let detail = demo_info(None, &path).unwrap();
+        assert_eq!(detail.start_positions.len(), 1);
+        let (stats, _) = decode(None, &path, false).unwrap();
+        assert!(stats.start_positions.is_empty());
+        for info in [detail, stats] {
+            assert_eq!(info.players[0].pick, Some(picked.clone()));
+            assert_eq!(info.players[0].side.as_deref(), Some("Loz Alliance"));
+            assert_eq!(info.players[1].pick, None);
+        }
+        let stored = serde_json::json!({ "frame": 34, "unitDefId": 19 });
+        assert_eq!(serde_json::to_value(&picked).unwrap(), stored);
+        // The stats store reads it back.
+        assert_eq!(
+            serde_json::from_value::<RecordedPick>(stored).unwrap(),
+            picked
+        );
     }
 
     #[test]

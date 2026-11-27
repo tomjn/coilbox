@@ -12,6 +12,7 @@ import { useDemoInfo, useReplays } from "@/content/config";
 import { demoInfoToSkirmishDraft } from "@/content/demoToSkirmish";
 import { ScanFailed } from "@/content/pages/components/states";
 import { useRefightSetup } from "@/content/refight";
+import { useReplayFactions } from "@/content/useReplayFactions";
 import { aiByline, type Participant, usePreferredTarget } from "../../config";
 import type { SkirmishDraft } from "../../drafts";
 
@@ -65,10 +66,9 @@ function ReplayPickerForm({
   const { target } = usePreferredTarget();
   const { replays, loading: replaysLoading } = useReplays(target?.dataDir);
   const [replayPath, setReplayPath] = useState("");
-  const { info, loading: infoLoading } = useDemoInfo(
-    target?.enginePath,
-    replayPath || undefined,
-  );
+  const decoded = useDemoInfo(target?.enginePath, replayPath || undefined);
+  const infoLoading = decoded.loading;
+  const { info, pending: factionsPending } = useReplayFactions(decoded.info);
   const {
     shortGameId,
     gameCandidates,
@@ -124,7 +124,12 @@ function ReplayPickerForm({
     : null;
   // The preset stores only what the match changed, so it waits for the game's
   // option list as well as for the replay and the content scan (#1838).
-  const ready = !!replayPath && !infoLoading && !scanLoading && !optionsLoading;
+  const ready =
+    !!replayPath &&
+    !infoLoading &&
+    !scanLoading &&
+    !optionsLoading &&
+    !factionsPending;
   const canSave =
     !!draft && !!name.trim() && !scanFailure && !missingGame && !missingMap;
 
