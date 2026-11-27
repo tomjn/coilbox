@@ -13874,11 +13874,6 @@ msgstr "bench"
 msgid "Bench"
 msgstr ""
 
-#: src/content/pages/components/MissingContentNotice.tsx
-#, fuzzy
-msgid "Best effort — an exact version match isn't guaranteed."
-msgstr "Καλύτερη προσπάθεια — δεν είναι εγγυημένη ακριβής αντιστοίχιση έκδοσης."
-
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Best protected direction"

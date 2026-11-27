@@ -13873,11 +13873,6 @@ msgstr "bench"
 msgid "Bench"
 msgstr ""
 
-#: src/content/pages/components/MissingContentNotice.tsx
-#, fuzzy
-msgid "Best effort — an exact version match isn't guaranteed."
-msgstr "Aproximado: no se garantiza que la versión coincida exactamente."
-
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Best protected direction"
