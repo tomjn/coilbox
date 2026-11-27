@@ -5550,9 +5550,12 @@ mod tests {
             assert_eq!(info.players[0].side.as_deref(), Some("Loz Alliance"));
             assert_eq!(info.players[1].pick, None);
         }
+        let stored = serde_json::json!({ "frame": 34, "unitDefId": 19 });
+        assert_eq!(serde_json::to_value(&picked).unwrap(), stored);
+        // The stats store reads it back.
         assert_eq!(
-            serde_json::to_value(picked).unwrap(),
-            serde_json::json!({ "frame": 34, "unitDefId": 19 })
+            serde_json::from_value::<RecordedPick>(stored).unwrap(),
+            picked
         );
     }
 
