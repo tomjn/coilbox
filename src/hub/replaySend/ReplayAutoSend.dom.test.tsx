@@ -229,7 +229,7 @@ describe("the background sender", () => {
 describe("the setting", () => {
   const toggle = () =>
     screen.getByRole("switch", {
-      name: "Send my finished matches to the hub",
+      name: "Send my finished multiplayer matches to the hub",
     });
 
   it("is off until turned on, and stores the answer", async () => {
@@ -240,6 +240,16 @@ describe("the setting", () => {
     });
     expect(stored.get("hub.autoSendReplays")).toBe(true);
     expect(toggle().getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("says in its help that single player matches are not sent", async () => {
+    render(<ReplayAutoSendControl />);
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: "About sending your matches" }),
+      );
+    });
+    expect(await screen.findByText(/Single player matches/)).toBeTruthy();
   });
 
   it("offers no switch when the distribution has switched uploads off", () => {

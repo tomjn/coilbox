@@ -14,7 +14,7 @@ import { AUTO_SEND_REPLAYS_KEY } from "./queue";
 export function ReplayAutoSendControl() {
   const { t } = useLingui();
   const [on, setOn] = useSetting<boolean>(AUTO_SEND_REPLAYS_KEY, false);
-  const label = t`Send my finished matches to the hub`;
+  const label = t`Send my finished multiplayer matches to the hub`;
   const offered = isHubAssetUploadOffered();
 
   return (
@@ -34,9 +34,10 @@ export function ReplayAutoSendControl() {
                   <Trans>
                     When a match ends, Coilbox sends its replay if you played in
                     it or watched it, people were on two or more sides, and it
-                    reached game over. Anyone can download it and see the
-                    players, the build orders and the totals, and the hub notes
-                    that you sent it.
+                    reached game over. Single player matches and matches against
+                    AI alone are not sent. Anyone can download a replay and see
+                    the players, the build orders and the totals, and the hub
+                    notes that you sent it.
                   </Trans>
                 </p>
                 <p>
