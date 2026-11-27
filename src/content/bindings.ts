@@ -2394,6 +2394,33 @@ export const contentGatherReplays = defineCommand<
   { summary: GatherSummary }
 >("coilbox-content", "content_gather_replays");
 
+/** A replay file from outside the library, read and ready to add to it. */
+export interface ReplayFileOffer {
+  fileName: string;
+  /** The folder it would be copied into, the root's `demos/`. */
+  destDir: string;
+  mapName: string;
+  gameType: string;
+  /** The file name of the library's replay of the same match, if it has one. */
+  inLibrary?: string;
+}
+
+/**
+ * Read a replay file dropped on the window and say where it would go in
+ * `root`'s library. Copies nothing. Fails with the reason when the file is not
+ * a readable replay or a different file of that name is already there.
+ */
+export const contentInspectReplayFile = defineCommand<
+  { path: string; root: string },
+  { offer: ReplayFileOffer }
+>("coilbox-content", "content_inspect_replay_file");
+
+/** Copy a replay file into `root`'s `demos/`. Never replaces a file. */
+export const contentAddReplayFile = defineCommand<
+  { path: string; root: string },
+  { path: string }
+>("coilbox-content", "content_add_replay_file");
+
 /* -------------------------------------------------------------------------- *
  * Savegames — singleplayer saves in a root's `Saves/` folder. Listing is cheap fs
  * metadata plus a best-effort map/game read from the save's embedded start-script.

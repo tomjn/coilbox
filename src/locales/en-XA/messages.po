@@ -991,9 +991,19 @@ msgstr ""
 msgid "{0, plural, one {across # model} other {across # models}}"
 msgstr ""
 
+#. placeholder {0}: offers.length
+#: src/deeplink/replayFiles.ts
+msgid "{0, plural, one {Add # replay} other {Add # replays}}"
+msgstr ""
+
 #. placeholder {0}: result.droppedUnits.length
 #: src/workshop/pages/components/CollectionsPanel.tsx
 msgid "{0, plural, one {Added \"{addedName}\". This game doesn't have this unit, so it was left out: {dropped}.} other {Added \"{addedName}\". This game doesn't have these units, so they were left out: {dropped}.}}"
+msgstr ""
+
+#. placeholder {0}: added.length
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "{0, plural, one {Added a replay to your library} other {Added # replays to your library}}"
 msgstr ""
 
 #. placeholder {0}: missions.length
@@ -2385,6 +2395,10 @@ msgstr ""
 msgid "{fileName} includes {includes}, which could not be found beside it or in a scripts folder above it, so it cannot be converted."
 msgstr ""
 
+#: src/deeplink/replayFiles.ts
+msgid "{fileName} is a match already in your replay library, as {inLibrary}."
+msgstr ""
+
 #: src/downloads/pages/components/EngineUpload.tsx
 msgid "{filename} is listed on the hub."
 msgstr ""
@@ -2399,6 +2413,10 @@ msgstr ""
 
 #: src/downloads/hubMismatch.ts
 msgid "{filename} is not what the hub says it is. The hub has been told. The file stays installed."
+msgstr ""
+
+#: src/deeplink/replayFiles.ts
+msgid "{fileName}, {gameType} on {mapName}."
 msgstr ""
 
 #: src/downloads/installArchive.ts
@@ -7267,6 +7285,10 @@ msgstr ""
 msgid "A copy called \"{trimmed}\" already exists. Replace it?"
 msgstr ""
 
+#: src/deeplink/replayFiles.ts
+msgid "A copy goes in {destDir}."
+msgstr ""
+
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 msgid "A copy holds this content folder's <0>springsettings.cfg</0>, <1>LuaUI/Config</1> and <2>uikeys.txt</2>, including the ones inside each engine folder. Restoring one puts all of them back."
 msgstr ""
@@ -8833,6 +8855,10 @@ msgstr ""
 msgid "Add a private note"
 msgstr ""
 
+#: src/deeplink/replayFiles.ts
+msgid "Add a replay"
+msgstr ""
+
 #: src/scenario/pages/components/StartConditions.tsx
 msgid "Add a start unit for {participantName}"
 msgstr ""
@@ -8986,10 +9012,15 @@ msgstr ""
 msgid "Add the {0} shown"
 msgstr ""
 
+#: src/deeplink/replayFiles.ts
+msgid "Add the replay of {gameType} on {mapName} to your replay library?"
+msgstr ""
+
 #: src/multiplayer/invite/InviteLinkHost.tsx
 msgid "Add this server"
 msgstr ""
 
+#: src/deeplink/DeepLinkHandler.tsx
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
 msgid "Add to library"
 msgstr ""
@@ -9504,6 +9535,10 @@ msgstr ""
 
 #: src/campaign/pages/components/ArchiveMediaImportButton.tsx
 msgid "Already imported from this archive earlier this session. Import again to add a second copy."
+msgstr ""
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Already in your library"
 msgstr ""
 
 #: src/lego/compounds.ts
@@ -15118,6 +15153,10 @@ msgstr ""
 msgid "Copies <0>{copySource}</0> as it stands into the project's weapon library, and {usesCopy}. Changing the copy changes no other unit."
 msgstr ""
 
+#: src/deeplink/replayFiles.ts
+msgid "Copies go in {destDir}."
+msgstr ""
+
 #: src/lego/pages/components/SymmetryPopover.tsx
 msgid "Copies round the axis"
 msgstr ""
@@ -15324,6 +15363,10 @@ msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
 msgid "Could not add a build arm"
+msgstr ""
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Could not add a replay"
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
@@ -17711,6 +17754,10 @@ msgstr ""
 
 #: src/lego/scriptMarks.ts
 msgid "Drop stand-in"
+msgstr ""
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Drop to add to your replays"
 msgstr ""
 
 #: src/deeplink/DeepLinkHandler.tsx
@@ -29835,6 +29882,10 @@ msgstr ""
 msgid "Nothing used yet."
 msgstr ""
 
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Nothing was added"
+msgstr ""
+
 #: src/conquest/pages/GalaxyPage.tsx
 msgid "Nothing was changed. {reason}"
 msgstr ""
@@ -30666,6 +30717,7 @@ msgstr ""
 msgid "Open in the Timeline tab"
 msgstr ""
 
+#: src/deeplink/DeepLinkHandler.tsx
 #: src/scenario/pages/components/BlueprintPanel.tsx
 msgid "Open it"
 msgstr ""
@@ -43125,6 +43177,10 @@ msgstr ""
 
 #: src/multiplayer/admin/BansSection.tsx
 msgid "There is no command to change a ban's reason or length. Lift it and ban again instead."
+msgstr ""
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "There is no content folder to keep replays in. Choose one in Settings > Sources."
 msgstr ""
 
 #: src/profile/health.ts

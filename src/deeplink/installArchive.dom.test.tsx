@@ -86,7 +86,7 @@ let archiveSettings = { move: false, noPrompt: false };
 const setMove = vi.fn();
 const setNoPrompt = vi.fn();
 vi.mock("../downloads/config", () => ({
-  useWriteRoot: (kind: "games" | "maps") => roots[kind],
+  useWriteRoot: (kind?: "games" | "maps") => roots[kind ?? "games"],
   useArchiveInstallSettings: () => ({
     ...archiveSettings,
     setMove,
@@ -95,8 +95,39 @@ vi.mock("../downloads/config", () => ({
 }));
 
 const invalidateScans = vi.fn();
+let replaysRoot: string | undefined = "/spring";
 vi.mock("../content/config", () => ({
   invalidateScans: () => invalidateScans(),
+  useScanTargetSelection: () => ({
+    selected: replaysRoot ? { rootPath: replaysRoot } : null,
+  }),
+}));
+
+type ReplayArgs = { path: string; root: string };
+const inspectReplay = vi.fn(async ({ path, root }: ReplayArgs) => {
+  const fileName = path.split("/").pop() ?? path;
+  if (fileName === "broken.sdfz") {
+    throw new Error("broken.sdfz is not a replay coilbox can read: no header.");
+  }
+  return {
+    offer: {
+      fileName,
+      destDir: `${root}/demos`,
+      mapName: "Comet Catcher Redux",
+      gameType: "Beyond All Reason",
+      ...(fileName === "held.sdfz" && { inLibrary: "2026-11-01_mine.sdfz" }),
+    },
+  };
+});
+const addReplay = vi.fn(async (_args: ReplayArgs) => ({ path: "" }));
+vi.mock("../content/bindings", () => ({
+  contentInspectReplayFile: (args: ReplayArgs) => inspectReplay(args),
+  contentAddReplayFile: (args: ReplayArgs) => addReplay(args),
+}));
+
+const loadReplays = vi.fn(async (_root: string, _refresh?: boolean) => []);
+vi.mock("../content/replayList", () => ({
+  loadReplays: (root: string, refresh?: boolean) => loadReplays(root, refresh),
 }));
 
 type Args = {
@@ -157,6 +188,7 @@ beforeEach(() => {
   onDrop = null;
   onOpenArchive = null;
   launchArchives = [];
+  replaysRoot = "/spring";
   archiveSettings = { move: false, noPrompt: false };
   roots = {
     games: { path: "/spring", loading: false },
@@ -453,5 +485,99 @@ describe("a file dropped on the window", () => {
     );
     drop({ type: "drop", paths: [GAME] });
     await screen.findByText("Install the game SplinterFaction_0.1.89.sdz?");
+  });
+});
+
+describe("a replay dropped on the window", () => {
+  const REPLAY = "/Users/me/Downloads/match.sdfz";
+
+  it("is asked about, then copied into the library, which is read again", async () => {
+    await draw();
+    drop({ type: "drop", paths: [REPLAY] });
+
+    await screen.findByText(
+      "Add the replay of Beyond All Reason on Comet Catcher Redux to your replay library?",
+    );
+    screen.getByText("A copy goes in /spring/demos.");
+    expect(addReplay).not.toHaveBeenCalled();
+
+    press("Add to library");
+    await waitFor(() =>
+      expect(addReplay).toHaveBeenCalledWith({ path: REPLAY, root: "/spring" }),
+    );
+    await waitFor(() =>
+      expect(loadReplays).toHaveBeenCalledWith("/spring", true),
+    );
+    expect(notify).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Added a replay to your library",
+        level: "success",
+        to: "/play/replays/match.sdfz",
+      }),
+    );
+    expect(inspect).not.toHaveBeenCalled();
+  });
+
+  it("copies nothing when the prompt is cancelled", async () => {
+    await draw();
+    drop({ type: "drop", paths: [REPLAY] });
+    await screen.findByText("A copy goes in /spring/demos.");
+    press("Cancel");
+    await act(async () => {});
+    expect(addReplay).not.toHaveBeenCalled();
+  });
+
+  it("offers to open the library's copy of a match it already has", async () => {
+    await draw();
+    drop({ type: "drop", paths: ["/dl/held.sdfz"] });
+    await screen.findByText(
+      "held.sdfz is a match already in your replay library, as 2026-11-01_mine.sdfz.",
+    );
+    press("Open it");
+    await act(async () => {});
+    expect(addReplay).not.toHaveBeenCalled();
+  });
+
+  it("is refused with the reason when it cannot be read", async () => {
+    await draw();
+    drop({ type: "drop", paths: ["/dl/broken.sdfz"] });
+    await waitFor(() =>
+      expect(notify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Nothing was added",
+          body: "broken.sdfz is not a replay coilbox can read: no header.",
+          level: "error",
+        }),
+      ),
+    );
+  });
+
+  it("is asked about after the archives dropped with it", async () => {
+    await draw();
+    drop({ type: "drop", paths: [GAME, REPLAY] });
+
+    await screen.findByText("Install the game SplinterFaction_0.1.89.sdz?");
+    expect(inspectReplay).not.toHaveBeenCalled();
+    press("Install");
+
+    await screen.findByText("A copy goes in /spring/demos.");
+    expect(install).toHaveBeenCalledTimes(1);
+    press("Add to library");
+    await waitFor(() => expect(addReplay).toHaveBeenCalledTimes(1));
+  });
+
+  it("goes in the folder of the engine the library lists", async () => {
+    replaysRoot = "/elsewhere";
+    await draw();
+    drop({ type: "drop", paths: [REPLAY] });
+    await screen.findByText("A copy goes in /elsewhere/demos.");
+  });
+
+  it("shows where to drop while a replay is over the window", async () => {
+    await draw();
+    drop({ type: "enter", paths: [REPLAY] });
+    screen.getByText("Drop to add to your replays");
+    drop({ type: "leave" });
+    expect(screen.queryByText("Drop to add to your replays")).toBeNull();
   });
 });

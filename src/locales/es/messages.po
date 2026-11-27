@@ -1193,11 +1193,21 @@ msgstr ""
 msgid "{0, plural, one {across # model} other {across # models}}"
 msgstr "{0, plural, one {en # modelo} other {en # modelos}}"
 
+#. placeholder {0}: offers.length
+#: src/deeplink/replayFiles.ts
+msgid "{0, plural, one {Add # replay} other {Add # replays}}"
+msgstr ""
+
 #. placeholder {0}: result.droppedUnits.length
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #, fuzzy
 msgid "{0, plural, one {Added \"{addedName}\". This game doesn't have this unit, so it was left out: {dropped}.} other {Added \"{addedName}\". This game doesn't have these units, so they were left out: {dropped}.}}"
 msgstr "{0, plural, one {Se añadió “{addedName}”. Este juego no tiene esta unidad, así que se omitió: {dropped}.} other {Se añadió “{addedName}”. Este juego no tiene estas unidades, así que se omitieron: {dropped}.}}"
+
+#. placeholder {0}: added.length
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "{0, plural, one {Added a replay to your library} other {Added # replays to your library}}"
+msgstr ""
 
 #. placeholder {0}: missions.length
 #: src/content/pages/components/MissionRuntimeSection.tsx
@@ -2905,6 +2915,10 @@ msgstr "{filename} · {mirrorCount}"
 msgid "{fileName} includes {includes}, which could not be found beside it or in a scripts folder above it, so it cannot be converted."
 msgstr "{fileName} incluye {includes}, que no se encontró a su lado ni en una carpeta scripts superior, así que no se puede convertir."
 
+#: src/deeplink/replayFiles.ts
+msgid "{fileName} is a match already in your replay library, as {inLibrary}."
+msgstr ""
+
 #: src/downloads/pages/components/EngineUpload.tsx
 msgid "{filename} is listed on the hub."
 msgstr ""
@@ -2923,6 +2937,10 @@ msgstr "{filename} no es lo que dice el hub. Coilbox no pudo avisar al hub. El a
 #, fuzzy
 msgid "{filename} is not what the hub says it is. The hub has been told. The file stays installed."
 msgstr "{filename} no es lo que dice el hub. Se ha avisado al hub. El archivo sigue instalado."
+
+#: src/deeplink/replayFiles.ts
+msgid "{fileName}, {gameType} on {mapName}."
+msgstr ""
 
 #: src/downloads/installArchive.ts
 #, fuzzy
@@ -8959,6 +8977,10 @@ msgstr "Una unidad de construcción que se estira hacia un lado, se detiene y lu
 msgid "A copy called \"{trimmed}\" already exists. Replace it?"
 msgstr ""
 
+#: src/deeplink/replayFiles.ts
+msgid "A copy goes in {destDir}."
+msgstr ""
+
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 msgid "A copy holds this content folder's <0>springsettings.cfg</0>, <1>LuaUI/Config</1> and <2>uikeys.txt</2>, including the ones inside each engine folder. Restoring one puts all of them back."
 msgstr ""
@@ -10830,6 +10852,10 @@ msgstr "Añadir una parte a la selección o quitarla"
 msgid "Add a private note"
 msgstr "Añadir una nota privada"
 
+#: src/deeplink/replayFiles.ts
+msgid "Add a replay"
+msgstr ""
+
 #: src/scenario/pages/components/StartConditions.tsx
 #, fuzzy
 msgid "Add a start unit for {participantName}"
@@ -11019,11 +11045,16 @@ msgstr "Añadir etiqueta…"
 msgid "Add the {0} shown"
 msgstr "Añadir los {0} mostrados"
 
+#: src/deeplink/replayFiles.ts
+msgid "Add the replay of {gameType} on {mapName} to your replay library?"
+msgstr ""
+
 #: src/multiplayer/invite/InviteLinkHost.tsx
 #, fuzzy
 msgid "Add this server"
 msgstr "Añadir este servidor"
 
+#: src/deeplink/DeepLinkHandler.tsx
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
 #, fuzzy
 msgid "Add to library"
@@ -11656,6 +11687,10 @@ msgstr "Ya adjunta"
 #, fuzzy
 msgid "Already imported from this archive earlier this session. Import again to add a second copy."
 msgstr "Ya se importó de este archivo comprimido antes en esta sesión. Vuelve a importar para añadir una segunda copia."
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Already in your library"
+msgstr ""
 
 #: src/lego/compounds.ts
 #, fuzzy
@@ -18516,6 +18551,10 @@ msgstr "Copias"
 msgid "Copies <0>{copySource}</0> as it stands into the project's weapon library, and {usesCopy}. Changing the copy changes no other unit."
 msgstr "Copia <0>{copySource}</0> tal cual en la biblioteca de armas del proyecto, y {usesCopy}. Cambiar la copia no cambia ninguna otra unidad."
 
+#: src/deeplink/replayFiles.ts
+msgid "Copies go in {destDir}."
+msgstr ""
+
 #: src/lego/pages/components/SymmetryPopover.tsx
 #, fuzzy
 msgid "Copies round the axis"
@@ -18771,6 +18810,10 @@ msgstr "Costes y tipos"
 #, fuzzy
 msgid "Could not add a build arm"
 msgstr "No se pudo añadir un brazo de construcción"
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Could not add a replay"
+msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -21683,6 +21726,10 @@ msgstr "Suelta un .smf, .sdz, .sd7 o una carpeta .sdd."
 #, fuzzy
 msgid "Drop stand-in"
 msgstr "Soltar el sustituto"
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Drop to add to your replays"
+msgstr ""
 
 #: src/deeplink/DeepLinkHandler.tsx
 #, fuzzy
@@ -36550,6 +36597,10 @@ msgstr "No se giró nada."
 msgid "Nothing used yet."
 msgstr "Todavía no se ha usado nada."
 
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Nothing was added"
+msgstr ""
+
 #: src/conquest/pages/GalaxyPage.tsx
 #, fuzzy
 msgid "Nothing was changed. {reason}"
@@ -37570,6 +37621,7 @@ msgstr "Abrir en el constructor"
 msgid "Open in the Timeline tab"
 msgstr "Abrir en la pestaña Línea de tiempo"
 
+#: src/deeplink/DeepLinkHandler.tsx
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
 msgid "Open it"
@@ -52826,6 +52878,10 @@ msgstr "No hay planos en este archivo que coilbox pueda leer."
 #, fuzzy
 msgid "There is no command to change a ban's reason or length. Lift it and ban again instead."
 msgstr "No hay ningún comando para cambiar el motivo o la duración de una expulsión. Levántala y vuelve a expulsar."
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "There is no content folder to keep replays in. Choose one in Settings > Sources."
+msgstr ""
 
 #: src/profile/health.ts
 #, fuzzy

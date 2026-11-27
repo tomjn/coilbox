@@ -62,6 +62,8 @@ permissions = [
   "allow-content-bundle-install-engine",
   "allow-content-bundle-cancel",
   "allow-content-gather-replays",
+  "allow-content-inspect-replay-file",
+  "allow-content-add-replay-file",
   "allow-content-list-saves",
   "allow-content-delete-save",
   "allow-content-config-profiles",

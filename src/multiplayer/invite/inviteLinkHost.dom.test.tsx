@@ -64,6 +64,12 @@ vi.mock("@picoframe/frame", async () => ({
 }));
 
 const notify = vi.fn();
+// The deep-link handler reads which content folder the replay library lists.
+vi.mock("../../content/config", async () => ({
+  ...(await vi.importActual<Record<string, unknown>>("../../content/config")),
+  useScanTargetSelection: () => ({ selected: null }),
+}));
+
 vi.mock("../../notify/notify", () => ({
   notify: (input: unknown) => notify(input),
 }));
