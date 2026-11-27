@@ -60,6 +60,7 @@ import {
   ReplayTimelineDock,
   TimelineKeysProvider,
 } from "./components/ReplayTimelineDock";
+import { SendReplayToHub } from "./components/SendReplayToHub";
 import { StaleRemixNotice } from "./components/StaleRemixNotice";
 import {
   DependencyBlocked,
@@ -347,6 +348,7 @@ export default function ReplayDetailPage() {
               />
             )}
             {info && <RefightPanel info={info} filename={filename} />}
+            {info && <SendReplayToHub info={info} replayPath={replay.path} />}
             {info && (
               <WatchWithRewindButton
                 replayPath={replay.path}

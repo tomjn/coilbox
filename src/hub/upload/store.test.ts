@@ -53,6 +53,8 @@ function state(patch: Partial<ArchiveUploadState> = {}): ArchiveUploadState {
     sent: 0,
     size: 100,
     uploadId: null,
+    pageUrl: null,
+    heldAlready: false,
     outcome: null,
     ...patch,
   };

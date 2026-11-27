@@ -46,7 +46,7 @@ export interface EngineArchiveFacts extends Omit<ArchiveFacts, "kind"> {
   note: string;
 }
 
-export type ArchiveKind = "map" | "game" | "engine";
+export type ArchiveKind = "map" | "game" | "engine" | "replay";
 
 /** Where an upload has got to. `waiting` is the mirror holding every byte and
  *  the hub not having listed the archive yet. */
@@ -110,6 +110,11 @@ export interface ArchiveUploadState {
   size: number;
   /** The hub's id for the upload, once it has given one. */
   uploadId: string | null;
+  /** The page the hub shows it on, once it says. Only a replay's answer
+   *  carries one. */
+  pageUrl: string | null;
+  /** The hub held this replay before this send, so nothing was uploaded. */
+  heldAlready: boolean;
   /** Set when `phase` is `done`. */
   outcome: ArchiveUploadOutcome | null;
 }
@@ -126,6 +131,46 @@ const hubArchiveUploadStart = defineCommand<
   },
   { upload: ArchiveUploadState }
 >("coilbox-hub", "hub_archive_upload_start");
+
+const hubReplayUploadStart = defineCommand<
+  {
+    hubUrl: string;
+    path: string;
+    gameId: string;
+    name: string;
+    summary: unknown;
+    grant: string;
+  },
+  { upload: ArchiveUploadState }
+>("coilbox-hub", "hub_replay_upload_start");
+
+/**
+ * Start sending a replay of a match the user was in (issue #5493), and answer as
+ * soon as it is running. It is followed like an archive upload, with `kind`
+ * `replay`. Rust works out the file's hash and size itself.
+ *
+ * `name` is the name the user was in the battle under, and `summary` what the
+ * replay page read out of the file (`content/replaySummary.ts`). `grant` is the
+ * one a press of the replay's send button opened.
+ */
+export async function startReplayUpload(
+  hubUrl: string,
+  path: string,
+  gameId: string,
+  name: string,
+  summary: unknown,
+  grant: string,
+): Promise<ArchiveUploadState> {
+  const { upload } = await hubReplayUploadStart({
+    hubUrl,
+    path,
+    gameId,
+    name,
+    summary,
+    grant,
+  });
+  return upload;
+}
 
 const hubArchiveUploadList = defineCommand<
   Record<string, never>,
