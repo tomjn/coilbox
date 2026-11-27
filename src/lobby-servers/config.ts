@@ -63,6 +63,11 @@ export interface LobbyServer {
   /** Our support for this server is beta, badged like `alpha` but as a softer caution. */
   beta?: boolean;
   /**
+   * Left out of the catalog unless a profile names it in `presets` or as `official`.
+   * Built-in entries only.
+   */
+  disabled?: boolean;
+  /**
    * A caution shown under the entry in Settings, for something a player would
    * otherwise only discover by hitting it. Built-in entries only.
    */
@@ -206,6 +211,7 @@ export const BUILTIN_SERVERS: LobbyServer[] = [
     allowSelfSigned: false,
     protocol: "tachyon",
     alpha: true,
+    disabled: true,
     notice: lazyText(TACHYON_NOTICE),
   },
   {
@@ -288,7 +294,7 @@ export function buildCatalog(
   const builtins = BUILTIN_SERVERS.filter(
     (s) =>
       s.id !== officialId &&
-      (rules.presets == null || rules.presets.includes(s.id)),
+      (rules.presets == null ? !s.disabled : rules.presets.includes(s.id)),
   ).map((s) => ({ ...s, builtin: true }));
   const list: LobbyServer[] = [];
   if (rules.official) list.push({ ...rules.official, builtin: true });
