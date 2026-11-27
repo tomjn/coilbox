@@ -26,9 +26,11 @@ vi.mock("@/content/bindings", async (actual) => ({
 }));
 const dataset = vi.fn();
 let installed = [{ name: "Game 1", primaryArchive: { name: "game.sdz" } }];
+const gameInfo = vi.fn();
 vi.mock("@/content/config", () => ({
   primeScan: async () => ({ games: installed }),
   loadUnitsyncUnitDataset: () => dataset(),
+  primeGameInfo: () => gameInfo(),
 }));
 
 const started = vi.fn();
@@ -191,6 +193,10 @@ beforeEach(() => {
     units: [{ name: "armsolar", stats: { metalCost: 155, energyCost: 0 } }],
   });
   installed = [{ name: "Game 1", primaryArchive: { name: "game.sdz" } }];
+  gameInfo.mockReset().mockResolvedValue({
+    checksum: "1",
+    sides: [{ name: "Cortex", startUnit: "armsolar" }],
+  });
   started.mockReset();
   cancelled.mockClear();
   marked.mockClear();
@@ -410,6 +416,48 @@ describe("sending finished matches", () => {
     await runDueReplaySends(context());
     expect(started).toHaveBeenCalledTimes(2);
     expect(readReplaySendQueue()).toMatchObject([{ path: PATH }]);
+  });
+
+  /** Alice picks the start unit with id 1 in the match. */
+  const PICKED: DemoInfo = {
+    ...INFO,
+    players: [
+      { ...INFO.players[0], pick: { unitDefId: 1, frame: 0 } },
+      ...INFO.players.slice(1),
+    ],
+  };
+
+  it("sends the faction a player picked, named from the game's sides", async () => {
+    demoInfo.mockResolvedValue({ info: PICKED });
+    // Nothing built, so only the pick needs the units.
+    buildOrders.mockResolvedValue({ ...ORDERS, orders: [] });
+    listed();
+    finish();
+    await runDueReplaySends(context());
+    expect(started.mock.calls[0][4]).toMatchObject({
+      players: [{ name: "Alice", faction: "Cortex" }, { name: "Bob" }],
+      units: [{ unit_def_id: 1, name: "armsolar" }],
+    });
+  });
+
+  it.each([
+    ["the game is not installed", () => (installed = [])],
+    [
+      "the game's factions cannot be read",
+      () => gameInfo.mockRejectedValue(new Error("busy")),
+    ],
+    [
+      "the picked unit cannot be read",
+      () => dataset.mockRejectedValue(new Error("busy")),
+    ],
+  ])("holds a replay with a picked unit while %s", async (_what, breakIt) => {
+    demoInfo.mockResolvedValue({ info: PICKED });
+    buildOrders.mockResolvedValue({ ...ORDERS, orders: [] });
+    breakIt();
+    finish();
+    await runDueReplaySends(context());
+    expect(started).not.toHaveBeenCalled();
+    expect(readReplaySendQueue()).toMatchObject([{ attempts: 1 }]);
   });
 
   it("does not miss a sign-in that happens during a pass", async () => {

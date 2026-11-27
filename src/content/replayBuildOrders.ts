@@ -200,7 +200,7 @@ export function sourceUnits(
  */
 export function resolveBuildUnit(
   unitDefId: number,
-  units: UnitDatasetEntry[] | null | undefined,
+  units: readonly UnitDatasetEntry[] | null | undefined,
 ): UnitDatasetEntry | undefined {
   return units?.[unitDefId - 1];
 }

@@ -169,7 +169,8 @@ async function send(item: QueuedReplay, context: SendContext): Promise<Step> {
           // A game that is installed later, or read again, can answer these.
           const later =
             made.problem.kind === "unknownUnit" ||
-            made.problem.kind === "otherBuild";
+            made.problem.kind === "otherBuild" ||
+            made.problem.kind === "noSides";
           return { kind: later ? "retry" : "giveUp", label, why };
         }
         // The plugin reads the switch off disk before it lets the replay go.

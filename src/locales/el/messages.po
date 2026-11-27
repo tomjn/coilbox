@@ -17039,6 +17039,10 @@ msgstr "Το Coilbox δεν μπόρεσε να διαβάσει τις φατρ
 msgid "Coilbox could not read the file."
 msgstr "Το Coilbox δεν μπόρεσε να διαβάσει το αρχείο."
 
+#: src/hub/replaySend/messages.ts
+msgid "Coilbox could not read the game's factions, which the hub checks. Install the game it was played on, then try again."
+msgstr ""
+
 #: src/hub/manualSend/run.ts
 #: src/hub/upload/bulkMaps.ts
 #, fuzzy

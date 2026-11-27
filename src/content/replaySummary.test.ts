@@ -4,6 +4,7 @@ import type {
   DemoBuildOrders,
   DemoInfo,
   DemoTrailer,
+  RecordedPick,
   TeamStatSample,
   UnitDatasetEntry,
 } from "./bindings";
@@ -137,7 +138,7 @@ const units: UnitDatasetEntry[] = [
 
 describe("buildReplaySummary", () => {
   it("builds the hub's summary from the page's reads", () => {
-    const made = buildReplaySummary(info(), trailer, orders(), units);
+    const made = buildReplaySummary(info(), trailer, orders(), units, []);
     if (!("summary" in made)) throw new Error(JSON.stringify(made));
     const { summary } = made;
     expect(summary).toMatchObject({
@@ -204,6 +205,7 @@ describe("buildReplaySummary", () => {
       trailer,
       orders({ unitNames: ["ArmCom", "armsolar"] }),
       units,
+      [],
     );
     if (!("summary" in made)) throw new Error("no summary");
     expect(made.summary.units[0].name).toBe("ArmCom");
@@ -216,24 +218,36 @@ describe("buildReplaySummary", () => {
         trailer,
         orders(),
         units,
+        [],
       ),
     ).toEqual({ problem: { kind: "unfinished" } });
   });
 
   it("refuses build orders the walk did not finish", () => {
     expect(
-      buildReplaySummary(info(), trailer, orders({ incomplete: true }), units),
+      buildReplaySummary(
+        info(),
+        trailer,
+        orders({ incomplete: true }),
+        units,
+        [],
+      ),
     ).toEqual({ problem: { kind: "incompleteOrders" } });
   });
 
   it("refuses a unit no list says the cost of", () => {
     expect(
-      buildReplaySummary(info(), trailer, orders(), [
-        units[0],
-        { name: "armsolar" },
-      ]),
+      buildReplaySummary(
+        info(),
+        trailer,
+        orders(),
+        [units[0], { name: "armsolar" }],
+        [],
+      ),
     ).toEqual({ problem: { kind: "unknownUnit", unitDefId: 2 } });
-    expect(buildReplaySummary(info(), trailer, orders(), [units[0]])).toEqual({
+    expect(
+      buildReplaySummary(info(), trailer, orders(), [units[0]], []),
+    ).toEqual({
       problem: { kind: "unknownUnit", unitDefId: 2 },
     });
   });
@@ -246,10 +260,78 @@ describe("buildReplaySummary", () => {
       trailer,
       orders({ orders: [] }),
       [],
+      [],
     );
     if (!("summary" in made)) throw new Error("no summary");
     expect(made.summary.players[0].faction).toBeNull();
     expect(made.summary.units).toEqual([]);
+  });
+});
+
+describe("buildReplaySummary and a faction picked in the match", () => {
+  const sides = [
+    { name: "Armada", startUnit: "armcom" },
+    { name: "Legion", startUnit: "legcom" },
+  ];
+  const list: UnitDatasetEntry[] = [
+    ...units,
+    { name: "legcom", stats: { metalCost: 2700, energyCost: 26000 } },
+  ];
+  const picked = (pick: RecordedPick) =>
+    info({
+      players: [
+        {
+          name: "Alice",
+          team: 0,
+          allyTeam: 0,
+          side: "Armada",
+          pick,
+          spectator: false,
+        },
+      ],
+    });
+  const summaryOf = (
+    pick: RecordedPick,
+    given: DemoBuildOrders = orders({ orders: [order(10, 0, 1)] }),
+    from: UnitDatasetEntry[] = list,
+  ) => {
+    const made = buildReplaySummary(picked(pick), trailer, given, from, sides);
+    if (!("summary" in made)) throw new Error(JSON.stringify(made));
+    return made.summary;
+  };
+
+  it("sends the picked side and lists the unit nobody built", () => {
+    const summary = summaryOf({ frame: 41, unitDefId: 3 });
+    expect(summary.players[0].faction).toBe("Legion");
+    expect(summary.units.map((u) => [u.unit_def_id, u.name])).toEqual([
+      [1, "armcom"],
+      [3, "legcom"],
+    ]);
+  });
+
+  it("names a picked unit as the replay's own list does", () => {
+    const summary = summaryOf(
+      { frame: -1, unitDefId: 3, unit: "legcom" },
+      orders({ orders: [], unitNames: ["armcom", "armsolar", "legcom"] }),
+    );
+    expect(summary.players[0].faction).toBe("Legion");
+    expect(summary.units.map((u) => u.name)).toEqual(["legcom"]);
+  });
+
+  it("lists a unit once when it was both picked and built", () => {
+    const summary = summaryOf({ frame: -1, unitDefId: 1 });
+    expect(summary.units.map((u) => u.unit_def_id)).toEqual([1]);
+  });
+
+  it("leaves out a picked unit nothing names and still sends", () => {
+    const summary = summaryOf({ frame: -1, unitDefId: 9 });
+    expect(summary.players[0].faction).toBeNull();
+    expect(summary.units.map((u) => u.unit_def_id)).toEqual([1]);
+  });
+
+  it("sends a picked name as it was sent", () => {
+    const summary = summaryOf({ frame: -1, name: "legion" });
+    expect(summary.players[0].faction).toBe("legion");
   });
 });
 

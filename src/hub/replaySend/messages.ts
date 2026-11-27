@@ -19,5 +19,7 @@ export function describeSummaryProblem(
       return t`Coilbox cannot say what every unit built in this match is or costs. Install the game it was played on, then try again.`;
     case "otherBuild":
       return t`Another version of the game is installed, so Coilbox cannot say which unit each build order was for. Install the version it was played on, then try again.`;
+    case "noSides":
+      return t`Coilbox could not read the game's factions, which the hub checks. Install the game it was played on, then try again.`;
   }
 }

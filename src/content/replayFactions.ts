@@ -30,7 +30,7 @@ import { storedListFor } from "./replayUnitDefs";
  */
 export function pickedSide(
   pick: RecordedPick,
-  units: UnitDatasetEntry[] | null,
+  units: readonly UnitDatasetEntry[] | null,
   sides: readonly Side[],
 ): string | undefined {
   const name = pick.name?.toLowerCase();

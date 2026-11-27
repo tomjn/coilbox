@@ -98,13 +98,27 @@ vi.mock("../../useReplayBuildOrders", () => ({
 }));
 const UNITS: UnitDatasetEntry[] = [
   { name: "armsolar", stats: { metalCost: 155, energyCost: 0 } },
+  { name: "legcom", stats: { metalCost: 2700, energyCost: 0 } },
 ];
+let unitSource: "installed" | "differentBuild";
 vi.mock("../../useReplayUnits", () => ({
   useReplayUnits: () => ({
-    source: { kind: "installed" },
+    source: { kind: unitSource },
     status: "ready",
     described: UNITS,
     units: UNITS,
+  }),
+}));
+let sidesStatus: "loading" | "ready" | "error";
+let gameInstalled: boolean;
+vi.mock("../../useReplayFactions", () => ({
+  useRecordedGameSides: () => ({
+    sides:
+      sidesStatus === "ready" ? [{ name: "Legion", startUnit: "legcom" }] : [],
+    status: sidesStatus,
+    installed: gameInstalled,
+    scanned: true,
+    scanning: false,
   }),
 }));
 
@@ -133,6 +147,13 @@ const INFO: DemoInfo = {
   mapOptions: {},
 };
 const PATH = "/d/demos/match.sdfz";
+const PICKED: DemoInfo = {
+  ...INFO,
+  players: [
+    { ...INFO.players[0], pick: { frame: -1, unitDefId: 2 } },
+    INFO.players[1],
+  ],
+};
 
 function signedIn(yes = true): HubAccount {
   return {
@@ -178,6 +199,9 @@ beforeEach(() => {
   ended.mockClear();
   opened.mockClear();
   forgetArchiveUploads();
+  unitSource = "installed";
+  sidesStatus = "ready";
+  gameInstalled = true;
 });
 
 afterEach(() => cleanup());
@@ -233,6 +257,50 @@ describe("send to hub on a replay's page", () => {
     });
     expect(begun).toHaveBeenCalledWith(GAME_ID);
     await waitFor(() => expect(ended).toHaveBeenCalledWith("grant-1"));
+  });
+
+  it("sends the faction picked in the match", async () => {
+    render(<SendReplayToHub info={PICKED} replayPath={PATH} />);
+    fireEvent.click(screen.getByRole("button", { name: /Send to hub/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Send" }));
+    await waitFor(() => expect(started).toHaveBeenCalled());
+    expect(started.mock.calls[0][4]).toMatchObject({
+      players: [{ name: "Alice", faction: "Legion" }],
+      units: [{ unit_def_id: 1 }, { unit_def_id: 2, name: "legcom" }],
+    });
+  });
+
+  it("waits for the game's factions before it offers to send a pick", async () => {
+    sidesStatus = "loading";
+    render(<SendReplayToHub info={PICKED} replayPath={PATH} />);
+    fireEvent.click(screen.getByRole("button", { name: /Send to hub/ }));
+    expect(await screen.findByText(/Reading the replay/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+  });
+
+  it("says so when the game's factions cannot be read", async () => {
+    sidesStatus = "error";
+    render(<SendReplayToHub info={PICKED} replayPath={PATH} />);
+    fireEvent.click(screen.getByRole("button", { name: /Send to hub/ }));
+    expect(
+      await screen.findByText(/could not read the game's factions/),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+  });
+
+  it("asks for the game when none is installed to name a pick's side", async () => {
+    gameInstalled = false;
+    render(<SendReplayToHub info={PICKED} replayPath={PATH} />);
+    fireEvent.click(screen.getByRole("button", { name: /Send to hub/ }));
+    expect(await screen.findByText(/Install the game it was/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+  });
+
+  it("asks for the recorded version to name a picked unit", async () => {
+    unitSource = "differentBuild";
+    render(<SendReplayToHub info={PICKED} replayPath={PATH} />);
+    fireEvent.click(screen.getByRole("button", { name: /Send to hub/ }));
+    expect(await screen.findByText(/Another version of the game/)).toBeTruthy();
   });
 
   it("walks through sending, the hub's check and the link", async () => {

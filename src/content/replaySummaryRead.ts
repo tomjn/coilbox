@@ -4,10 +4,13 @@ import {
   contentUnitDefSet,
   type DemoBuildOrders,
   type DemoInfo,
+  type Side,
   type UnitDatasetEntry,
 } from "./bindings";
-import { loadUnitsyncUnitDataset, primeScan } from "./config";
+import { loadUnitsyncUnitDataset, primeGameInfo, primeScan } from "./config";
+import { hubPickUnitIds } from "./hubPlayedFactions";
 import {
+  closestInstalledGame,
   liveGame,
   pickUnitSource,
   recordedGame,
@@ -67,9 +70,30 @@ async function readUnits(
   return { source, described: sourceUnits(source, read, named).described };
 }
 
+/** The game's sides, as `useRecordedGameSides` reads them, or null when they
+ *  cannot be read. */
+async function readSides(
+  target: { dataDir: string; enginePath: string },
+  info: DemoInfo,
+): Promise<readonly Side[] | null> {
+  const scan = await primeScan(target.enginePath, target.dataDir);
+  const game = closestInstalledGame(recordedGame(info), scan.games);
+  if (!game) return null;
+  return primeGameInfo(
+    target.enginePath,
+    target.dataDir,
+    game.primaryArchive.name,
+  ).then(
+    (read) => read.sides,
+    () => null,
+  );
+}
+
 export type SummaryRead =
   | { summary: ReplaySummary }
-  | { problem: SummaryProblem | { kind: "otherBuild" } };
+  | {
+      problem: SummaryProblem | { kind: "otherBuild" } | { kind: "noSides" };
+    };
 
 /** Read a replay and build its summary. Rejects when the file cannot be read. */
 export async function readReplaySummary(
@@ -81,12 +105,35 @@ export async function readReplaySummary(
     contentReplayTrailer({ replayPath }),
     contentDemoBuildOrders({ replayPath }),
   ]);
-  // A match with no build orders names no units, so nothing is read for them.
+  // A picked start unit needs the units and the game's sides to say which
+  // faction it is.
+  const picks = hubPickUnitIds(info.players);
+  // A match with no build orders and no picked unit names no units, so nothing
+  // is read for them.
   const units =
-    orders.orders.length > 0 ? await readUnits(target, info, orders) : null;
+    orders.orders.length > 0 || picks.length > 0
+      ? await readUnits(target, info, orders)
+      : null;
   // Another version's ids can name the wrong unit, which the hub would refuse.
   if (units?.source.kind === "differentBuild") {
     return { problem: { kind: "otherBuild" } };
   }
-  return buildReplaySummary(info, trailer, orders, units?.described ?? []);
+  let sides: readonly Side[] = [];
+  if (picks.length > 0) {
+    const read = await readSides(target, info);
+    // The hub would refuse a picked faction sent as none.
+    if (!read) return { problem: { kind: "noSides" } };
+    // Nobody is there to see that the units were not read, and to try again.
+    if (!units?.described?.length) {
+      return { problem: { kind: "unknownUnit", unitDefId: picks[0] } };
+    }
+    sides = read;
+  }
+  return buildReplaySummary(
+    info,
+    trailer,
+    orders,
+    units?.described ?? [],
+    sides,
+  );
 }
