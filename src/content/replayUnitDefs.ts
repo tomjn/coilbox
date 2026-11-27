@@ -36,6 +36,10 @@ const STAT_KEYS = [
   "radarDistanceJam",
   "sonarDistanceJam",
   "seismicDistance",
+  // Zero-K's income, read from customParams because a gadget pays it.
+  "incomeEnergy",
+  "incomeMetal",
+  "metalExtractorMult",
 ] as const;
 
 const COST_KEYS = ["metalCost", "energyCost"] as const;

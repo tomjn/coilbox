@@ -605,6 +605,54 @@ do
 	check("the unit definition fixture is what these definitions write, byte for byte", recorded == engine.raw)
 end
 
+-- A game whose gadget pays its income, as Zero-K's does: the engine's own keys
+-- are zero and the numbers are customParams, which the engine hands over as
+-- strings.
+local INCOME_DEFS = {
+	{
+		name = "tgsolar", metalCost = 70, energyCost = 70, speed = 0,
+		isBuilder = false, buildOptions = {}, weapons = {},
+		energyMake = 0, customParams = { income_energy = "2" },
+	},
+	{
+		name = "tgmoho", metalCost = 85, energyCost = 85, speed = 0,
+		isBuilder = false, buildOptions = {}, weapons = {},
+		customParams = { income_metal = "0.5", metal_extractor_mult = "1" },
+	},
+	{
+		name = "tgrock", metalCost = 1, energyCost = 1, speed = 0,
+		isBuilder = false, buildOptions = {}, weapons = {},
+		customParams = { income_energy = "lots", income_metal = "0" },
+	},
+}
+
+do
+	local engine = newEngine({ unitDefs = INCOME_DEFS })
+	local defs = ofKind(engine, "unit_def")
+
+	check("income a game declares in customParams is written as a number, under the dataset's names",
+		defs[1].incomeEnergy == 2 and defs[2].incomeMetal == 0.5 and defs[2].metalExtractorMult == 1,
+		engine.raw)
+	check("a definition says only the income it declares",
+		defs[1].incomeMetal == nil and defs[1].metalExtractorMult == nil and defs[2].incomeEnergy == nil)
+	check("a customParam that is zero or no number is left out",
+		defs[3].incomeEnergy == nil and defs[3].incomeMetal == nil)
+
+	local path = support.root() .. "/tests/fixtures/unit_defs_income.jsonl"
+	if os.getenv("COILBOX_WRITE_FIXTURE") then
+		local out = assert(io.open(path, "w"))
+		out:write(engine.raw)
+		out:close()
+		print("wrote " .. path)
+	end
+	local fixture = io.open(path)
+	local recorded = fixture and fixture:read("*a")
+	if fixture then
+		fixture:close()
+	end
+	check("the income fixture is what these definitions write, byte for byte", recorded == engine.raw)
+end
+
 do
 	local engine = newEngine()
 	check("an engine with no unit definitions writes none", #ofKind(engine, "unit_def") == 0 and #engine.lines == 1)
