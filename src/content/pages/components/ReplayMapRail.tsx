@@ -72,13 +72,14 @@ export function ReplayMapLayout({
       <div className="flex flex-col gap-4 @xl:flex-row @xl:items-start">
         <div
           data-map-column
-          // All the width the card has, and no wider than lets the map keep its
-          // shape inside the share of the window's height it may take, so a
-          // tall map still fits on screen and the rail sits against it.
+          // All the width the card has less the rail's, and no wider than lets
+          // the map keep its shape inside the share of the window's height it
+          // may take, so a tall map still fits on screen. The rail takes the
+          // width the map does not.
           style={{
             maxWidth: `calc(${MAP_VIEW_HEIGHT} * ${shape.width} / ${shape.height})`,
           }}
-          className="min-w-0 @xl:flex-1"
+          className="min-w-0 @xl:w-full @xl:shrink @xl:grow-0"
         >
           {map}
         </div>
@@ -89,7 +90,7 @@ export function ReplayMapLayout({
           // legends does not run past the card. Under the map it is as tall as
           // it needs to be. The padding keeps a focus ring from being clipped.
           style={{ "--rail-max-height": MAP_VIEW_HEIGHT } as CSSProperties}
-          className="flex min-w-0 flex-col gap-3 @xl:w-52 @xl:shrink-0 @xl:max-h-(--rail-max-height) @xl:overflow-x-hidden @xl:overflow-y-auto @xl:p-1"
+          className="flex min-w-0 flex-col gap-3 @xl:basis-52 @xl:grow @xl:shrink-0 @xl:max-h-(--rail-max-height) @xl:overflow-x-hidden @xl:overflow-y-auto @xl:p-1"
         >
           {rail}
         </div>

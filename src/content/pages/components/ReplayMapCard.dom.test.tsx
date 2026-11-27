@@ -2136,6 +2136,15 @@ describe("the map card's modes", () => {
       "calc(max(16rem, 100cqh - var(--replay-dock-reserve, 0px) - 4.5rem) * 8192 / 6144)",
     );
 
+    // The rail takes the width the map's cap leaves, so it is flush with the
+    // card's right edge for a tall map as for a wide one.
+    const railBox = rail();
+    expect(railBox.className).toContain("@xl:grow");
+    expect(railBox.className).toContain("@xl:shrink-0");
+    expect(railBox.className).not.toContain("@xl:w-52");
+    expect(column.className).toContain("@xl:grow-0");
+    expect(column.className).not.toContain("@xl:flex-1");
+
     await pick("Heat");
     const flat = document.querySelector("[data-map-ground]") as HTMLElement;
     expect(flat.style.aspectRatio).toBe("513 / 385");
