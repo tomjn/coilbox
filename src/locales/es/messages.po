@@ -25695,6 +25695,10 @@ msgstr "Ir a la partida"
 msgid "Go to recording"
 msgstr "Ir a la grabación"
 
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Go to start"
+msgstr ""
+
 #: src/content/pages/components/ReplayEventLayers.tsx
 #: src/content/pages/components/ReplayStartUnitLayer.tsx
 #, fuzzy

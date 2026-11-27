@@ -25695,6 +25695,10 @@ msgstr "前往对局"
 msgid "Go to recording"
 msgstr "前往录制"
 
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Go to start"
+msgstr ""
+
 #: src/content/pages/components/ReplayEventLayers.tsx
 #: src/content/pages/components/ReplayStartUnitLayer.tsx
 #, fuzzy

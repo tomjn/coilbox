@@ -20981,6 +20981,10 @@ msgstr "Go to battle"
 msgid "Go to recording"
 msgstr "Go to recording"
 
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Go to start"
+msgstr "Go to start"
+
 #: src/content/pages/components/ReplayEventLayers.tsx
 #: src/content/pages/components/ReplayStartUnitLayer.tsx
 msgid "Go to the analysis section"

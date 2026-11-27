@@ -25703,6 +25703,10 @@ msgstr "Gå til kampen"
 msgid "Go to recording"
 msgstr "Gå til opptaket"
 
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Go to start"
+msgstr ""
+
 #: src/content/pages/components/ReplayEventLayers.tsx
 #: src/content/pages/components/ReplayStartUnitLayer.tsx
 #, fuzzy
