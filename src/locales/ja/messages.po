@@ -35488,10 +35488,6 @@ msgstr "2 チームの試合 {twoSides} のいずれにも結果が記録され�
 msgid "None of the lines on the chart above gave orders of this kind."
 msgstr "上のグラフの線のいずれも、この種類の命令を出していません。"
 
-#: src/content/pages/components/SendReplayToHub.tsx
-msgid "None of the names you are signed in with played in or watched this match."
-msgstr ""
-
 #: src/content/pages/StatsPage.tsx
 #, fuzzy
 msgid "None of the replays in this set are in your library."
@@ -37250,6 +37246,10 @@ msgstr "移動クラスのないユニット（固定または飛行するもの
 #, fuzzy
 msgid "Only shoots at"
 msgstr "攻撃対象"
+
+#: src/content/pages/components/SendReplayToHub.tsx
+msgid "Only someone who played in or watched this match can send it."
+msgstr ""
 
 #: src/blueprint/pages/components/LeavingPack.tsx
 #, fuzzy
