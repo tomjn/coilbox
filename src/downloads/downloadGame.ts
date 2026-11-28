@@ -19,6 +19,7 @@ import { loadGithubReleases } from "./githubReleases";
 import { findInIndex, indexTick, loadSpringfilesList } from "./mirrorIndex";
 import { type ProgressSink, progressChannel } from "./progressChannel";
 import { DEFAULT_RAPID_MASTERS } from "./rapidMasters";
+import { resolveRapidTagByName } from "./rapidTags";
 import {
   AttemptLog,
   isCancel,
@@ -189,6 +190,10 @@ async function downloadGameAnySourceImpl(opts: {
       // Every configured master is tried, because pr-downloader only ever
       // searches the one it is given and games are spread across several.
       //
+      // A name with a colon in it is looked up here and fetched by its tag,
+      // because pr-downloader would read the part before the colon as a
+      // repository name (see `resolveRapidTagByName`).
+      //
       // Beyond All Reason goes to BAR's own master and only there, by its exact
       // tag (see `barRapid.ts`). No other game is ever sent to BAR.
       case "rapid": {
@@ -217,8 +222,13 @@ async function downloadGameAnySourceImpl(opts: {
             { label: master.name },
           );
           try {
+            const tag = gameName.includes(":")
+              ? await resolveRapidTagByName(gameName, master.url)
+              : gameName;
+            if (!tag)
+              throw new Error(t`${master.name} does not list "${gameName}".`);
             await dlDownloadRaw({
-              tag: gameName,
+              tag,
               masterUrl: master.url,
               writePath,
               opId,
