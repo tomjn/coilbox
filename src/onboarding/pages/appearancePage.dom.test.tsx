@@ -7,6 +7,8 @@
  */
 
 import {
+  ACCENTS,
+  BASES,
   memoryStorage,
   PersistentStoreProvider,
   ThemeProvider,
@@ -21,7 +23,6 @@ import {
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { Profile } from "@/profile/profile";
 import { Wizard } from "../Wizard";
-import { ACCENT_OPTIONS, BASE_OPTIONS } from "./themeOptions";
 
 let profile: Pick<Profile, "mode" | "accent" | "base"> = {};
 
@@ -167,8 +168,13 @@ it("names every swatch after its value's label", () => {
     Array.from(row.querySelectorAll('[role="radio"]')).map((el) =>
       el.getAttribute("aria-label"),
     );
-  expect(names(base)).toHaveLength(BASE_OPTIONS.length);
-  expect(names(accent)).toHaveLength(ACCENT_OPTIONS.length);
+  // picoframe's own colours, then Coilbox's neon ones in each row.
+  const neon = ["Phosphor", "Neon cyan", "Neon peach", "Neon purple"];
+  expect(names(base)).toEqual([...names(base).slice(0, BASES.length), ...neon]);
+  expect(names(accent)).toEqual([
+    ...names(accent).slice(0, ACCENTS.length),
+    ...neon,
+  ]);
   for (const name of [...names(base), ...names(accent)]) {
     expect(name).toBeTruthy();
   }

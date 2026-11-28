@@ -1,0 +1,151 @@
+/* Coilbox's own bases and accents, added to picoframe's picker by `colours.ts`.
+   Imported after picoframe's theme.css. See the note above its accent blocks for
+   how a host colour is written.
+
+   The neon bases are glowing terminal screens. In light mode each is a vivid tint
+   like picoframe's emerald. In dark mode each also turns text and borders its own
+   colour. A base sets four numbers, and the shared blocks below turn them into
+   every token:
+   --neon-hue and --neon-l, the hue and lightness of the text,
+   --neon-bg-hue and --neon-bg-sat, the tint of the dark surfaces.
+   A picked accent keeps the tokens it sets, so the base's own button and focus
+   colours only apply under the default accent. Adding a neon colour is one block
+   here, its accent below and a line in `colours.ts`. */
+
+[data-base="phosphor"] {
+  --base-hue: 140;
+  --base-sat: 6;
+  --base-sat-text: 2;
+  --neon-hue: 140;
+  --neon-l: 82%;
+  --neon-bg-hue: 120;
+  --neon-bg-sat: 22%;
+}
+[data-base="neoncyan"] {
+  --base-hue: 190;
+  --base-sat: 6;
+  --base-sat-text: 2;
+  --neon-hue: 190;
+  --neon-l: 72%;
+  --neon-bg-hue: 205;
+  --neon-bg-sat: 35%;
+}
+[data-base="neonpeach"] {
+  --base-hue: 22;
+  --base-sat: 6;
+  --base-sat-text: 2;
+  --neon-hue: 22;
+  --neon-l: 78%;
+  --neon-bg-hue: 15;
+  --neon-bg-sat: 25%;
+}
+[data-base="neonpurple"] {
+  --base-hue: 285;
+  --base-sat: 6;
+  --base-sat-text: 2;
+  --neon-hue: 285;
+  --neon-l: 80%;
+  --neon-bg-hue: 275;
+  --neon-bg-sat: 30%;
+}
+:is(.dark[data-base="phosphor"], .dark[data-base="neoncyan"], .dark[data-base="neonpeach"], .dark[data-base="neonpurple"]) {
+  --background: var(--neon-bg-hue) var(--neon-bg-sat) 8%;
+  --foreground: var(--neon-hue) 100% var(--neon-l);
+  --card: var(--neon-bg-hue) var(--neon-bg-sat) 10%;
+  --card-foreground: var(--neon-hue) 100% var(--neon-l);
+  --popover: var(--neon-bg-hue) var(--neon-bg-sat) 10%;
+  --popover-foreground: var(--neon-hue) 100% var(--neon-l);
+  --secondary: var(--neon-bg-hue) calc(var(--neon-bg-sat) - 2%) 15%;
+  --secondary-foreground: var(--neon-hue) 100% var(--neon-l);
+  --muted: var(--neon-bg-hue) calc(var(--neon-bg-sat) - 2%) 15%;
+  --muted-foreground: var(--neon-hue) 60% calc(var(--neon-l) - 16%);
+  --border: var(--neon-bg-hue) calc(var(--neon-bg-sat) + 6%) 48%;
+  --input: var(--neon-bg-hue) calc(var(--neon-bg-sat) + 6%) 55%;
+  --sidebar: var(--neon-bg-hue) var(--neon-bg-sat) 7%;
+  --sidebar-foreground: var(--neon-hue) 90% calc(var(--neon-l) - 6%);
+  --sidebar-border: var(--neon-bg-hue) calc(var(--neon-bg-sat) + 2%) 22%;
+}
+:is(.dark[data-base="phosphor"]:not([data-accent]), .dark[data-base="neoncyan"]:not([data-accent]), .dark[data-base="neonpeach"]:not([data-accent]), .dark[data-base="neonpurple"]:not([data-accent])) {
+  --primary: var(--neon-hue) 100% var(--neon-l);
+  --primary-foreground: var(--neon-bg-hue) 25% 8%;
+  --ring: var(--neon-hue) 75% calc(var(--neon-l) - 20%);
+  --accent: var(--neon-bg-hue) calc(var(--neon-bg-sat) + 3%) 18%;
+  --accent-foreground: var(--neon-hue) 100% var(--neon-l);
+  --sidebar-accent: var(--neon-bg-hue) calc(var(--neon-bg-sat) + 3%) 16%;
+  --sidebar-accent-foreground: var(--neon-hue) 100% var(--neon-l);
+}
+/* The neon accents: a bright fill with near-black text in dark mode. Light mode
+   needs a darker shade so white text clears AA. Literal values, because the
+   contrast tests read them out of this file. */
+[data-accent="phosphor"]:not(.dark) {
+  --primary: 130 70% 28%;
+  --primary-foreground: 130 40% 97%;
+  --ring: 130 70% 28%;
+  --accent: 140 60% 91%;
+  --accent-foreground: 130 70% 22%;
+  --sidebar-accent: 140 60% 91%;
+  --sidebar-accent-foreground: 130 70% 22%;
+}
+.dark[data-accent="phosphor"] {
+  --primary: 150 100% 85%;
+  --primary-foreground: 120 25% 8%;
+  --ring: 140 75% 62%;
+  --accent: 120 25% 18%;
+  --accent-foreground: 140 100% 82%;
+  --sidebar-accent: 120 25% 18%;
+  --sidebar-accent-foreground: 140 100% 82%;
+}
+[data-accent="neoncyan"]:not(.dark) {
+  --primary: 195 90% 30%;
+  --primary-foreground: 195 40% 97%;
+  --ring: 195 90% 30%;
+  --accent: 190 60% 91%;
+  --accent-foreground: 195 90% 22%;
+  --sidebar-accent: 190 60% 91%;
+  --sidebar-accent-foreground: 195 90% 22%;
+}
+.dark[data-accent="neoncyan"] {
+  --primary: 185 100% 78%;
+  --primary-foreground: 205 25% 8%;
+  --ring: 190 75% 52%;
+  --accent: 205 38% 18%;
+  --accent-foreground: 190 100% 72%;
+  --sidebar-accent: 205 38% 18%;
+  --sidebar-accent-foreground: 190 100% 72%;
+}
+[data-accent="neonpeach"]:not(.dark) {
+  --primary: 18 85% 38%;
+  --primary-foreground: 18 40% 97%;
+  --ring: 18 85% 38%;
+  --accent: 22 60% 91%;
+  --accent-foreground: 18 85% 22%;
+  --sidebar-accent: 22 60% 91%;
+  --sidebar-accent-foreground: 18 85% 22%;
+}
+.dark[data-accent="neonpeach"] {
+  --primary: 28 100% 80%;
+  --primary-foreground: 15 25% 8%;
+  --ring: 22 75% 58%;
+  --accent: 15 28% 18%;
+  --accent-foreground: 22 100% 78%;
+  --sidebar-accent: 15 28% 18%;
+  --sidebar-accent-foreground: 22 100% 78%;
+}
+[data-accent="neonpurple"]:not(.dark) {
+  --primary: 280 65% 45%;
+  --primary-foreground: 280 40% 97%;
+  --ring: 280 65% 45%;
+  --accent: 285 60% 91%;
+  --accent-foreground: 280 65% 22%;
+  --sidebar-accent: 285 60% 91%;
+  --sidebar-accent-foreground: 280 65% 22%;
+}
+.dark[data-accent="neonpurple"] {
+  --primary: 290 100% 84%;
+  --primary-foreground: 275 25% 8%;
+  --ring: 285 75% 60%;
+  --accent: 275 33% 18%;
+  --accent-foreground: 285 100% 80%;
+  --sidebar-accent: 275 33% 18%;
+  --sidebar-accent-foreground: 285 100% 80%;
+}

@@ -33176,6 +33176,18 @@ msgstr "Κανένα από τα δύο δεν διαβάζεται από τη 
 msgid "Neither switch above is on, so the engine never looks at a piece's box and none of this reaches a game."
 msgstr "Κανένας από τους παραπάνω διακόπτες δεν είναι ενεργός, οπότε η μηχανή δεν εξετάζει ποτέ το πλαίσιο ενός τμήματος και τίποτα από αυτά δεν φτάνει σε παιχνίδι."
 
+#: src/theme/colours.ts
+msgid "Neon cyan"
+msgstr "Κυανό νέον"
+
+#: src/theme/colours.ts
+msgid "Neon peach"
+msgstr "Ροδακινί νέον"
+
+#: src/theme/colours.ts
+msgid "Neon purple"
+msgstr "Μωβ νέον"
+
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #, fuzzy
 msgid "Nest {collectionName} under"
@@ -38868,6 +38880,10 @@ msgstr ""
 msgctxt "view"
 msgid "Perspective"
 msgstr "Προοπτική"
+
+#: src/theme/colours.ts
+msgid "Phosphor"
+msgstr "Φώσφορος"
 
 #: src/mapconv/pages/DecompilePage.tsx
 #, fuzzy

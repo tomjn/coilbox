@@ -316,10 +316,10 @@ export interface Profile {
   background?: string;
   /** picoframe CSS variable overrides, e.g. { "--primary": "24 90% 50%" }. */
   theme?: Record<string, string>;
-  /** Force a built-in accent (zinc/blue/green/rose/violet/orange) each launch. */
-  accent?: Accent;
-  /** Force a built-in base (the neutral tint: zinc, slate, stone, ...) each launch. */
-  base?: Base;
+  /** Force an accent (blue, green, rose, ... or Coilbox's own phosphor) each launch. */
+  accent?: Accent | (string & {});
+  /** Force a base (the neutral tint: zinc, slate, stone, ... or phosphor) each launch. */
+  base?: Base | (string & {});
   /** Force the colour scheme each launch: "light" | "dark" | "system". */
   mode?: ThemeMode;
   /**

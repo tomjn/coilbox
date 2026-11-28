@@ -4,6 +4,8 @@
 /* Lua is engine code and holds no class names, so an edit to it need not rebuild the stylesheet. */
 @source not "../**/*.lua";
 @import "@picoframe/frame/theme.css";
+/* Coilbox's own bases and accents, after picoframe's so they can build on its tokens. */
+@import "./theme/colours.css";
 /* Country flag sprites (fi fi-xx) for lobby user/battle lists — see multiplayer/UserBadges. */
 @import "flag-icons/css/flag-icons.min.css";
 /* Tektur: a self-hosted display face for the conquest/warpath "command console"

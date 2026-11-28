@@ -33164,6 +33164,18 @@ msgstr "El motor no lee ninguno de los dos. Ambos sirven para llevar la unidad a
 msgid "Neither switch above is on, so the engine never looks at a piece's box and none of this reaches a game."
 msgstr "Ninguno de los interruptores de arriba está activado, así que el motor nunca mira la caja de una parte y nada de esto llega al juego."
 
+#: src/theme/colours.ts
+msgid "Neon cyan"
+msgstr "Cian neón"
+
+#: src/theme/colours.ts
+msgid "Neon peach"
+msgstr "Melocotón neón"
+
+#: src/theme/colours.ts
+msgid "Neon purple"
+msgstr "Morado neón"
+
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #, fuzzy
 msgid "Nest {collectionName} under"
@@ -38852,6 +38864,10 @@ msgstr ""
 msgctxt "view"
 msgid "Perspective"
 msgstr "Perspectiva"
+
+#: src/theme/colours.ts
+msgid "Phosphor"
+msgstr "Fósforo"
 
 #: src/mapconv/pages/DecompilePage.tsx
 #, fuzzy

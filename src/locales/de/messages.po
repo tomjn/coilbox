@@ -33164,6 +33164,18 @@ msgstr "Keine von beiden liest die Engine. Beide dienen dazu, die Einheit in Ble
 msgid "Neither switch above is on, so the engine never looks at a piece's box and none of this reaches a game."
 msgstr "Keiner der Schalter oben ist an, also schaut die Engine nie auf die Box eines Teils, und nichts davon erreicht ein Spiel."
 
+#: src/theme/colours.ts
+msgid "Neon cyan"
+msgstr "Neoncyan"
+
+#: src/theme/colours.ts
+msgid "Neon peach"
+msgstr "Neonpfirsich"
+
+#: src/theme/colours.ts
+msgid "Neon purple"
+msgstr "Neonlila"
+
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #, fuzzy
 msgid "Nest {collectionName} under"
@@ -38852,6 +38864,10 @@ msgstr ""
 msgctxt "view"
 msgid "Perspective"
 msgstr "Perspektive"
+
+#: src/theme/colours.ts
+msgid "Phosphor"
+msgstr "Phosphor"
 
 #: src/mapconv/pages/DecompilePage.tsx
 #, fuzzy

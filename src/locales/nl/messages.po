@@ -33176,6 +33176,18 @@ msgstr "Geen van beide wordt door de engine gelezen. Beide zijn om de eenheid in
 msgid "Neither switch above is on, so the engine never looks at a piece's box and none of this reaches a game."
 msgstr "Geen van beide schakelaars hierboven staat aan, dus de engine kijkt nooit naar het kader van een deel en niets hiervan bereikt een spel."
 
+#: src/theme/colours.ts
+msgid "Neon cyan"
+msgstr "Neoncyaan"
+
+#: src/theme/colours.ts
+msgid "Neon peach"
+msgstr "Neonperzik"
+
+#: src/theme/colours.ts
+msgid "Neon purple"
+msgstr "Neonpaars"
+
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #, fuzzy
 msgid "Nest {collectionName} under"
@@ -38868,6 +38880,10 @@ msgstr ""
 msgctxt "view"
 msgid "Perspective"
 msgstr "Perspectief"
+
+#: src/theme/colours.ts
+msgid "Phosphor"
+msgstr "Fosfor"
 
 #: src/mapconv/pages/DecompilePage.tsx
 #, fuzzy

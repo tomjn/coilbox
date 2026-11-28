@@ -27105,6 +27105,18 @@ msgstr "Neither is read by the engine. Both are for taking the unit into Blender
 msgid "Neither switch above is on, so the engine never looks at a piece's box and none of this reaches a game."
 msgstr "Neither switch above is on, so the engine never looks at a piece's box and none of this reaches a game."
 
+#: src/theme/colours.ts
+msgid "Neon cyan"
+msgstr "Neon cyan"
+
+#: src/theme/colours.ts
+msgid "Neon peach"
+msgstr "Neon peach"
+
+#: src/theme/colours.ts
+msgid "Neon purple"
+msgstr "Neon purple"
+
 #: src/workshop/pages/components/CollectionsPanel.tsx
 msgid "Nest {collectionName} under"
 msgstr "Nest {collectionName} under"
@@ -31725,6 +31737,10 @@ msgstr "Persistent"
 msgctxt "view"
 msgid "Perspective"
 msgstr "Perspective"
+
+#: src/theme/colours.ts
+msgid "Phosphor"
+msgstr "Phosphor"
 
 #: src/mapconv/pages/DecompilePage.tsx
 msgid "Pick a .sdd folder…"
