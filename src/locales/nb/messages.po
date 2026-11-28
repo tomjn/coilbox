@@ -33176,6 +33176,18 @@ msgstr "Ingen av dem leses av motoren. Begge er for å ta enheten inn i Blender,
 msgid "Neither switch above is on, so the engine never looks at a piece's box and none of this reaches a game."
 msgstr "Ingen av bryterne over er på, så motoren ser aldri på boksen til en del, og ingenting av dette når et spill."
 
+#: src/theme/colours.ts
+msgid "Neon cyan"
+msgstr "Neoncyan"
+
+#: src/theme/colours.ts
+msgid "Neon peach"
+msgstr "Neonfersken"
+
+#: src/theme/colours.ts
+msgid "Neon purple"
+msgstr "Neonlilla"
+
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #, fuzzy
 msgid "Nest {collectionName} under"

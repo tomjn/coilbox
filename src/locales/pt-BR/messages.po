@@ -33176,6 +33176,18 @@ msgstr "Nenhum deles é lido pela engine. Os dois servem para levar a unidade ao
 msgid "Neither switch above is on, so the engine never looks at a piece's box and none of this reaches a game."
 msgstr "Nenhuma das opções acima está ligada, então a engine nunca olha a caixa de uma parte e nada disto chega a um jogo."
 
+#: src/theme/colours.ts
+msgid "Neon cyan"
+msgstr "Ciano neon"
+
+#: src/theme/colours.ts
+msgid "Neon peach"
+msgstr "Pêssego neon"
+
+#: src/theme/colours.ts
+msgid "Neon purple"
+msgstr "Roxo neon"
+
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #, fuzzy
 msgid "Nest {collectionName} under"

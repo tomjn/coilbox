@@ -33164,6 +33164,18 @@ msgstr "两者都不会被引擎读取。它们都用于将单位导入 Blender�
 msgid "Neither switch above is on, so the engine never looks at a piece's box and none of this reaches a game."
 msgstr "上面的两个开关都没有开启，所以引擎从不读取部件的碰撞盒，这里的设置都不会进入游戏。"
 
+#: src/theme/colours.ts
+msgid "Neon cyan"
+msgstr "霓虹青"
+
+#: src/theme/colours.ts
+msgid "Neon peach"
+msgstr "霓虹桃"
+
+#: src/theme/colours.ts
+msgid "Neon purple"
+msgstr "霓虹紫"
+
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #, fuzzy
 msgid "Nest {collectionName} under"

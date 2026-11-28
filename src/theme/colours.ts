@@ -15,10 +15,24 @@ export function useCoilboxColours(): {
   return useMemo(
     () => ({
       bases: [
-        { value: "phosphor", swatch: "hsl(125 45% 42%)", name: t`Phosphor` },
+        { value: "phosphor", swatch: "hsl(135 45% 42%)", name: t`Phosphor` },
+        { value: "neoncyan", swatch: "hsl(192 60% 45%)", name: t`Neon cyan` },
+        { value: "neonpeach", swatch: "hsl(20 70% 58%)", name: t`Neon peach` },
+        {
+          value: "neonpurple",
+          swatch: "hsl(282 50% 55%)",
+          name: t`Neon purple`,
+        },
       ],
       accents: [
         { value: "phosphor", swatch: "hsl(130 70% 28%)", name: t`Phosphor` },
+        { value: "neoncyan", swatch: "hsl(195 90% 30%)", name: t`Neon cyan` },
+        { value: "neonpeach", swatch: "hsl(18 85% 38%)", name: t`Neon peach` },
+        {
+          value: "neonpurple",
+          swatch: "hsl(280 65% 45%)",
+          name: t`Neon purple`,
+        },
       ],
     }),
     [t],

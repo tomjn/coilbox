@@ -33164,6 +33164,18 @@ msgstr "どちらもエンジンは読み込みません。どちらもユニッ
 msgid "Neither switch above is on, so the engine never looks at a piece's box and none of this reaches a game."
 msgstr "上のスイッチがどちらもオンではないため、エンジンはピースのボックスを参照せず、ここでの設定はゲームに反映されません。"
 
+#: src/theme/colours.ts
+msgid "Neon cyan"
+msgstr "ネオンシアン"
+
+#: src/theme/colours.ts
+msgid "Neon peach"
+msgstr "ネオンピーチ"
+
+#: src/theme/colours.ts
+msgid "Neon purple"
+msgstr "ネオンパープル"
+
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #, fuzzy
 msgid "Nest {collectionName} under"

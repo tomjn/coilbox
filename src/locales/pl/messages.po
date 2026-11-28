@@ -33164,6 +33164,18 @@ msgstr "Żaden z nich nie jest czytany przez silnik. Oba służą do przeniesien
 msgid "Neither switch above is on, so the engine never looks at a piece's box and none of this reaches a game."
 msgstr "Żaden z przełączników powyżej nie jest włączony, więc silnik nigdy nie patrzy na bryłę elementu i nic z tego nie trafia do gry."
 
+#: src/theme/colours.ts
+msgid "Neon cyan"
+msgstr "Neonowy cyjan"
+
+#: src/theme/colours.ts
+msgid "Neon peach"
+msgstr "Neonowa brzoskwinia"
+
+#: src/theme/colours.ts
+msgid "Neon purple"
+msgstr "Neonowy fiolet"
+
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #, fuzzy
 msgid "Nest {collectionName} under"

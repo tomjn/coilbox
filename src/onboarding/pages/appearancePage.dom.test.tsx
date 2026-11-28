@@ -168,11 +168,13 @@ it("names every swatch after its value's label", () => {
     Array.from(row.querySelectorAll('[role="radio"]')).map((el) =>
       el.getAttribute("aria-label"),
     );
-  // picoframe's own colours, then Coilbox's phosphor in each row.
-  expect(names(base)).toHaveLength(BASES.length + 1);
-  expect(names(accent)).toHaveLength(ACCENTS.length + 1);
-  expect(names(base).at(-1)).toBe("Phosphor");
-  expect(names(accent).at(-1)).toBe("Phosphor");
+  // picoframe's own colours, then Coilbox's neon ones in each row.
+  const neon = ["Phosphor", "Neon cyan", "Neon peach", "Neon purple"];
+  expect(names(base)).toEqual([...names(base).slice(0, BASES.length), ...neon]);
+  expect(names(accent)).toEqual([
+    ...names(accent).slice(0, ACCENTS.length),
+    ...neon,
+  ]);
   for (const name of [...names(base), ...names(accent)]) {
     expect(name).toBeTruthy();
   }
