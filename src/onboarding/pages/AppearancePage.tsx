@@ -1,5 +1,12 @@
 import { useLingui } from "@lingui/react/macro";
-import { Button, cn, type ThemeMode, useTheme } from "@picoframe/frame";
+import {
+  ACCENTS,
+  BASES,
+  Button,
+  cn,
+  type ThemeMode,
+  useTheme,
+} from "@picoframe/frame";
 import { type ReactNode, useId } from "react";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -7,7 +14,6 @@ import { useFrameStrings } from "@/i18n/frameStrings";
 import { getProfile } from "@/profile/profile";
 import { useCoilboxColours } from "@/theme/colours";
 import type { WizardPageProps } from "./registry";
-import { ACCENT_OPTIONS, BASE_OPTIONS } from "./themeOptions";
 
 const MODES: readonly ThemeMode[] = ["light", "dark", "system"];
 
@@ -150,14 +156,14 @@ export default function AppearancePage(_: WizardPageProps) {
         <>
           <Swatches
             label={baseLabel}
-            options={[...BASE_OPTIONS, ...coilboxColours.bases]}
+            options={[...BASES, ...coilboxColours.bases]}
             names={strings.baseNames}
             value={base}
             onChange={setBase}
           />
           <Swatches
             label={accentLabel}
-            options={[...ACCENT_OPTIONS, ...coilboxColours.accents]}
+            options={[...ACCENTS, ...coilboxColours.accents]}
             names={strings.accentNames}
             value={accent}
             onChange={setAccent}

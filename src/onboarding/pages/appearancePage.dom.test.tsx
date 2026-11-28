@@ -7,6 +7,8 @@
  */
 
 import {
+  ACCENTS,
+  BASES,
   memoryStorage,
   PersistentStoreProvider,
   ThemeProvider,
@@ -21,7 +23,6 @@ import {
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { Profile } from "@/profile/profile";
 import { Wizard } from "../Wizard";
-import { ACCENT_OPTIONS, BASE_OPTIONS } from "./themeOptions";
 
 let profile: Pick<Profile, "mode" | "accent" | "base"> = {};
 
@@ -168,8 +169,8 @@ it("names every swatch after its value's label", () => {
       el.getAttribute("aria-label"),
     );
   // picoframe's own colours, then Coilbox's phosphor in each row.
-  expect(names(base)).toHaveLength(BASE_OPTIONS.length + 1);
-  expect(names(accent)).toHaveLength(ACCENT_OPTIONS.length + 1);
+  expect(names(base)).toHaveLength(BASES.length + 1);
+  expect(names(accent)).toHaveLength(ACCENTS.length + 1);
   expect(names(base).at(-1)).toBe("Phosphor");
   expect(names(accent).at(-1)).toBe("Phosphor");
   for (const name of [...names(base), ...names(accent)]) {
