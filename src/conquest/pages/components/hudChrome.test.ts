@@ -686,6 +686,7 @@ describe("the accent as an icon on the HUD card clears 3:1 over anything the can
         "indigo",
         "opal",
         "orange",
+        "phosphor",
         "pink",
         "purple",
         "rainbow",
