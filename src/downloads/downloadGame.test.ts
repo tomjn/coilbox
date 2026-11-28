@@ -5,6 +5,7 @@ const {
   dlDownloadFileRaw,
   dlGithubReleaseArchives,
   dlSpringfilesList,
+  dlRepos,
   dlVersions,
   loadGithubGameRepos,
   notify,
@@ -13,6 +14,7 @@ const {
   dlDownloadFileRaw: vi.fn(),
   dlGithubReleaseArchives: vi.fn(),
   dlSpringfilesList: vi.fn(),
+  dlRepos: vi.fn(),
   dlVersions: vi.fn(),
   loadGithubGameRepos: vi.fn(),
   notify: vi.fn(),
@@ -23,6 +25,7 @@ vi.mock("./bindings", () => ({
   dlDownloadFileRaw,
   dlGithubReleaseArchives,
   dlSpringfilesList,
+  dlRepos,
   dlVersions,
 }));
 vi.mock("../content/branding", () => ({ loadGithubGameRepos }));
@@ -602,6 +605,94 @@ describe("downloadGameAnySource, rapid step", () => {
       expect(String(err)).toContain(master.name);
     }
     expect(dlDownloadRaw).toHaveBeenCalledTimes(DEFAULT_RAPID_MASTERS.length);
+  });
+
+  it("does not look a name without a colon up first", async () => {
+    dlDownloadRaw.mockResolvedValueOnce({ message: "ok" });
+    await run();
+    expect(dlRepos).not.toHaveBeenCalled();
+  });
+});
+
+describe("downloadGameAnySource, a game name with a colon in it", () => {
+  // pr-downloader would search a repository called `MechCommander` for this,
+  // and there is none. The game is in `mcl`.
+  const MCL = "MechCommander: Legacy test-3923-c2258a6";
+  const version = (tag: string, name: string) => ({
+    tag,
+    md5: "10402ee059014a4b66c2df1ee4999b16",
+    name,
+    depends: [],
+    kind: tag.includes(":git:") ? "snapshot" : "release",
+    installed: false,
+  });
+  const repos = {
+    repos: [
+      { name: "ba", url: "https://repos.springrts.com/ba" },
+      { name: "mcl", url: "https://repos.springrts.com/mcl" },
+    ],
+    ageSecs: 0,
+    stale: false,
+  };
+  const listing = (versions: ReturnType<typeof version>[]) => ({
+    versions,
+    ageSecs: 0,
+    stale: false,
+  });
+  const mclListing = listing([
+    version("mcl:test", MCL),
+    version("mcl:git:c2258a6f00000000000000000000000000000000", MCL),
+  ]);
+  const fetchMcl = () =>
+    downloadGameAnySource({
+      gameName: MCL,
+      writePath: "/data",
+      onProgress: () => {},
+    });
+
+  beforeEach(() => dlRepos.mockResolvedValue(repos));
+
+  it("fetches it by the exact commit tag its repository lists", async () => {
+    dlVersions.mockImplementation(async ({ repoUrl }: { repoUrl: string }) =>
+      repoUrl.endsWith("/mcl") ? mclListing : listing([]),
+    );
+    dlDownloadRaw.mockResolvedValueOnce({ message: "ok" });
+
+    await expect(fetchMcl()).resolves.toBe("rapid");
+
+    expect(dlDownloadRaw).toHaveBeenCalledTimes(1);
+    expect(dlDownloadRaw.mock.calls[0][0].tag).toBe(
+      "mcl:git:c2258a6f00000000000000000000000000000000",
+    );
+  });
+
+  it("fetches the indexes again when the copies held do not list the build", async () => {
+    dlVersions.mockImplementation(
+      async ({
+        repoUrl,
+        revalidate,
+      }: {
+        repoUrl: string;
+        revalidate: boolean;
+      }) => (revalidate && repoUrl.endsWith("/mcl") ? mclListing : listing([])),
+    );
+    dlDownloadRaw.mockResolvedValueOnce({ message: "ok" });
+
+    await expect(fetchMcl()).resolves.toBe("rapid");
+
+    expect(dlRepos.mock.calls.map((c) => c[0].revalidate)).toEqual([
+      false,
+      true,
+    ]);
+  });
+
+  it("says the master does not list it, without asking pr-downloader", async () => {
+    dlVersions.mockResolvedValue(listing([]));
+
+    const err = await fetchMcl().catch((e: Error) => e);
+
+    expect(String(err)).toContain(`does not list "${MCL}"`);
+    expect(dlDownloadRaw).not.toHaveBeenCalled();
   });
 });
 

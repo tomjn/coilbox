@@ -1224,6 +1224,11 @@ msgstr "{0} at a position with no name."
 msgid "{0} called a vote: {1}"
 msgstr "{0} called a vote: {1}"
 
+#. placeholder {0}: master.name
+#: src/downloads/downloadGame.ts
+msgid "{0} does not list \"{gameName}\"."
+msgstr "{0} does not list \"{gameName}\"."
+
 #. placeholder {0}: d.asset
 #: src/content/gameSourceRows.ts
 msgid "{0} from the newest release"
