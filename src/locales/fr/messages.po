@@ -38853,6 +38853,10 @@ msgctxt "view"
 msgid "Perspective"
 msgstr "Perspective"
 
+#: src/i18n/frameStrings.ts
+msgid "Phosphor"
+msgstr "Phosphore"
+
 #: src/mapconv/pages/DecompilePage.tsx
 #, fuzzy
 msgid "Pick a .sdd folder…"

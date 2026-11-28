@@ -31726,6 +31726,10 @@ msgctxt "view"
 msgid "Perspective"
 msgstr "Perspective"
 
+#: src/i18n/frameStrings.ts
+msgid "Phosphor"
+msgstr "Phosphor"
+
 #: src/mapconv/pages/DecompilePage.tsx
 msgid "Pick a .sdd folder…"
 msgstr "Pick a .sdd folder…"

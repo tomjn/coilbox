@@ -1,7 +1,7 @@
 import type { Accent, Base } from "@picoframe/frame";
 
 /**
- * picoframe's `ACCENTS` and `BASES` swatch lists. `@picoframe/frame` 0.10 does
+ * picoframe's `ACCENTS` and `BASES` swatch lists. `@picoframe/frame` 0.12 does
  * not export them, so they are copied from its `context/themeConfig.ts`. The
  * checks below fail the typecheck if picoframe adds a value this copy lacks.
  */
@@ -21,6 +21,7 @@ export const ACCENT_OPTIONS = [
   { value: "indigo", swatch: "hsl(243 75% 59%)" },
   { value: "purple", swatch: "hsl(271 76% 53%)" },
   { value: "pink", swatch: "hsl(330 75% 47%)" },
+  { value: "phosphor", swatch: "hsl(130 70% 28%)" },
   {
     value: "rainbow",
     swatch:
@@ -56,6 +57,7 @@ export const BASE_OPTIONS = [
   { value: "emerald", swatch: "hsl(160 45% 40%)" },
   { value: "yellow", swatch: "hsl(50 60% 48%)" },
   { value: "crimson", swatch: "hsl(350 55% 48%)" },
+  { value: "phosphor", swatch: "hsl(125 45% 42%)" },
 ] as const satisfies readonly { value: Base; swatch: string }[];
 
 type Missing<All, Listed> = [Exclude<All, Listed>] extends [never]
