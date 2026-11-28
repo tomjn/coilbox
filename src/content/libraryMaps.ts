@@ -30,11 +30,13 @@ export function catalogueLabel(c: CatalogueRequest): string {
 }
 
 /**
- * The Maps page's filter chips, in the order they are shown. My maps and New
- * Maps narrow by state. The other three are play types over every map, read
- * off the hub's facts for the map (see {@link mapPlayTypes}).
+ * The Maps page's filter chips, in the order they are shown. All shows every
+ * map, for a player who only wants to search. My maps and New maps narrow by
+ * state. The other three are play types over every map, read off the hub's
+ * facts for the map (see {@link mapPlayTypes}).
  */
 export const MAP_CHIPS = [
+  { value: "all", label: msg`All` },
   { value: "installed", label: msg`My maps` },
   { value: "notInstalled", label: msg`New maps` },
   { value: "1v1", label: msg`1v1` },

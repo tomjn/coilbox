@@ -11422,6 +11422,8 @@ msgstr "Wyrównaj {axisName} do środka"
 msgid "Align {axisName} middle. A piece with no shape lines up by its origin."
 msgstr "Wyrównaj {axisName} do środka. Element bez kształtu wyrównuje się według punktu odniesienia."
 
+#: src/content/libraryGames.ts
+#: src/content/libraryMaps.ts
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/pages/components/PlayerMatchFigures.tsx
 #: src/content/pages/components/ReplayEventList.tsx
@@ -34195,6 +34197,10 @@ msgstr "Nie zapisano gier"
 msgid "No games yet — try one of these"
 msgstr "Nie ma jeszcze gier — wypróbuj jedną z tych"
 
+#: src/content/pages/GamesPage.tsx
+msgid "No games."
+msgstr ""
+
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 #, fuzzy
 msgid "No generated game and no rescan: the launch carries the edits itself."
@@ -34410,6 +34416,10 @@ msgstr "Nie zapisano map."
 #, fuzzy
 msgid "No maps yet — try one of these"
 msgstr "Nie ma jeszcze map — wypróbuj jedną z tych"
+
+#: src/content/pages/MapsPage.tsx
+msgid "No maps."
+msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy

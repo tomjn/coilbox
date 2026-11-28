@@ -11423,6 +11423,8 @@ msgstr "Justera {axisName} mitten"
 msgid "Align {axisName} middle. A piece with no shape lines up by its origin."
 msgstr "Justera {axisName} mitten. En del utan form justeras efter sin origo."
 
+#: src/content/libraryGames.ts
+#: src/content/libraryMaps.ts
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/pages/components/PlayerMatchFigures.tsx
 #: src/content/pages/components/ReplayEventList.tsx
@@ -34207,6 +34209,10 @@ msgstr "Inga matcher registrerade"
 msgid "No games yet — try one of these"
 msgstr "Inga spel än – prova något av de här"
 
+#: src/content/pages/GamesPage.tsx
+msgid "No games."
+msgstr ""
+
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 #, fuzzy
 msgid "No generated game and no rescan: the launch carries the edits itself."
@@ -34422,6 +34428,10 @@ msgstr "Inga kartor registrerade."
 #, fuzzy
 msgid "No maps yet — try one of these"
 msgstr "Inga kartor än – prova någon av de här"
+
+#: src/content/pages/MapsPage.tsx
+msgid "No maps."
+msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy

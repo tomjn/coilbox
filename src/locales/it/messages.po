@@ -11423,6 +11423,8 @@ msgstr "Allinea {axisName} al centro"
 msgid "Align {axisName} middle. A piece with no shape lines up by its origin."
 msgstr "Allinea {axisName} al centro. Un pezzo senza forma si allinea in base alla sua origine."
 
+#: src/content/libraryGames.ts
+#: src/content/libraryMaps.ts
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/pages/components/PlayerMatchFigures.tsx
 #: src/content/pages/components/ReplayEventList.tsx
@@ -34207,6 +34209,10 @@ msgstr "Nessuna partita registrata"
 msgid "No games yet — try one of these"
 msgstr "Ancora nessun gioco: prova uno di questi"
 
+#: src/content/pages/GamesPage.tsx
+msgid "No games."
+msgstr ""
+
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 #, fuzzy
 msgid "No generated game and no rescan: the launch carries the edits itself."
@@ -34422,6 +34428,10 @@ msgstr "Nessuna mappa registrata."
 #, fuzzy
 msgid "No maps yet — try one of these"
 msgstr "Ancora nessuna mappa: prova una di queste"
+
+#: src/content/pages/MapsPage.tsx
+msgid "No maps."
+msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy

@@ -58,6 +58,7 @@ const PAGE = 200;
 
 /** What a chip with nothing in it says. */
 const EMPTY_CHIP: Record<MapChip, MessageDescriptor> = {
+  all: msg`No maps.`,
   installed: msg`No maps installed.`,
   notInstalled: msg`Every map is installed.`,
   "1v1": msg`No 1v1 maps.`,

@@ -150,6 +150,12 @@ describe("Games page", () => {
     ]);
   });
 
+  it("shows installed and new games together under All", () => {
+    renderPage();
+    fireEvent.click(screen.getByRole("radio", { name: /^All/ }));
+    expect(cardTitles()).toHaveLength(7);
+  });
+
   it("opens on the player's own games", () => {
     renderPage();
     expect(
@@ -181,7 +187,7 @@ describe("Games page", () => {
       within(chips)
         .getAllByRole("radio")
         .map((c) => c.textContent),
-    ).toEqual(["My games3", "New games4", "Updates1", "Featured2"]);
+    ).toEqual(["All7", "My games3", "New games4", "Updates1", "Featured2"]);
     fireEvent.click(within(chips).getByRole("radio", { name: /Updates/ }));
     expect(cardTitles()).toEqual(["SplinterFaction"]);
   });

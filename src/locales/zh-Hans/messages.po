@@ -11422,6 +11422,8 @@ msgstr "{axisName} 居中对齐"
 msgid "Align {axisName} middle. A piece with no shape lines up by its origin."
 msgstr "{axisName} 居中对齐。没有形状的部件按原点对齐。"
 
+#: src/content/libraryGames.ts
+#: src/content/libraryMaps.ts
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/pages/components/PlayerMatchFigures.tsx
 #: src/content/pages/components/ReplayEventList.tsx
@@ -34195,6 +34197,10 @@ msgstr "没有记录的对局"
 msgid "No games yet — try one of these"
 msgstr "还没有游戏，试试这些"
 
+#: src/content/pages/GamesPage.tsx
+msgid "No games."
+msgstr ""
+
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 #, fuzzy
 msgid "No generated game and no rescan: the launch carries the edits itself."
@@ -34410,6 +34416,10 @@ msgstr "没有记录地图。"
 #, fuzzy
 msgid "No maps yet — try one of these"
 msgstr "还没有地图，试试这些"
+
+#: src/content/pages/MapsPage.tsx
+msgid "No maps."
+msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy

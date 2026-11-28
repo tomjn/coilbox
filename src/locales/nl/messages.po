@@ -11423,6 +11423,8 @@ msgstr "{axisName} midden uitlijnen"
 msgid "Align {axisName} middle. A piece with no shape lines up by its origin."
 msgstr "{axisName} midden uitlijnen. Een deel zonder vorm wordt uitgelijnd op zijn oorsprong."
 
+#: src/content/libraryGames.ts
+#: src/content/libraryMaps.ts
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/pages/components/PlayerMatchFigures.tsx
 #: src/content/pages/components/ReplayEventList.tsx
@@ -34207,6 +34209,10 @@ msgstr "Geen spellen vastgelegd"
 msgid "No games yet — try one of these"
 msgstr "Nog geen spellen. Probeer een van deze"
 
+#: src/content/pages/GamesPage.tsx
+msgid "No games."
+msgstr ""
+
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 #, fuzzy
 msgid "No generated game and no rescan: the launch carries the edits itself."
@@ -34422,6 +34428,10 @@ msgstr "Geen kaarten vastgelegd."
 #, fuzzy
 msgid "No maps yet — try one of these"
 msgstr "Nog geen kaarten. Probeer een van deze"
+
+#: src/content/pages/MapsPage.tsx
+msgid "No maps."
+msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy

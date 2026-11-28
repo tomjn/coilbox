@@ -19,6 +19,7 @@ import type { LibraryGame, LibrarySource } from "./library";
  * descriptors, resolved at render.
  */
 export const GAME_CHIPS = [
+  { value: "all", label: msg`All` },
   { value: "installed", label: msg`My games` },
   { value: "notInstalled", label: msg`New games` },
   { value: "updates", label: msg`Updates` },
@@ -87,6 +88,8 @@ export function mutatorsOf(
 
 export function matchesChip(g: LibraryGame, chip: GameChip): boolean {
   switch (chip) {
+    case "all":
+      return true;
     case "installed":
       return isOnDisk(g);
     case "updates":

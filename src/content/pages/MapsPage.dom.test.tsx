@@ -181,6 +181,12 @@ describe("Maps page", () => {
     expect(cardTitles()).toEqual(["Isis", "Supreme Isthmus v2"]);
   });
 
+  it("shows installed and new maps together under All", () => {
+    renderPage();
+    pressChip(/^All/);
+    expect(cardTitles()).toHaveLength(4);
+  });
+
   it("draws an installed map on two mirrors once, installed, with both sources", () => {
     renderPage();
     const comet = card("Comet Catcher Redux");
@@ -216,7 +222,14 @@ describe("Maps page", () => {
     const chips = within(screen.getByRole("radiogroup", { name: "Show" }))
       .getAllByRole("radio")
       .map((c) => c.textContent);
-    expect(chips).toEqual(["My maps2", "New maps2", "1v1", "Team", "Water"]);
+    expect(chips).toEqual([
+      "All4",
+      "My maps2",
+      "New maps2",
+      "1v1",
+      "Team",
+      "Water",
+    ]);
   });
 
   it("filters by start count and tag through the play type chips", () => {
@@ -245,7 +258,7 @@ describe("Maps page", () => {
     const chips = within(screen.getByRole("radiogroup", { name: "Show" }))
       .getAllByRole("radio")
       .map((c) => c.textContent);
-    expect(chips).toEqual(["My maps2", "New maps2"]);
+    expect(chips).toEqual(["All4", "My maps2", "New maps2"]);
   });
 
   it("names a mirror index that could not be read", () => {
