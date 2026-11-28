@@ -11428,6 +11428,8 @@ msgstr "Στοίχιση {axisName} στη μέση"
 msgid "Align {axisName} middle. A piece with no shape lines up by its origin."
 msgstr "Στοίχιση {axisName} στη μέση. Ένα τμήμα χωρίς σχήμα στοιχίζεται με βάση την αρχή αξόνων του."
 
+#: src/content/libraryGames.ts
+#: src/content/libraryMaps.ts
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/pages/components/PlayerMatchFigures.tsx
 #: src/content/pages/components/ReplayEventList.tsx
@@ -34212,6 +34214,10 @@ msgstr "Δεν καταγράφηκαν παιχνίδια"
 msgid "No games yet — try one of these"
 msgstr "Κανένα παιχνίδι ακόμη — δοκιμάστε ένα από αυτά"
 
+#: src/content/pages/GamesPage.tsx
+msgid "No games."
+msgstr ""
+
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 #, fuzzy
 msgid "No generated game and no rescan: the launch carries the edits itself."
@@ -34427,6 +34433,10 @@ msgstr "Δεν καταγράφηκαν χάρτες."
 #, fuzzy
 msgid "No maps yet — try one of these"
 msgstr "Κανένας χάρτης ακόμη — δοκιμάστε έναν από αυτούς"
+
+#: src/content/pages/MapsPage.tsx
+msgid "No maps."
+msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy

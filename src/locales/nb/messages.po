@@ -11428,6 +11428,8 @@ msgstr "Juster {axisName} midt"
 msgid "Align {axisName} middle. A piece with no shape lines up by its origin."
 msgstr "Juster {axisName} midt. En del uten form justeres etter origo."
 
+#: src/content/libraryGames.ts
+#: src/content/libraryMaps.ts
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/pages/components/PlayerMatchFigures.tsx
 #: src/content/pages/components/ReplayEventList.tsx
@@ -34212,6 +34214,10 @@ msgstr "Ingen spill registrert"
 msgid "No games yet — try one of these"
 msgstr "Ingen spill ennå – prøv et av disse"
 
+#: src/content/pages/GamesPage.tsx
+msgid "No games."
+msgstr ""
+
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 #, fuzzy
 msgid "No generated game and no rescan: the launch carries the edits itself."
@@ -34427,6 +34433,10 @@ msgstr "Ingen kart registrert."
 #, fuzzy
 msgid "No maps yet — try one of these"
 msgstr "Ingen kart ennå – prøv et av disse"
+
+#: src/content/pages/MapsPage.tsx
+msgid "No maps."
+msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy

@@ -55,6 +55,7 @@ describe("the Games grid", () => {
 
   it("counts each chip", () => {
     expect(chipCounts(grid)).toEqual({
+      all: 7,
       installed: 3,
       updates: 1,
       featured: 2,
@@ -71,6 +72,7 @@ describe("the Games grid", () => {
     expect(ids("updates")).toEqual(["sf"]);
     expect(ids("featured")).toEqual(["sf", "zk"]);
     expect(ids("installed")).toEqual(["ba", "my test game", "sf"]);
+    expect(ids("all")).toEqual(grid.map((g) => g.id).sort());
   });
 
   it("searches the title and the installed archive names", () => {

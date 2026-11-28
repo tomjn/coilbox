@@ -11427,6 +11427,8 @@ msgstr "{axisName} を中央で揃える"
 msgid "Align {axisName} middle. A piece with no shape lines up by its origin."
 msgstr "{axisName} を中央で揃えます。形状のないピースは原点で揃います。"
 
+#: src/content/libraryGames.ts
+#: src/content/libraryMaps.ts
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/pages/components/PlayerMatchFigures.tsx
 #: src/content/pages/components/ReplayEventList.tsx
@@ -34200,6 +34202,10 @@ msgstr "記録された試合はありません"
 msgid "No games yet — try one of these"
 msgstr "まだゲームはありません — これらを試してください"
 
+#: src/content/pages/GamesPage.tsx
+msgid "No games."
+msgstr ""
+
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 #, fuzzy
 msgid "No generated game and no rescan: the launch carries the edits itself."
@@ -34415,6 +34421,10 @@ msgstr "マップの記録はありません。"
 #, fuzzy
 msgid "No maps yet — try one of these"
 msgstr "まだマップはありません — これらを試してください"
+
+#: src/content/pages/MapsPage.tsx
+msgid "No maps."
+msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy

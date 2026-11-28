@@ -56,6 +56,7 @@ import {
 
 /** What a chip with nothing in it says. */
 const EMPTY_CHIP = {
+  all: msg`No games.`,
   installed: msg`No games installed.`,
   updates: msg`Every installed game is up to date.`,
   featured: msg`The hub features no games.`,

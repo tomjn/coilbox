@@ -9325,6 +9325,8 @@ msgstr "Align {axisName} middle"
 msgid "Align {axisName} middle. A piece with no shape lines up by its origin."
 msgstr "Align {axisName} middle. A piece with no shape lines up by its origin."
 
+#: src/content/libraryGames.ts
+#: src/content/libraryMaps.ts
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/pages/components/PlayerMatchFigures.tsx
 #: src/content/pages/components/ReplayEventList.tsx
@@ -27946,6 +27948,10 @@ msgstr "No games recorded"
 msgid "No games yet — try one of these"
 msgstr "No games yet — try one of these"
 
+#: src/content/pages/GamesPage.tsx
+msgid "No games."
+msgstr "No games."
+
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 msgid "No generated game and no rescan: the launch carries the edits itself."
 msgstr "No generated game and no rescan: the launch carries the edits itself."
@@ -28121,6 +28127,10 @@ msgstr "No maps recorded."
 #: src/content/pages/MapsPage.tsx
 msgid "No maps yet — try one of these"
 msgstr "No maps yet — try one of these"
+
+#: src/content/pages/MapsPage.tsx
+msgid "No maps."
+msgstr "No maps."
 
 #: src/content/pages/components/MapAggregate.tsx
 msgid "No match on this map in the picture has been analysed, so there are no deaths to draw."
