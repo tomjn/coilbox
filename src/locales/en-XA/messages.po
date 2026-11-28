@@ -31725,7 +31725,7 @@ msgctxt "view"
 msgid "Perspective"
 msgstr ""
 
-#: src/i18n/frameStrings.ts
+#: src/theme/colours.ts
 msgid "Phosphor"
 msgstr ""
 

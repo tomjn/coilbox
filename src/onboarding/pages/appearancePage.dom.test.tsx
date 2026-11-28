@@ -167,8 +167,11 @@ it("names every swatch after its value's label", () => {
     Array.from(row.querySelectorAll('[role="radio"]')).map((el) =>
       el.getAttribute("aria-label"),
     );
-  expect(names(base)).toHaveLength(BASE_OPTIONS.length);
-  expect(names(accent)).toHaveLength(ACCENT_OPTIONS.length);
+  // picoframe's own colours, then Coilbox's phosphor in each row.
+  expect(names(base)).toHaveLength(BASE_OPTIONS.length + 1);
+  expect(names(accent)).toHaveLength(ACCENT_OPTIONS.length + 1);
+  expect(names(base).at(-1)).toBe("Phosphor");
+  expect(names(accent).at(-1)).toBe("Phosphor");
   for (const name of [...names(base), ...names(accent)]) {
     expect(name).toBeTruthy();
   }

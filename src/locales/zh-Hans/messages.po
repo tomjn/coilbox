@@ -38853,7 +38853,7 @@ msgctxt "view"
 msgid "Perspective"
 msgstr "透视"
 
-#: src/i18n/frameStrings.ts
+#: src/theme/colours.ts
 msgid "Phosphor"
 msgstr "荧光"
 

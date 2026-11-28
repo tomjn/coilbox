@@ -1,0 +1,60 @@
+/* Coilbox's own bases and accents, added to picoframe's picker by `colours.ts`.
+   Imported after picoframe's theme.css. See the note above its accent blocks for
+   how a host colour is written.
+
+   Phosphor is a green screen terminal. In light mode it is a vivid green tint like
+   picoframe's emerald. In dark mode it also turns text and borders green. A picked
+   accent keeps the tokens it sets, so the base's own button and focus colours only
+   apply under the default accent. */
+[data-base="phosphor"] {
+  --base-hue: 125;
+  --base-sat: 6;
+  --base-sat-text: 2;
+}
+.dark[data-base="phosphor"] {
+  --background: 120 22% 8%;
+  --foreground: 140 100% 82%;
+  --card: 120 22% 10%;
+  --card-foreground: 140 100% 82%;
+  --popover: 120 22% 10%;
+  --popover-foreground: 140 100% 82%;
+  --secondary: 120 20% 15%;
+  --secondary-foreground: 140 100% 82%;
+  --muted: 120 20% 15%;
+  --muted-foreground: 130 60% 66%;
+  --border: 121 28% 48%;
+  --input: 121 28% 55%;
+  --sidebar: 120 22% 7%;
+  --sidebar-foreground: 135 90% 76%;
+  --sidebar-border: 121 24% 22%;
+}
+.dark[data-base="phosphor"]:not([data-accent]) {
+  --primary: 140 100% 82%;
+  --primary-foreground: 120 25% 8%;
+  --ring: 135 75% 62%;
+  --accent: 120 25% 18%;
+  --accent-foreground: 140 100% 82%;
+  --sidebar-accent: 120 25% 16%;
+  --sidebar-accent-foreground: 140 100% 82%;
+}
+
+/* The phosphor accent: a pale mint fill with near-black text in dark mode. Light
+   mode needs a darker green so white text clears AA. */
+[data-accent="phosphor"]:not(.dark) {
+  --primary: 130 70% 28%;
+  --primary-foreground: 120 40% 97%;
+  --ring: 130 70% 28%;
+  --accent: 125 60% 90%;
+  --accent-foreground: 130 70% 22%;
+  --sidebar-accent: 125 60% 90%;
+  --sidebar-accent-foreground: 130 70% 22%;
+}
+.dark[data-accent="phosphor"] {
+  --primary: 150 100% 85%;
+  --primary-foreground: 120 25% 8%;
+  --ring: 135 80% 65%;
+  --accent: 120 28% 18%;
+  --accent-foreground: 140 100% 82%;
+  --sidebar-accent: 120 28% 18%;
+  --sidebar-accent-foreground: 140 100% 82%;
+}

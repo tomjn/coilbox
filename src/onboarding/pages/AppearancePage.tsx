@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useFrameStrings } from "@/i18n/frameStrings";
 import { getProfile } from "@/profile/profile";
+import { useCoilboxColours } from "@/theme/colours";
 import type { WizardPageProps } from "./registry";
 import { ACCENT_OPTIONS, BASE_OPTIONS } from "./themeOptions";
 
@@ -21,7 +22,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function Swatches<V extends string>({
+function Swatches({
   label,
   options,
   names,
@@ -29,10 +30,10 @@ function Swatches<V extends string>({
   onChange,
 }: {
   label: string;
-  options: readonly { value: V; swatch: string }[];
-  names: Partial<Record<V, string>> | undefined;
-  value: V;
-  onChange: (value: V) => void;
+  options: readonly { value: string; swatch: string; name?: string }[];
+  names: Partial<Record<string, string>> | undefined;
+  value: string;
+  onChange: (value: string) => void;
 }) {
   return (
     <Row label={label}>
@@ -46,7 +47,7 @@ function Swatches<V extends string>({
         className="flex flex-wrap gap-2"
       >
         {options.map((option) => {
-          const name = names?.[option.value] ?? option.value;
+          const name = option.name ?? names?.[option.value] ?? option.value;
           return (
             <RadioGroupItem
               key={option.value}
@@ -96,6 +97,7 @@ function Preview() {
 export default function AppearancePage(_: WizardPageProps) {
   const { t } = useLingui();
   const strings = useFrameStrings();
+  const coilboxColours = useCoilboxColours();
   const { mode, setMode, base, setBase, accent, setAccent } = useTheme();
   const profile = getProfile();
   const modeLocked = !!profile.mode;
@@ -148,14 +150,14 @@ export default function AppearancePage(_: WizardPageProps) {
         <>
           <Swatches
             label={baseLabel}
-            options={BASE_OPTIONS}
+            options={[...BASE_OPTIONS, ...coilboxColours.bases]}
             names={strings.baseNames}
             value={base}
             onChange={setBase}
           />
           <Swatches
             label={accentLabel}
-            options={ACCENT_OPTIONS}
+            options={[...ACCENT_OPTIONS, ...coilboxColours.accents]}
             names={strings.accentNames}
             value={accent}
             onChange={setAccent}

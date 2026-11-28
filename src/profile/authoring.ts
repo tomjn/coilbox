@@ -49,7 +49,7 @@ export interface ScaffoldInputs {
   /** The colour scheme currently in effect. */
   mode: ThemeMode;
   /** The accent currently in effect. */
-  accent: Accent;
+  accent: Accent | (string & {});
   /** Which feature toggles are on. */
   features: Record<Feature, boolean>;
   /** Whether the window is set to open fullscreen. */

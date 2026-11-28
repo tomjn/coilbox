@@ -578,7 +578,7 @@ describe("the accent inks clear AA on the band too", () => {
  * The icons now take `--hud-primary`, which `.hud-card` in `src/index.css` sets to
  * the accent with its lightness raised until it clears 3:1 and no further. This
  * block reads those rules back out of the stylesheet and measures them against the
- * accents in picoframe's own `theme.css`, so a new or retuned accent with no rule
+ * accents in picoframe's own `theme.css` and Coilbox's `theme/colours.css`, so a new or retuned accent with no rule
  * fails here. An accent with no rule is measured as `--primary` itself, which is
  * what it ships as.
  *
@@ -591,9 +591,9 @@ describe("the accent as an icon on the HUD card clears 3:1 over anything the can
 
   const read = (path: string) =>
     readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
-  const themeCss = read(
-    "../../../../node_modules/@picoframe/frame/src/theme.css",
-  );
+  const themeCss =
+    read("../../../../node_modules/@picoframe/frame/src/theme.css") +
+    read("../../../theme/colours.css");
   const indexCss = read("../../../index.css");
 
   /** `H S% L%` with an optional `var(--pf-accent-hue)` for the hue. */
@@ -675,7 +675,7 @@ describe("the accent as an icon on the HUD card clears 3:1 over anything the can
 
   const primaries = shippedPrimaries();
 
-  it("finds the accents picoframe ships", () => {
+  it("finds the accents picoframe and Coilbox ship", () => {
     // A parser that matched nothing would pass every loop below.
     expect(Object.keys(primaries).sort()).toEqual(
       [

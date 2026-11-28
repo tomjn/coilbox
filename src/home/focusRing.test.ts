@@ -22,7 +22,8 @@ import { CARD_FOCUS_CLASS } from "./cardShell";
  * could not carry the indicator.
  *
  * The sweep below is what makes it a measurement.
- * Accents are read out of `@picoframe/frame/src/theme.css` rather than transcribed,
+ * Accents are read out of `@picoframe/frame/src/theme.css` and Coilbox's own
+ * `theme/colours.css` rather than transcribed,
  * so an accent added upstream joins the sweep on the next `bun install` instead of
  * quietly sitting outside it.
  *
@@ -35,15 +36,20 @@ import { CARD_FOCUS_CLASS } from "./cardShell";
  */
 
 const SRC = fileURLToPath(new URL("..", import.meta.url));
-const THEME = readFileSync(
-  fileURLToPath(
-    new URL(
-      "../../node_modules/@picoframe/frame/src/theme.css",
-      import.meta.url,
+const THEME =
+  readFileSync(
+    fileURLToPath(
+      new URL(
+        "../../node_modules/@picoframe/frame/src/theme.css",
+        import.meta.url,
+      ),
     ),
-  ),
-  "utf8",
-);
+    "utf8",
+  ) +
+  readFileSync(
+    fileURLToPath(new URL("../theme/colours.css", import.meta.url)),
+    "utf8",
+  );
 
 /** One accent's `--ring`, named, or `null` for the base-derived neutral. */
 type Accent = [string, Rgb | null];
